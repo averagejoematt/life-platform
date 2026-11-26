@@ -515,22 +515,21 @@ def call_journal_coach(data: dict[str, Any], profile: dict[str, Any], api_key: s
     pctx = build_experiment_phase_context(profile, data.get("date"))
     phase_block = format_experiment_phase_context(pctx)
 
-    # Phase 2A: Journal enrichment context
+    # Phase 2A: Journal enrichment context.
+    # #6286 (owner ruling 2026-11-26): the model-inferred defense / avoidance / cognitive
+    # labels never reach this prompt — no "DETECTED", no "challenge one", no "name what's
+    # being avoided". They are unreviewed model readings (common.inferred_fields).
     j_signals = data.get("journal_signals") or {}
-    _defense_ctx = ""
-    if j_signals.get("defense_patterns"):
-        _defense_ctx = f"\nDEFENSE PATTERNS DETECTED: {', '.join(j_signals['defense_patterns'])}. Challenge one gently."
+    _signal_ctx = ""
     if j_signals.get("growth_signals"):
-        _defense_ctx += f"\nGROWTH SIGNALS: {', '.join(j_signals['growth_signals'])}. Acknowledge these."
-    if j_signals.get("avoidance_flags"):
-        _defense_ctx += f"\nAVOIDANCE FLAGS: {', '.join(j_signals['avoidance_flags'])}. Name what's being avoided."
+        _signal_ctx += f"\nGROWTH SIGNALS: {', '.join(j_signals['growth_signals'])}. Acknowledge these."
     if j_signals.get("stress_sources"):
-        _defense_ctx += f"\nSTRESS SOURCES: {', '.join(j_signals['stress_sources'])}."
+        _signal_ctx += f"\nSTRESS SOURCES: {', '.join(j_signals['stress_sources'])}."
 
     prompt = f"""You are a wise, warm-but-direct inner coach reading Matthew's journal from yesterday.
 He's 36, {pctx['stage_label']} of transformation ({weight_ctx}), battling: {obstacles_str}.
 His coaching tone: Jocko's discipline meets Attia's precision meets Brene Brown's vulnerability.
-{_defense_ctx}
+{_signal_ctx}
 
 {phase_block}
 
@@ -543,7 +542,7 @@ Part 2: One specific tactical thing he can try JUST TODAY. Be concrete (e.g. "pr
 
 TONE RULES:
 - Match the emotional truth of what he actually wrote — don't force motivation onto a flat day or add caveats to a genuinely good day.
-- If the journal shows avoidance, deflection, or a recurring unfinished intention, name it directly and without softening. "You've written about X three times this week without acting on it" is more useful than "consider taking action."
+- If HE wrote about the same unfinished intention more than once, you may reflect his own words back plainly ("You've written about X three times this week") — quote what he wrote, never diagnose why. Do not label a psychological mechanism in him (defense, avoidance, distortion) or tell him one was detected.
 - If the journal shows genuine progress or insight, celebrate it without qualification. Not every note needs a challenge.
 - 'Profound' is not a goal — honest is.
 

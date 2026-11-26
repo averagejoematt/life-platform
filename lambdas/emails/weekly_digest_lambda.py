@@ -705,7 +705,7 @@ Sleep architecture (REM%, deep%), efficiency, sleep debt, upstream causes. What'
 Long-term trajectory. What does the 4-week trend say? What leading indicator is most encouraging or concerning? What data gaps matter most?
 
 🧠 COACH MAYA RODRIGUEZ — BEHAVIOURAL PERFORMANCE
-The gap between knowing and doing. Where did Matthew underperform vs his own standards? Use journal data (mood, themes, avoidance flags, cognitive patterns) + habit data + day grades to connect subjective experience with objective performance. Be direct and human.
+The gap between knowing and doing. Where did Matthew underperform vs his own standards? Use journal data (mood/energy/stress, themes, what he wrote) + habit data + day grades to connect subjective experience with objective performance. Be direct and human.
 
 🎯 THE CHAIR — VERDICT & PRIORITY
 4–6 sentences. Clear verdict. Reference day grade average and trend. CROSS-DOMAIN SYNTHESIS: Connect the advisors' observations — if Reyes says training load is high, Webb says nutrition is low, and Park says sleep is degraded, name the cascade and the single intervention that breaks it. Don't just summarize each advisor — identify the interaction. Name ONE priority for next week with specific data justification. One sentence of genuine encouragement grounded in data.
@@ -1520,8 +1520,6 @@ def build_html(data, commentary, profile):
                 for t, c in jt["top_themes"][:5]
             )
             jn_rows += row("Themes", chips)
-        if jt.get("avoidance_flags"):
-            jn_rows += row("⚠ Avoidance", f'<span style="color:#dc2626;">{", ".join(jt["avoidance_flags"][:3])}</span>')
         if jt.get("notable_quotes"):
             for nq in jt["notable_quotes"][:2]:
                 jn_rows += row(f'📝 {nq["date"]}', f'<span style="font-style:italic;color:#4338ca;">"{nq["quote"]}"</span>')

@@ -47,19 +47,28 @@ def test_mind_data_signal_lands_from_journal_entries():
     data = {"journal_entries": [ENRICHED_ENTRY, dict(ENRICHED_ENTRY, enriched_mood=Decimal("2"), enriched_themes=["stress"])]}
     mind = _build_mind_data(data)
     assert mind["journal_entry_count"] == 2
-    assert mind["enriched_mood"] == 3.0  # mean of 4 and 2
-    assert mind["enriched_energy"] == 3.0
-    assert mind["enriched_stress"] == 2.0
+    assert mind["mood_avg"] == 3.0  # mean of 4 and 2
+    assert mind["energy_avg"] == 3.0
+    assert mind["stress_avg"] == 2.0
+    assert mind["rating_sources"]["mood"] == {"model_inferred": 2}
     assert mind["enriched_sentiment"] == "positive"
     assert "discipline" in mind["enriched_themes"] and "stress" in mind["enriched_themes"]
-    assert mind["enriched_avoidance_flags"] == ["skipped hard conversation"]
+    # #6286: the model-inferred avoidance label is withheld from the mind coach.
+    assert "enriched_avoidance_flags" not in mind and "skipped hard conversation" not in repr(mind)
     assert mind["enriched_growth_signals"] == ["asked for feedback"]
+
+
+def test_mind_data_prefers_his_own_rating():
+    """#6286: his own 1-5 rating outranks the model's reading of the same entry."""
+    mind = _build_mind_data({"journal_entries": [dict(ENRICHED_ENTRY, morning_mood=Decimal("1"))]})
+    assert mind["mood_avg"] == 1.0
+    assert mind["rating_sources"]["mood"] == {"self_report": 1}
 
 
 def test_mind_data_empty_journal_is_honest_absence():
     mind = _build_mind_data({"journal_entries": []})
     assert mind["journal_entry_count"] == 0
-    assert mind["enriched_mood"] is None
+    assert mind["mood_avg"] is None
     assert mind["enriched_themes"] == []
 
 
@@ -67,7 +76,7 @@ def test_mind_data_tolerates_unenriched_entries():
     # Raw entries with no enriched_* fields (the pre-backfill state) must not crash.
     mind = _build_mind_data({"journal_entries": [{"sk": "DATE#2026-07-01#journal#morning", "raw_text": "short"}]})
     assert mind["journal_entry_count"] == 1
-    assert mind["enriched_mood"] is None
+    assert mind["mood_avg"] is None
 
 
 # ── #503 J-3: trajectory tool reads the written field names ───────────────

@@ -4,7 +4,7 @@ challenge_generator_lambda.py — AI-Powered Challenge Generation Pipeline
 Runs weekly (Sunday 3 PM PT, after hypothesis engine + weekly correlations).
 Generates 0-5 challenge candidates from 5 sources:
 
-  1. journal_mining   — Scans enriched journal for recurring avoidance flags / themes
+  1. journal_mining   — Scans enriched journal for recurring themes / behaviours / his own causal statements
   2. data_signal      — Reads character sheet for weak pillars, habit scores for broken streaks
   3. hypothesis_graduate — Confirmed hypotheses that should become behavioural challenges
   4. science_scan     — AI suggests evidence-based challenges from current research context
@@ -36,6 +36,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 from common import digest_utils  # shared query_range implementations (#970)
+from common.inferred_fields import resolve_rating  # #6286: self-report-first mood/energy/stress
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from common.pacific_time import pacific_now, pacific_today  # #2811: THE Pacific day helper — DATE# keys are Pacific days
 from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 (#2109/#2221)
@@ -160,7 +161,7 @@ def gather_context():
 
     context = {}
 
-    # 1. Journal entries (enriched fields only — themes, avoidance, emotions)
+    # 1. Journal entries (enriched fields — themes, behaviours, emotions; his own words)
     journal_entries = query_range("notion", start_date, end_date)
     if journal_entries:
         journal_summary = []
@@ -169,17 +170,14 @@ def gather_context():
                 "date": entry.get("sk", "").replace("DATE#", "").split("#")[0],
                 "template": entry.get("template", ""),
             }
-            # Enriched fields — the gold for challenge mining
+            # Enriched fields — the gold for challenge mining. #6286: the model-inferred
+            # avoidance / defense / cognitive-distortion labels (common.inferred_fields) are
+            # NOT passed — a challenge built on an unreviewed label acts on it as fact. His
+            # own words (the raw-text fields below, behaviours, causal hints) carry the signal.
             for field in [
                 "enriched_themes",
-                "enriched_avoidance_flags",
                 "enriched_growth_signals",
                 "enriched_emotions",
-                "enriched_cognitive_patterns",
-                "enriched_stress",
-                "enriched_mood",
-                "enriched_energy",
-                "enriched_primary_defense",
                 # #505 v2: behaviors + author-asserted causal hints replace the
                 # retired defense_context as the challenge-mining gold.
                 "enriched_behaviors",
@@ -188,6 +186,13 @@ def gather_context():
                 val = entry.get(field)
                 if val:
                     j[field] = val
+            # #6286: mood / energy / stress — his own 1-5 rating first; the model's score only
+            # when he gave none, and then marked as such.
+            for metric in ("mood", "energy", "stress"):
+                val, src = resolve_rating(entry, metric)
+                if val is not None:
+                    j[metric] = val
+                    j[f"{metric}_source"] = src
             # Raw text snippets for context (truncated)
             for field in ["win_of_the_day", "what_drained_me", "todays_intention", "biggest_challenge", "what_would_i_change"]:
                 val = entry.get(field, "")
@@ -352,9 +357,12 @@ CHALLENGE PHILOSOPHY:
 - Every challenge must have a clear daily action and success criteria
 
 SOURCES YOU CAN DRAW FROM:
-1. JOURNAL MINING: Look for recurring avoidance flags, themes, defense mechanisms.
+1. JOURNAL MINING: Look for recurring themes, behaviours, and what he wrote in his own words
+   (causal hints, what drained him, what he would change).
    If "late-night snacking" appears 4+ times → create a "No eating after 8pm" challenge.
    If "skipped workout" appears 3+ times → create a daily movement challenge.
+   Never base a challenge on a psychological label (a defense mechanism, "avoidance", a
+   cognitive distortion) and never describe one as detected in him — use observable behaviour.
 
 2. DATA SIGNALS: Look at character sheet pillar scores.
    If a pillar is below level 30 or in "Foundation" tier → challenge for that domain.
@@ -385,7 +393,7 @@ Respond ONLY with valid JSON:
       "name": "Short punchy name",
       "description": "Why this challenge exists — the motivation from data",
       "source": "journal_mining|data_signal|hypothesis_graduate|science_scan",
-      "source_detail": "Specific data trigger (e.g. 'avoidance_flag: late_night_snacking ×6 in 14d')",
+      "source_detail": "Specific data trigger (e.g. 'behavior: late_night_snacking ×6 in 14d')",
       "domain": "movement",
       "difficulty": "moderate",
       "duration_days": 7,

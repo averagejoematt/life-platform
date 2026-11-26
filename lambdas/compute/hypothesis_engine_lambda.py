@@ -74,6 +74,7 @@ from common import (
     stats_core,  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 )
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, PLAN_DAILY_PROTEIN_MIN_G  # ADR-058
+from common.inferred_fields import resolved_value  # #6286: self-report-first mood/energy/stress
 from common.input_manifest import COMPUTE_INPUTS  # #3049: the compute-input census
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from common.numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
@@ -450,9 +451,10 @@ def build_data_narrative(data, registry=None):
         # Notion journal
         nj = next((i for i in data.get("notion", []) if i.get("date") == date), {})
         if nj:
-            row["mood"] = safe_float(nj, "enriched_mood")
-            row["energy"] = safe_float(nj, "enriched_energy")
-            row["journal_stress"] = safe_float(nj, "enriched_stress")
+            # #6286: his own 1-5 rating first; the enrichment model's score only when he gave none.
+            row["mood"] = resolved_value(nj, "mood")
+            row["energy"] = resolved_value(nj, "energy")
+            row["journal_stress"] = resolved_value(nj, "stress")
             row["social"] = nj.get("enriched_social_quality")
 
         # Eight Sleep — onset only; bed temperature is deliberately NOT read (RETIRED, ADR-118/#489, #2221).
