@@ -157,12 +157,9 @@ def refresh_journey(journey: dict, weight, weight_as_of) -> dict:
 
 
 def public_tier0(table):
-    """#6224: the public tier-0 figures (``web.site_api_habits.public_tier0_summary``) for the latest scored day, or
-    None — no scored day, or the restraint set unreadable — in which case the file carries no tier-0 figure."""
-    hs = _get_latest(table, "habit_scores", days_back=3)
-    as_of = str((hs or {}).get("date") or str((hs or {}).get("sk", "")).replace("DATE#", ""))[:10]
-    if not as_of:
-        return None
+    """#6224: the public tier-0 figures (``web.site_api_habits.public_tier0_summary``) for the reader's yesterday (the
+    day the morning brief scores), or None when they cannot be counted — the file then carries no tier-0 figure."""
+    as_of = (datetime.now(PT).date() - timedelta(days=1)).isoformat()
     return site_api_habits.public_tier0_or_none(table, as_of, EXPERIMENT_START_DATE)
 
 

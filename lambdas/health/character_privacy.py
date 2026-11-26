@@ -148,7 +148,7 @@ PUBLIC_METHOD_HISTORY = (
         "from": PUBLIC_METHOD_EFFECTIVE_FROM,
         "defined_on": PUBLIC_METHOD_DEFINED_ON,
         "note": "Public-eligible inputs only. Restraint-habit streaks are private: they are held out of the Mind score and "
-        "its data coverage, and no effect that reads them is applied (owner ruling 2026-11-24). Dates before it was adopted "
+        "its data coverage, and no effect that reads them is applied (ruling of 2026-11-24). Dates before it was adopted "
         "were recomputed from the stored inputs; what the site showed on those dates at the time was computed under method 1.",
     },
 )
