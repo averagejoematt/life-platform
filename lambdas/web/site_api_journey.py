@@ -52,6 +52,9 @@ from web.site_api_common import (
 # measurement date, or a count of measurements with no dates behind it. Two callers
 # need the same suppression (the pre-start countdown and the Day-1 synthetic
 # baseline), so the set lives here once rather than being restated per branch.
+#: #6271: what ``health.weight_trend.latest_weight`` reads off an Apple Health day row (``_record_date`` /
+#: ``_record_weight_lbs``) — pinned against that function by tests/test_edition_origin_reads_6271.py.
+_AH_WEIGHT_PROJECTION = ("date", "weight_lbs", "weight_kg")
 _WEIGHT_ABSENT_FIELDS = (
     "current_weight_lbs",
     "lost_lbs",
@@ -127,7 +130,8 @@ def journey(*, _g) -> dict:
     try:
         # #4088: genesis DATE clamp — the same "this experiment" frame as the withings series above.
         _ah_start = weight_trend.experiment_rate_window(today, EXPERIMENT_START, lookback_days=7)[0]
-        _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today))
+        # #6271: only what latest_weight reads (the date and the two weight fields), not whole Apple Health days
+        _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today, projection=_AH_WEIGHT_PROJECTION))
         # #3478: against a SYNTHETIC anchor the `>` test is wrong twice over — the
         # anchor is the genesis date, so a real Day-1 weigh-in dated ON genesis
         # compares equal and loses to a constant. Any in-cycle reading supersedes it.
