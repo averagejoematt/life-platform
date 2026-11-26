@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "version": "1.6.0",
-    "description": "Character Sheet v1.6.0 (#1411 fitted-not-authored, ADR-105): every cross-pillar effect declares fit_status='authored-prior' \u2014 the config can only declare the prior; 'fitted' is earned from data by the quarterly effect_fitter re-fit (lagged pairs, block-bootstrap CI, BH-FDR) and merged at compute/serve time, never hand-written here. On v1.5.0's #965 source wiring.",
-    "last_updated": "2026-09-06",
+    "version": "1.7.0",
+    "description": "Character Sheet v1.7.0 (#6293, owner rulings 2026-11-26): journaling frequency (journal_consistency) and the model-counted values read (values_alignment) leave Mind, whose remaining component weights are renormalised by 1/0.8 (t0 0.30\u21920.375; t1, state of mind, stress, vice, reading 0.10\u21920.125); Relationships has no components and reads not instrumented until an owner-approved assessment exists. On v1.6.0 (#1411 fitted-not-authored, ADR-105): every cross-pillar effect declares fit_status='authored-prior' \u2014 the config can only declare the prior; 'fitted' is earned from data by the quarterly effect_fitter re-fit (lagged pairs, block-bootstrap CI, BH-FDR) and merged at compute/serve time, never hand-written here. On v1.5.0's #965 source wiring.",
+    "last_updated": "2026-11-26",
     "review_ref": "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md"
   },
   "baseline": {
@@ -136,37 +136,29 @@
       "owner": "Nathan Reeves",
       "components": {
         "t0_habit_compliance": {
-          "weight": 0.3,
+          "weight": 0.375,
           "behavioral": true
         },
         "t1_habit_compliance": {
-          "weight": 0.1,
-          "behavioral": true
-        },
-        "journal_consistency": {
-          "weight": 0.1,
+          "weight": 0.125,
           "behavioral": true
         },
         "state_of_mind_valence": {
-          "weight": 0.1
+          "weight": 0.125
         },
         "stress_management": {
-          "weight": 0.1,
+          "weight": 0.125,
           "owner_only_input": "evening_checkin",
           "in_pillar_score": false,
           "description": "Reported stress from the evening check-in, scored 0-100 (calmer is higher; #5129). The answers are private, so this score is kept out of the published Mind score and is never named as a driver."
         },
         "vice_control": {
-          "weight": 0.1
+          "weight": 0.125
         },
         "reading_practice": {
-          "weight": 0.1,
+          "weight": 0.125,
           "target_days_week": 4,
           "behavioral": true
-        },
-        "values_alignment": {
-          "weight": 0.1,
-          "description": "Distinct values-in-action the journal-enrichment pass evidenced today (SOURCE#flourishing, #1403). LLM-coded from journal text - provenance surfaced wherever rendered."
         }
       }
     },
@@ -175,18 +167,8 @@
       "ema_lambda": 0.93,
       "rolling_window_days": 14,
       "owner": "Social Connection",
-      "not_instrumented_note": "No relationship data source feeds this pillar yet \u2014 tracked as future work (#747).",
-      "components": {
-        "social_interaction_frequency": {
-          "weight": 0.45
-        },
-        "interaction_quality": {
-          "weight": 0.35
-        },
-        "social_mood_correlation": {
-          "weight": 0.2
-        }
-      }
+      "not_instrumented_note": "Not instrumented: no defensible, owner-approved relationship assessment exists yet (#6293). Model-coded readings of the journal are kept as interpretation and feed no score.",
+      "components": {}
     },
     "consistency": {
       "weight": 0.1,

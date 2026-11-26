@@ -48,7 +48,12 @@ logger = logging.getLogger(__name__)
 _config_cache: dict[str, Any] = {"data": None, "ts": 0}  # dict[str, Any]: heterogeneous, see #2638
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.8.0"  # #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
+ENGINE_VERSION = "1.10.0"  # #6293: Mind without journaling frequency or model-counted values; Relationships not instrumented
+# v1.10.0 — #6293 (owner rulings 2026-11-26): `journal_consistency` and `values_alignment` leave Mind (sum AND coverage);
+# Relationships scores nothing (no defensible, owner-approved assessment exists) and returns the not-instrumented state.
+# Journal and flourishing rows stay stored and readable as interpretation; they feed no score. Habit components are
+# unchanged. (1.9.0 is draft PR #6096's exact-boundary headline; the two compose — see docs/engines/CHARACTER.md.)
+# v1.8.0 — #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
 # #1412 (no version bump — no transition-formula change): component targets may arrive
 # personalized via personal_baselines.apply_character_targets; _weighted_pillar_score
 # surfaces each target's derivation provenance into component details. Target values
@@ -706,14 +711,9 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
     else:
         scores["t1_habit_compliance"] = None
 
-    # Journal consistency (14d)
-    j14d_count = data.get("journal_14d_count")
-    if j14d_count is not None:
-        scores["journal_consistency"] = _clamp(round((j14d_count / 14) * 100, 1))
-    elif data.get("journal_entries"):
-        scores["journal_consistency"] = 50.0
-    else:
-        scores["journal_consistency"] = None
+    # #6293 (owner ruling 2026-11-26): journaling FREQUENCY is not psychological progress — `journal_consistency`
+    # (entries in 14 days / 14) is no longer computed, so it is in neither the sum nor the coverage, and a day without
+    # a journal entry is unknown, never a zero.
 
     # State of Mind valence — HAE writes the daily aggregate as som_avg_valence
     # (-1..+1) on the apple_health record; legacy field names kept as a fallback.
@@ -762,128 +762,23 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
         reading_target = components.get("reading_practice", {}).get("target_days_week", 4)
         scores["reading_practice"] = _pct_of_target(len(reading_days), reading_target, 1.25) if reading_days is not None else None
 
-    # Values alignment (#1403): distinct values-in-action the enrichment pass
-    # found in the day's journal (SOURCE#flourishing row). Config-gated like
-    # reading_practice; a journaled day with zero values evidenced is a REAL low
-    # (20), a day with no flourishing row is uninstrumented (None) — ADR-104.
-    if "values_alignment" in components:
-        from health.flourishing import values_alignment_score
-
-        flourishing = data.get("flourishing") or {}
-        scores["values_alignment"] = values_alignment_score(
-            _safe_float(flourishing, "values_lived_count"),
-            bool(flourishing),
-        )
-
-    raw, details = _weighted_pillar_score(scores, components)
-    if "values_alignment" in components and (data.get("flourishing") or {}).get("enrichment_model"):
-        from health.flourishing import provenance_line
-
-        details["_flourishing_provenance"] = provenance_line((data.get("flourishing") or {}).get("enrichment_model"))
-    return raw, details
-
-
-# Ordered rungs of the categorical `enriched_social_quality` field emitted by
-# journal_enrichment_lambda. Rank spacing maps linearly onto the 0–10 scale.
-_SOCIAL_QUALITY_RANK = {"alone": 0, "surface": 1, "meaningful": 2, "deep": 3}
-
-
-def _social_quality_to_10(raw):
-    """Map the categorical `enriched_social_quality`
-    (`alone|surface|meaningful|deep`) onto the 0–10 scale
-    `compute_relationships_raw` already handles for `social_score`.
-
-    #910: `journal_enrichment_lambda` only ever writes the *categorical*
-    `enriched_social_quality`; the numeric `social_connection_score` /
-    `enriched_social_connection` fields the consumer reads are never produced by
-    any code, so `social_score` was always None and both
-    `social_interaction_frequency` (`social_score * 10`) and
-    `social_mood_correlation` (gated on `social_score is not None`) stayed dead.
-
-    The four ordered rungs are spread evenly across the 0–10 range by rank,
-    `rank / 3 * 10`: alone→0, surface→3.33, meaningful→6.67, deep→10. The
-    consumer's `social_interaction_frequency = social_score * 10` then lands them
-    at the intuitive quartiles 0 / 33 / 67 / 100 %. Unknown / `null` / missing →
-    None, preserving the falsy contract (a day with no recognizable social signal
-    stays uninstrumented). The numeric fields remain the primary path; this is
-    only the read-time fallback, mirroring #902's `enriched_mood`→`mood_avg`
-    bridge. Returns None on unrecognized / non-string input.
-    """
-    if not isinstance(raw, str):
-        return None
-    rank = _SOCIAL_QUALITY_RANK.get(raw.strip().lower())
-    if rank is None:
-        return None
-    return rank / 3 * 10
+    # #6293 (owner ruling 2026-11-26): `values_alignment` — a model's count of values it found in the journal's prose
+    # (SOURCE#flourishing) — is no longer scored. The flourishing row stays stored and readable as interpretation.
+    return _weighted_pillar_score(scores, components)
 
 
 def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
-    """Compute Relationships pillar raw_score (0-100)."""
-    pillar_cfg = config.get("pillars", {}).get("relationships", {})
-    components = pillar_cfg.get("components", {})
-    scores = {}
+    """Relationships — NOT INSTRUMENTED (#6293, owner ruling 2026-11-26: "Relationships should remain uninstrumented
+    until a defensible, owner-approved assessment exists").
 
-    journal = data.get("journal") or {}
-    entries = data.get("journal_entries") or []
-
-    # Social interaction frequency.
-    # #1403 primary path: the day's SOURCE#flourishing row — the aggregated,
-    # provenance-stamped projection of the same enrichment (already averaged
-    # across the day's entries at write time). First-class input, so the
-    # Relationships pillar is no longer wired only through a read-time fallback.
-    flourishing = data.get("flourishing") or {}
-    social_score = _safe_float(flourishing, "social_quality_score")
-    # Legacy numeric path: social_connection_score / enriched_social_connection
-    # (no producer writes them yet, first-found wins as before).
-    quality_scores = []
-    for entry in entries:
-        if social_score is not None:
-            break
-        sc = _safe_float(entry, "social_connection_score") or _safe_float(entry, "enriched_social_connection")
-        if sc is not None:
-            social_score = sc
-            break
-        mapped = _social_quality_to_10(entry.get("enriched_social_quality"))
-        if mapped is not None:
-            quality_scores.append(mapped)
-    if social_score is None and quality_scores:
-        social_score = sum(quality_scores) / len(quality_scores)
-    if social_score is not None:
-        scores["social_interaction_frequency"] = _clamp(round(social_score * 10, 1)) if social_score <= 10 else _clamp(social_score)
-    else:
-        scores["social_interaction_frequency"] = None
-
-    # Interaction quality
-    themes = journal.get("themes", [])
-    social_themes = [t for t in themes if any(k in t.lower() for k in ["social", "friend", "family", "partner", "relationship"])]
-    if social_themes:
-        scores["interaction_quality"] = min(100, len(social_themes) * 33)
-    elif themes:
-        scores["interaction_quality"] = 30.0
-    else:
-        scores["interaction_quality"] = None
-
-    # Buddy engagement: REMOVED (#962, B-3 precedent — same disease as the
-    # body-fat component). No producer ever wrote buddy_freshness_days, so the
-    # component could never score and structurally capped relationships
-    # coverage at 0.85. Gone from character_sheet.json too; re-add via a real
-    # producer + config entry if a buddy system ever ships.
-
-    # Social mood correlation
-    mood = _safe_float(journal, "mood_avg")
-    if mood is not None and social_score is not None:
-        scores["social_mood_correlation"] = _clamp(round((mood / 10) * 100, 1)) if mood <= 10 else _clamp(mood)
-    else:
-        scores["social_mood_correlation"] = None
-
-    raw, details = _weighted_pillar_score(scores, components)
-    # #1403 provenance: when the social input came from the flourishing row, say
-    # so — these are LLM-coded readings of prose, never sensor data (ADR-104).
-    if _safe_float(flourishing, "social_quality_score") is not None:
-        from health.flourishing import provenance_line
-
-        details["_flourishing_provenance"] = provenance_line(flourishing.get("enrichment_model"))
-    return raw, details
+    Every input it used to read was a model's reading of journal prose: the enrichment's categorical
+    `enriched_social_quality` (and the flourishing row's `social_quality_score` projected from it), a keyword match over
+    `enriched_themes`, and the model's mood rescaled (a "correlation" that never correlated anything). None is scored.
+    The pillar returns the engine's existing no-signal state whatever the day's data or the config's component list
+    holds — neutral 50 flagged `_not_instrumented`, XP held, levels frozen, out of the headline mean while it has never
+    earned a level (#747/#960/#964). A stale config that still lists the retired components cannot revive them: no
+    component is computed here, and `_weighted_pillar_score` only weighs computed components."""
+    return _weighted_pillar_score({}, {})
 
 
 #  Primary pillars whose raw scores feed the derived consistency inputs (#962).

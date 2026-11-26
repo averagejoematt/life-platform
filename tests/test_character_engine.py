@@ -33,7 +33,6 @@ from health.character_engine import (
     _compute_xp,
     _in_range_score,
     _roll_xp_buffer,
-    _social_quality_to_10,
     _weighted_pillar_score,
     character_level_up_drivers,
     compute_character_sheet,
@@ -47,7 +46,7 @@ from health.character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.8.0"  # #1411: fitted-not-authored — active effects carry fit badges
+    assert ENGINE_VERSION == "1.10.0"  # #6293: journaling frequency + model-counted values out of Mind; Relationships held
 
 
 # ── F-01: Confidence scoring ──
@@ -102,133 +101,64 @@ def test_weighted_pillar_score_with_data_not_flagged():
     assert details["_not_instrumented"] is False
 
 
-def test_compute_relationships_raw_no_data_is_not_instrumented():
-    """The reported #747 scenario: none of the relationships components have a
-    real data source today (no journal_entries, no buddy_freshness_days) -> the
-    pillar is flagged, not silently rendered as a real neutral score."""
-    config = {
-        "pillars": {
-            "relationships": {
-                "components": {
-                    "social_interaction_frequency": {"weight": 0.4},
-                    "interaction_quality": {"weight": 0.3},
-                    "buddy_engagement": {"weight": 0.15},
-                    "social_mood_correlation": {"weight": 0.15},
-                }
-            }
-        }
-    }
-    raw, details = compute_relationships_raw({}, config)
-    assert raw == 50.0
-    assert details["_not_instrumented"] is True
-
-
-def test_compute_relationships_raw_with_data_is_instrumented():
-    """Once a real relationship signal shows up (e.g. journal_entries carries a
-    social_connection_score), the pillar scores normally and is no longer flagged."""
-    config = {
-        "pillars": {
-            "relationships": {
-                "components": {
-                    "social_interaction_frequency": {"weight": 0.4},
-                    "interaction_quality": {"weight": 0.3},
-                    "buddy_engagement": {"weight": 0.15},
-                    "social_mood_correlation": {"weight": 0.15},
-                }
-            }
-        }
-    }
-    data = {"journal_entries": [{"social_connection_score": 7.0}]}
-    raw, details = compute_relationships_raw(data, config)
-    assert details["_not_instrumented"] is False
-    assert raw != 50.0 or details["_confidence"] > 0  # a real (if partial) reading, not the bare placeholder
-
-
-# ── #910: categorical enriched_social_quality → numeric social_score bridge ──
-
-
 def _relationships_config():
+    # The pre-#6293 component list: a stale config that still names them must not revive them.
     return {
         "pillars": {
             "relationships": {
                 "components": {
-                    "social_interaction_frequency": {"weight": 0.4},
-                    "interaction_quality": {"weight": 0.3},
-                    "buddy_engagement": {"weight": 0.15},
-                    "social_mood_correlation": {"weight": 0.15},
+                    "social_interaction_frequency": {"weight": 0.45},
+                    "interaction_quality": {"weight": 0.35},
+                    "social_mood_correlation": {"weight": 0.2},
                 }
             }
         }
     }
 
 
-def test_social_quality_scale_map_full_domain():
-    """The four ordered categories spread evenly across the 0–10 scale by rank:
-    alone→0, surface→3.33, meaningful→6.67, deep→10. The consumer's
-    `social_score * 10` then lands them at the intuitive quartiles 0/33/67/100 %."""
-    assert _social_quality_to_10("alone") == 0.0
-    assert round(_social_quality_to_10("surface"), 2) == 3.33
-    assert round(_social_quality_to_10("meaningful"), 2) == 6.67
-    assert _social_quality_to_10("deep") == 10.0
-    # Case / whitespace tolerant (the field is a free-form LLM string).
-    assert _social_quality_to_10(" Deep ") == 10.0
-    # Unknown / null / non-string -> None (falsy contract preserved).
-    assert _social_quality_to_10("null") is None
-    assert _social_quality_to_10("") is None
-    assert _social_quality_to_10(None) is None
-    assert _social_quality_to_10(5) is None
+def test_compute_relationships_raw_no_data_is_not_instrumented():
+    """#747 shape: no relationship reading -> the flagged placeholder, never presented as a real neutral."""
+    raw, details = compute_relationships_raw({}, _relationships_config())
+    assert raw == 50.0
+    assert details["_not_instrumented"] is True
 
 
-def test_social_quality_bridges_interaction_frequency():
-    """A day whose only social signal is the categorical enriched_social_quality
-    now scores social_interaction_frequency — previously dead, since the numeric
-    fields are never written. deep -> 10 -> *10 -> 100."""
-    data = {"journal_entries": [{"enriched_social_quality": "deep"}]}
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] == 100.0
-    assert details["_not_instrumented"] is False
-
-
-def test_social_quality_averaged_across_entries():
-    """Multiple entries' mapped qualities are averaged (mirrors #902's mood_avg).
-    deep(10) + surface(3.33) -> avg 6.67 -> *10 -> 66.7."""
+def test_relationships_is_not_instrumented_whatever_the_journal_says():
+    """#6293 (owner ruling 2026-11-26): every input the pillar read was a model's reading of journal prose — the
+    flourishing row's social quality, the categorical enriched_social_quality, enriched themes, the model's mood. None
+    is scored: the pillar is the not-instrumented state on a day that carries every one of them, under the old config."""
     data = {
-        "journal_entries": [
-            {"enriched_social_quality": "deep"},
-            {"enriched_social_quality": "surface"},
-        ]
+        "flourishing": {"social_quality_score": 10.0, "enrichment_model": "synthetic-model"},
+        "journal_entries": [{"social_connection_score": 7.0, "enriched_social_quality": "deep"}],
+        "journal": {"themes": ["friends", "family"], "mood_avg": 8.0},
     }
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] == 66.7
+    for cfg in (_relationships_config(), {"pillars": {"relationships": {"components": {}}}}, {}):
+        raw, details = compute_relationships_raw(data, cfg)
+        assert raw == 50.0
+        assert details["_not_instrumented"] is True
+        assert details["_raw_unblended"] is None
+        assert not {"social_interaction_frequency", "interaction_quality", "social_mood_correlation"} & set(details)
 
 
-def test_social_quality_enables_mood_correlation():
-    """social_mood_correlation is gated on `social_score is not None`; #902 fixed
-    `mood`, and the categorical bridge now supplies the remaining social_score.
-    meaningful -> 6.67 (non-None) unlocks the gate; mood_avg 8.0 -> (8/10)*100."""
+def test_relationships_holds_xp_and_level_and_stays_out_of_the_headline():
+    """The existing not-instrumented state end to end: neutral, flagged, XP held, level frozen, out of the mean."""
+    import json as _json
+
+    config = _json.load(open(os.path.join(os.path.dirname(__file__), "..", "config", "character_sheet.json")))
     data = {
-        "journal": {"mood_avg": 8.0},
-        "journal_entries": [{"enriched_social_quality": "meaningful"}],
+        "date": "2026-10-01",
+        "journal_entries": [{"enriched_social_quality": "deep"}],
+        "journal": {"themes": ["friends"], "mood_avg": 9.0},
+        "flourishing": {"social_quality_score": 10.0},
     }
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_mood_correlation"]["score"] == 80.0
-
-
-def test_numeric_social_score_takes_precedence_over_quality():
-    """The numeric field stays the primary path; the categorical is only a
-    fallback. A numeric 7 wins even when enriched_social_quality is also present."""
-    data = {"journal_entries": [{"social_connection_score": 7.0, "enriched_social_quality": "alone"}]}
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] == 70.0
-
-
-def test_unknown_social_quality_leaves_both_components_none():
-    """An unrecognized / null category leaves social_score None -> both social
-    components stay None (falsy contract preserved), even with mood present."""
-    data = {"journal": {"mood_avg": 8.0}, "journal_entries": [{"enriched_social_quality": "null"}]}
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] is None
-    assert details["social_mood_correlation"]["score"] is None
+    prev = {"character_level": 5, "pillar_relationships": {"level": 1, "xp_total": 0, "xp_debt": 0}}
+    rec = compute_character_sheet(data, prev, {}, config)
+    rel = rec["pillar_relationships"]
+    assert rel["not_instrumented"] is True and rel["raw_score"] == 50.0
+    assert rel["xp_delta"] == 0 and rel["xp_total"] == 0 and rel["xp_debt"] == 0
+    assert rel["level"] == 1 and rel["coverage_hold"] is True
+    assert "relationships" in rec["headline_excluded_pillars"]
+    assert rel["not_instrumented_note"] == config["pillars"]["relationships"]["not_instrumented_note"]
 
 
 def test_compute_character_sheet_propagates_not_instrumented_and_note():
@@ -920,10 +850,10 @@ def test_reported_scenario_mind_lags_and_movement_sinks():
 
     # Mind never journaled / logged habits: raw is stress-only ≈ 15, far below sleep
     assert mind_p["raw_score"] < 30 < sleep_p["raw_score"]
-    # Habit logging vanished entirely (record absent → behavioral zero, flagged);
-    # journaling shows as a scored 0/100 (the 14d count always exists) — both honest.
+    # Habit logging vanished entirely (record absent → behavioral zero, flagged, the owner-ruled two-state habit);
+    # #6293: journaling frequency is no longer scored at all — a config that still lists it does not revive it.
     assert mind_p["absent_behaviors"] == ["t0_habit_compliance"]
-    assert mind_p["components"]["journal_consistency"]["score"] == 0.0
+    assert "journal_consistency" not in mind_p["components"]
     # Movement collapsed after workouts stopped on day 13
     assert move_p["raw_score"] == 0.0
     # #747: the scenario never feeds a relationships signal (no journal_entries) —

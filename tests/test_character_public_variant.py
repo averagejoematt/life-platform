@@ -137,12 +137,14 @@ def histories():
 
 
 def test_method1_really_differs_between_the_two_histories(histories):
-    """The control: the private inputs reach method 1 (Mind, Relationships XP, the composite, consistency)."""
+    """The control: the private inputs reach method 1 (Mind and the state its EMA carries forward, the composite,
+    consistency). #6293: Relationships reads no input at all now, so it is no longer one of the carriers."""
     quiet, private, _q, _p = histories
     d = _days()[PRIVATE_DAYS.__iter__().__next__()]
     assert _canon(quiet) != _canon(private)
     assert any(quiet[d]["pillar_mind"]["raw_score"] != private[d]["pillar_mind"]["raw_score"] for d in quiet)
-    assert any(quiet[d]["character_xp"] != private[d]["character_xp"] for d in quiet)
+    assert any(quiet[d]["pillar_mind"]["level_score"] != private[d]["pillar_mind"]["level_score"] for d in quiet)
+    assert all(quiet[d]["pillar_relationships"] == private[d]["pillar_relationships"] for d in quiet)
     assert d in quiet
 
 

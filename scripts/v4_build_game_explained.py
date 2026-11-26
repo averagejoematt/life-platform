@@ -279,17 +279,22 @@ def _pillars_section(config: dict) -> str:
             if atrophies
             else "below the atrophy threshold; a quiet stretch here reads as a sensor gap, not detraining."
         )
+        # #6293: a pillar with no components (Relationships) is not instrumented — its note, never an empty table
+        body = (
+            _tbl(["component", "weight", "kind", "parameters"], rows, f"{name} components") + f'<p class="gx-note">{esc(share_note)}</p>'
+            if rows
+            else f'<p class="gx-note">{esc(p.get("not_instrumented_note") or "Not instrumented: no component is scored.")}</p>'
+        )
         cards.append(
             f'<article class="gx-pillar" id="pillar-{esc(name)}">'
             f'<div class="gx-pillar-head"><h3 class="gx-pillar-name">{esc(name.capitalize())}</h3>'
             f'<span class="gx-pillar-meta">{esc(pct(p.get("weight", 0)))} of the headline · smoothing λ {esc(num(p.get("ema_lambda", "")))} · owner {esc(p.get("owner", "—"))}</span></div>'
-            + _tbl(["component", "weight", "kind", "parameters"], rows, f"{name} components")
-            + f'<p class="gx-note">{esc(share_note)}</p>'
-            "</article>"
+            + body
+            + "</article>"
         )
     intro = (
         '<p class="rd-prose">Every night the engine scores seven pillars, each 0–100, from weighted components. '
-        "Each component is either a <strong>behavior</strong> (something that is done or not done — logging food, training, journaling) "
+        "Each component is either a <strong>behavior</strong> (something that is done or not done — logging food, training, completing a habit) "
         "or a <strong>sensor</strong> (something a device measures). The distinction is load-bearing: when a behavior has no data, "
         "the behavior didn't happen and it scores <strong>0 at full weight</strong>; when a sensor has no data, the engine has no "
         "evidence either way, so the component drops out of the weight sum instead (ADR-104). "
@@ -461,6 +466,7 @@ def _dark_section(config: dict) -> str:
         "stops — it can never coast on silence, and it can never punish a sensor outage as if it were a lapse.</p>"
         '<ul class="rd-tierlist">'
         "<li><strong>Absent behaviors score zero.</strong> An unlogged habit is a habit that didn't happen: behavior components score 0 at full weight. A quiet device just drops out of the weight sum — a wearable gap is not a failure.</li>"
+        "<li><strong>Missing qualitative information is unknown, not decline.</strong> How often the journal is written is not scored, and nothing a language model reads into the journal is scored: a day without an entry moves no score and triggers no decay.</li>"
         "<li><strong>Thin days blend toward neutral — for display only.</strong> As data coverage falls, the day's score is blended toward a neutral 50 (full confidence at 80% coverage). The blend smooths the EMA and the display; it is uncertainty, not performance, so the level gates always judge the unblended measured number.</li>"
         "<li><strong>A never-instrumented pillar is a placeholder, not a reading.</strong> With zero components reporting, the pillar shows a mathematical neutral 50 and is excluded from the headline until it earns its first level — after that it counts forever, and going dark later drags honestly instead of vanishing.</li>"
         f"<li><strong>Neglect atrophies.</strong> After {esc(num(grace))} consecutive dark days of manual-logging silence (with no planned pause — sick days and travel never decay), behavioral pillars start to atrophy: the smoothed score multiplies by {esc(num(rate))} per additional dark day, floored at what each day actually measured. Only pillars whose weight is at least {esc(pct(min_share))} behavioral qualify — currently <strong>{esc(', '.join(qualifying))}</strong> — because a dark stretch detrains behaviors, not blood panels.</li>"
