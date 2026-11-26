@@ -35,6 +35,8 @@ import re
 import sys
 from datetime import datetime, timedelta
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
@@ -48,6 +50,15 @@ from web import (  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def _today_pt():
@@ -152,10 +163,11 @@ def test_a_real_sheet_is_untouched(monkeypatch):
         monkeypatch.setattr(mod, "EXPERIMENT_START", _iso(_today_pt() - timedelta(days=30)), raising=False)
     monkeypatch.setattr(vitals, "table", _Table(), raising=False)
     b = _body(vitals.handle_character())
-    # relationships (index 5) reads only private sources: served held (owner rulings 2026-11-03/04)
-    assert [p["raw_score"] for p in b["pillars"]] == [40, 45, 50, 55, 60, 50, 70]
+    # relationships (index 5) reads only private sources: served held (owner rulings 2026-11-03/04); Mind (index 4) is
+    # not scored in public (#6224, owner rulings 2026-11-26): no score at all
+    assert [p["raw_score"] for p in b["pillars"]] == [40, 45, 50, 55, None, 50, 70]
     for p in b["pillars"]:
-        held = p["name"] == "relationships"
+        held = p["name"] in ("relationships", "mind")
         assert p["not_instrumented"] is held
         assert p["coverage_hold"] is held
 

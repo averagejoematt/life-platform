@@ -676,14 +676,17 @@ def build_data_packet(data):
         if sorted_dates:
             latest_cs = cs_data[sorted_dates[-1]]
             earliest_cs = cs_data[sorted_dates[0]] if len(sorted_dates) > 1 else latest_cs
-            lvl = latest_cs.get("character_level", 1)
-            tier = latest_cs.get("character_tier", "Foundation")
-            tier_emoji = latest_cs.get("character_tier_emoji", "\U0001f528")
-            xp = latest_cs.get("character_xp", 0)
-            prev_lvl = earliest_cs.get("character_level", 1)
-            delta = lvl - prev_lvl
-            delta_str = f" ({'+' if delta > 0 else ''}{delta} this week)" if delta != 0 else " (stable)"
-            packet.append(f"Overall: Level {lvl} {tier_emoji} {tier}{delta_str} | XP: {xp}")
+            if latest_cs.get("scores_pending"):  # #6224 containment: no overall level/XP while it is recalculated
+                packet.append("Overall: the character scores are being recalculated — do not state a level, tier or XP.")
+            else:
+                lvl = latest_cs.get("character_level", 1)
+                tier = latest_cs.get("character_tier", "Foundation")
+                tier_emoji = latest_cs.get("character_tier_emoji", "\U0001f528")
+                xp = latest_cs.get("character_xp", 0)
+                prev_lvl = earliest_cs.get("character_level", 1)
+                delta = lvl - prev_lvl
+                delta_str = f" ({'+' if delta > 0 else ''}{delta} this week)" if delta != 0 else " (stable)"
+                packet.append(f"Overall: Level {lvl} {tier_emoji} {tier}{delta_str} | XP: {xp}")
             packet.append("")
 
             # Pillar breakdown (latest day)
@@ -700,6 +703,15 @@ def build_data_packet(data):
             for pn in pillar_names:
                 pd = latest_cs.get(f"pillar_{pn}") or {}
                 ep = earliest_cs.get(f"pillar_{pn}") or {}
+                if character_privacy.is_not_scored(pd):  # #6224: Mind is not scored in public — never a default level
+                    packet.append(f"  {pillar_labels.get(pn, pn)}: not scored in public (its inputs are private)")
+                    continue
+                if pd.get("scores_pending") or pd.get("level_pending"):  # #6224 containment
+                    raw = pd.get("raw_score") if pd.get("level_pending") and not pd.get("not_instrumented") else None
+                    packet.append(
+                        f"  {pillar_labels.get(pn, pn)}: level being recalculated" + (f" (raw: {raw:.0f})" if raw is not None else "")
+                    )
+                    continue
                 p_lvl = pd.get("level", 1)
                 p_tier = pd.get("tier", "Foundation")
                 p_raw = pd.get("raw_score")

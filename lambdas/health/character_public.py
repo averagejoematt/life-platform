@@ -1,4 +1,4 @@
-"""character_public.py — the character sheet's PUBLIC method, ``character-public-v1`` (owner ruling 2026-11-05).
+"""character_public.py — the character sheet's PUBLIC method, ``character-public-v2`` (owner rulings 2026-11-05, 2026-11-26).
 
 THE RULING. "Public Mind, composite, XP, Day grades and overall levels must depend only on public-eligible
 inputs. Recompute affected historical public values using the corrected methodology. Preserve the original
@@ -9,8 +9,17 @@ its OWN state chain — the previous day's public variant, the public raw-score 
 streaks, buffers, effects, the mood and the headline level never carry a private input forward:
 
 * **Sleep, Movement, Nutrition, Metabolic** — every component reads a public source, so the public variant takes
-  the day's method-1 raw score and component details VERBATIM (``VERBATIM_PILLARS``) and only re-runs the chain.
-* **Mind** — scored from its public components only (``MIND_COMPONENT_SOURCES``): a component whose source the
+  the day's method-1 raw score and component details VERBATIM (``VERBATIM_PILLARS``) and only re-runs the chain — less
+  any raw-score modifier whose source is not public (#6224: the food-delivery multiplier on Nutrition, owner ruling
+  2026-11-26), restored from the values the engine recorded before applying it (``without_private_modifiers``).
+* **Mind — NOT SCORED (v2, #6224, owner rulings 2026-11-26: "Keep Mind unscored publicly"; "Do not replace private
+  inputs with inferred or renamed equivalents").** The engine runs with Mind in ``unscored_pillars``: no raw score,
+  level, tier, XP, driver or event, and no place in the consistency variance, the effects, the mood or the headline
+  mean. The variant stores ``character_privacy.not_scored_pillar("mind")`` — the reason, and no number. Under v1 (below,
+  kept for the backfill report's analysis) Mind was scored from its "public" components, but its habit shares still
+  counted restraint habits (the core-12 share and the tier-weighted share), so v1 published a Mind derived from private
+  inputs; recounting those shares over public habits would be the renamed equivalent the ruling forbids.
+* **Mind (v1, retired)** — scored from its public components only (``MIND_COMPONENT_SOURCES``): a component whose source the
   publication policy does not classify public (``common.activity_publication``; unknown fails closed) is held out of
   the sum AND the coverage — not scored 0, which would let a behavioral absence move the score. The journal's 14-day
   consistency, the journal-enrichment values read, How We Feel / State of Mind and the check-in's stress are out.
@@ -50,6 +59,12 @@ from health import character_engine, character_privacy
 PUBLIC_KEY = character_privacy.PUBLIC_KEY
 METHOD_VERSION = character_privacy.PUBLIC_METHOD_VERSION
 EFFECTIVE_FROM = character_privacy.PUBLIC_METHOD_EFFECTIVE_FROM
+# #6224: the pillars the public method does not score (``character_privacy.UNSCORED_PUBLIC_PILLARS``).
+UNSCORED_PILLARS = tuple(
+    p
+    for p in ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency")
+    if not character_privacy.pillar_scored_in_public(p)
+)
 
 PILLARS = ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency")
 # Pillars every component of which reads a public source: method-1 raw + details are taken verbatim.
@@ -88,6 +103,29 @@ def public_config(config: dict[str, Any]) -> dict[str, Any]:
     if isinstance(mind, dict):
         cfg["pillars"]["mind"]["components"] = {k: v for k, v in mind.items() if mind_component_is_public(k)}
         cfg["pillars"]["mind"]["not_instrumented_note"] = UNAVAILABLE_NOTE
+    return cfg
+
+
+def public_contract(config: dict[str, Any]) -> dict[str, Any]:
+    """#6224: the engine config as the PUBLIC "how the engine works" contract (``/api/character_config``) may describe
+    it: ``public_config`` (no restraint component, no restraint-conditioned effect) with every pillar the public method
+    does not score emptied of components, and no cross-pillar effect whose condition reads such a pillar (it is never
+    evaluated publicly) — and that pillar's key taken out of every effect's targets."""
+    cfg = public_config(config)
+    for name in UNSCORED_PILLARS:
+        pillar = (cfg.get("pillars") or {}).get(name)
+        if isinstance(pillar, dict):
+            cfg["pillars"][name] = dict(pillar, components={})
+    effects = []
+    for e in cfg.get("cross_pillar_effects") or []:
+        cond = str((e or {}).get("condition") or "").lower().split()
+        if any(name in cond for name in UNSCORED_PILLARS):
+            continue
+        if isinstance(e.get("targets"), dict):
+            e = dict(e, targets={k: v for k, v in e["targets"].items() if k not in UNSCORED_PILLARS})
+        effects.append(e)
+    if isinstance(cfg.get("cross_pillar_effects"), list):
+        cfg["cross_pillar_effects"] = effects
     return cfg
 
 
@@ -231,6 +269,24 @@ def _derivation_exact(rec: dict, gap: Optional[float], quiet: list, ec: Any) -> 
     return False, "the latest manual log may have been private or habits-only: the pause window is not provably the same"
 
 
+def without_private_modifiers(raw: Any, details: Any) -> tuple:
+    """#6224: a verbatim pillar's (raw, details) without any raw-score modifier whose source the publication policy does
+    not classify public (``activity_publication``; unclassified fails closed) — the food-delivery multiplier on Nutrition
+    (owner ruling 2026-11-26: the source's dates are private, and its multiplier must not reach the public variant). The
+    pre-modifier values are the ones the engine recorded before it applied the multiplier; a record that carries a
+    modifier without them cannot be restored exactly and raises (fail closed — never divided back out)."""
+    d = copy.deepcopy(details or {})
+    mod = d.get("_modifier")
+    if not isinstance(mod, dict) or activity_publication.source_is_public(mod.get("source")):
+        return raw, d
+    del d["_modifier"]
+    if d.get("_raw_unblended") is not None:
+        if "pre_modifier_raw_unblended" not in mod:
+            raise ValueError("a non-public modifier without its pre-modifier unblended raw: the public day cannot be restored")
+        d["_raw_unblended"] = mod["pre_modifier_raw_unblended"]
+    return mod.get("pre_modifier_raw", raw), d
+
+
 def public_view_for_chain(record: Any) -> Optional[dict[str, Any]]:
     """A stored record's public variant as the NEXT day's chain reads it (top-level date, unmasked pillars)."""
     return character_privacy.public_view(record)
@@ -264,15 +320,24 @@ def compute_public_variant(
     pre: dict[str, Any] = {}
     for p in VERBATIM_PILLARS:
         pd = m1.get(f"pillar_{p}") or {}
-        pre[p] = (pd.get("raw_score"), copy.deepcopy(pd.get("components") or {}))
-    pre["mind"] = public_mind((m1.get("pillar_mind") or {}).get("components"), habit_method, cfg)
+        pre[p] = without_private_modifiers(pd.get("raw_score"), pd.get("components") or {})
+    if "mind" not in UNSCORED_PILLARS:  # pragma: no cover — v1's arithmetic, kept for an owner ruling that reopens it
+        pre["mind"] = public_mind((m1.get("pillar_mind") or {}).get("components"), habit_method, cfg)
     pre["relationships"] = public_relationships(cfg)
     hist = [character_engine._from_decimal(h) for h in public_history or []]
+    # #6224: an unscored pillar's history (a v1 variant's Mind) never reaches the consistency streak or its ratio.
+    hist = [{k: v for k, v in h.items() if k not in {f"pillar_{u}" for u in UNSCORED_PILLARS}} for h in hist]
     prev_cs = (m1.get("pillar_consistency") or {}).get("components")
     # #6224: the restraint streaks never reach the public engine (no effect, no component reads them) while no restraint
     # figure is published — the parameter stays so the live compute and the backfill keep one call shape.
     restraint_in = vice_streaks if character_privacy.restraint_published() else None
-    data: dict[str, Any] = {"date": date, "precomputed_pillars": pre, "engagement_state": engagement, "vice_streaks": restraint_in}
+    data: dict[str, Any] = {
+        "date": date,
+        "precomputed_pillars": pre,
+        "engagement_state": engagement,
+        "vice_streaks": restraint_in,
+        "unscored_pillars": list(UNSCORED_PILLARS),
+    }
     data.update(consistency_inputs(prev_cs, hist, date))
     bonus = public_challenge_bonus(challenge_bonus)
     if bonus:
@@ -280,6 +345,18 @@ def compute_public_variant(
     prev = character_engine._from_decimal(prev_public) if prev_public else None
     rec = character_engine.compute_character_sheet(data, prev, public_histories(hist), cfg)
     transitions = rec.pop("progression_transitions", None)
+    for name in UNSCORED_PILLARS:  # #6224: the reason, and no number
+        rec[f"pillar_{name}"] = character_privacy.not_scored_pillar(name)
+    rec["unscored_pillars"] = list(UNSCORED_PILLARS)
+    rec["headline_excluded_pillars"] = [p for p in rec.get("headline_excluded_pillars") or [] if p not in UNSCORED_PILLARS] + list(
+        UNSCORED_PILLARS
+    )
+    if prev and prev.get("public_method_version") not in (None, METHOD_VERSION):
+        # A level computed under an earlier method is not the level this one would have reached: a move from it is the
+        # method changing, never an event (owner ruling 2026-11-06: a recalculation is not an achievement).
+        rec["level_events"] = [
+            e for e in rec.get("level_events") or [] if e.get("type") not in ("character_level_up", "character_level_down")
+        ]
     rec.update(
         {
             "public_method_version": METHOD_VERSION,

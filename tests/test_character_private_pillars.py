@@ -29,6 +29,15 @@ _GENESIS = "2026-09-06"
 _PUBLIC_PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "consistency"]
 
 
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
+
+
 def _pillar(raw, cov=1.0, ni=False, xp=0.0):
     return {
         "raw_score": raw,
@@ -91,7 +100,7 @@ def test_character_is_byte_identical_on_a_journal_day_and_a_quiet_day(monkeypatc
     body = json.loads(_served(JOURNAL_DAY, monkeypatch, date))
     rel = next(p for p in body["pillars"] if p["name"] == "relationships")
     assert rel["not_instrumented"] is True and rel["not_instrumented_note"] == character_privacy.PRIVATE_PILLAR_NOTE
-    assert body["character"]["composite_pillar_count"] == 6
+    assert body["character"]["composite_pillar_count"] == 5  # #6224: Mind is not scored in public either
 
 
 def test_mutation_control_a_published_relationships_pillar_would_move(monkeypatch):
@@ -107,8 +116,11 @@ def test_public_sheet_is_pure_and_holds_only_private_pillars():
     assert rec == before, "the stored record is never changed"
     assert out["pillar_relationships"] == character_privacy.public_sheet(_sheet("2026-09-23", QUIET_DAY))["pillar_relationships"]
     for p in _PUBLIC_PILLARS:
+        if p == "mind":  # #6224 (owner rulings 2026-11-26): Mind is served not scored, whatever the variant holds
+            assert out["pillar_mind"] == character_privacy.not_scored_pillar("mind")
+            continue
         assert out[f"pillar_{p}"] == rec[f"pillar_{p}"]
-    assert character_privacy.pillar_is_publishable("mind") and not character_privacy.pillar_is_publishable("relationships")
+    assert not character_privacy.pillar_is_publishable("mind") and not character_privacy.pillar_is_publishable("relationships")
 
 
 def _receipt(journal: bool):

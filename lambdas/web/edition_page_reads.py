@@ -123,6 +123,8 @@ def sheet_block(body: dict | None, today: str) -> dict:
         return _unavailable(src, "The character sheet")
     got = body.get("character")
     c: dict = got if isinstance(got, dict) else {}
+    if c.get("status") == "recalculating":  # #6224 containment: the level is being recalculated, not missing
+        return _block("absent", None, src, "The character sheet is being recalculated.")
     if _num(c.get("level")) is None:
         return _block("absent", None, src, "The character sheet has no level yet.")
     data = {"character": {k: c.get(k) for k in ("level", "composite_pillar_count", "composite_pillar_total")}}

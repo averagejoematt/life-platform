@@ -35,6 +35,8 @@ import sys
 from datetime import datetime, timezone
 from decimal import Decimal
 
+import pytest
+
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
@@ -58,6 +60,15 @@ GENESIS = "2026-08-03"  # a Monday
 # ══════════════════════════════════════════════════════════════════════════════
 # Hand-written stubs (no MagicMock — see module docstring)
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 class _StubLogger:
@@ -833,7 +844,8 @@ def test_packet_character_sheet_level_events_are_typed_by_tier_change():
 
     assert "LEVEL EVENTS THIS WEEK (these are story moments):" in text
     assert "  2026-08-11: sleep TIER CHANGE: Foundation → Momentum (Level 3 → 4)" in text
-    assert "  2026-08-11: mind level_up: Level 2 → 3" in text
+    # #6224 (owner rulings 2026-11-26): Mind is not scored in public — its level events never reach the public chronicle
+    assert "mind level_up" not in text
     assert "ACTIVE EFFECTS (cross-pillar buffs/debuffs):" in text
     assert "  + Synthetic Buff: synthetic effect description" in text
 

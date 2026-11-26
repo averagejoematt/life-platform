@@ -220,9 +220,13 @@ def test_streak_badges_read_the_written_row_directly(monkeypatch):
 
 @pytest.mark.parametrize("streak,expected", [(0, set()), (365, set(STREAK_RUNGS))])
 def test_milestone_streak_rungs_can_fire(monkeypatch, streak, expected):
-    """The six N-Day Streak rungs become satisfiable off the written row."""
+    """The six N-Day Streak rungs become satisfiable — #6224: on the PUBLIC run (the stored Habitify rows, restraint
+    habits out), with the written row naming the day; the stored streak on that row is not what they judge."""
+    import public_tier0_fixture
+
     monkeypatch.setattr(dmc, "table", FakeTable(), raising=False)
     table, _row = _write(streak)
+    public_tier0_fixture.plant_public_run(lambda item: table.put_item(Item=item), USER_PREFIX, "2026-08-06", streak)
     signals = ml.collect_signals(table, USER_PREFIX, None, "2026-08-07")
     assert signals["tier0_streak"] == streak
     decision = ml.evaluate(signals, existing_ids=set(), last_event_date=None, today="2026-08-07", suppressed=False)
@@ -230,6 +234,16 @@ def test_milestone_streak_rungs_can_fire(monkeypatch, streak, expected):
     assert expected <= fired, f"streak rungs {expected - fired} unreachable at tier0_streak={streak}"
     if not expected:
         assert not (set(STREAK_RUNGS) & fired)
+
+
+def test_the_stored_streak_alone_fires_no_milestone_streak_rung(monkeypatch):
+    """#6224: a stored `t0_perfect_streak` of 365 with no public run behind it fires no streak rung."""
+    monkeypatch.setattr(dmc, "table", FakeTable(), raising=False)
+    table, _row = _write(365)
+    signals = ml.collect_signals(table, USER_PREFIX, None, "2026-08-07")
+    assert signals["tier0_streak"] == 0
+    decision = ml.evaluate(signals, existing_ids=set(), last_event_date=None, today="2026-08-07", suppressed=False)
+    assert not (set(STREAK_RUNGS) & ({e["milestone_id"] for e in decision["to_write"]} | set(decision["deferred"])))
 
 
 # ── 3. Reset-on-miss round trip ───────────────────────────────────────────────

@@ -173,6 +173,10 @@ def test_activity_only_sources_never_reclassify_a_narrative_family():
     for src, cls in AP.ACTIVITY_ONLY_SOURCES.items():
         assert NP.classify(src) is None, f"{src} is classified in narrative_provenance; do not shadow it"
         assert cls == AP.PUBLIC
+    # #6224: the owner-ruled private activity sources — disjoint from the public list, never a narrative family.
+    for src, cls in AP.ACTIVITY_PRIVATE_SOURCES.items():
+        assert NP.classify(src) is None and src not in AP.ACTIVITY_ONLY_SOURCES
+        assert cls == AP.PRIVATE and not AP.source_is_public(src)
 
 
 def test_an_unclassified_source_is_not_public():

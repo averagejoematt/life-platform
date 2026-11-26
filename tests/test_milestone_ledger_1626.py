@@ -27,6 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
 
+import public_tier0_fixture  # noqa: E402 — #6224: the public run behind the streak rungs
 from health import milestone_ledger as ml  # noqa: E402
 
 USER_PREFIX = "USER#matthew#SOURCE#"
@@ -70,6 +71,13 @@ def _weight_day(date: str, lbs: float) -> dict:
 
 def _habit_day(date: str, streak: int) -> dict:
     return {"pk": USER_PREFIX + "habit_scores", "sk": f"DATE#{date}", "t0_perfect_streak": streak}
+
+
+def _put_habit_day(table, d: str, streak: int) -> None:
+    """The day's habit_scores row AND (#6224) the stored Habitify rows whose PUBLIC tier-0 run ending ``d`` is
+    ``streak`` — the streak rungs are judged on the public run, never on the stored ``t0_perfect_streak``."""
+    table.put_item(Item=_habit_day(d, streak))
+    public_tier0_fixture.plant_public_run(lambda item: table.put_item(Item=item), USER_PREFIX, d, streak)
 
 
 def _strava_day(date: str) -> dict:
@@ -193,7 +201,7 @@ def test_multiple_categories_in_one_week_yield_exactly_one_event():
     for d in ("2026-04-29", "2026-04-30", "2026-05-01"):
         table.put_item(Item=_weight_day(d, 252.0))
     for i, d in enumerate(_dates("04-06", 25)):
-        table.put_item(Item=_habit_day(d, min(3, i + 1)))
+        _put_habit_day(table, d, min(3, i + 1))
     g = _sweep(table, "2026-05-01")
     assert g["genesis"] and g["announced"] == []
 
@@ -207,7 +215,7 @@ def test_multiple_categories_in_one_week_yield_exactly_one_event():
     for d in week:
         if d in weights:
             table.put_item(Item=_weight_day(d, weights[d]))
-        table.put_item(Item=_habit_day(d, streaks[d]))
+        _put_habit_day(table, d, streaks[d])
         r = _sweep(table, d)
         announced += [e["milestone_id"] for e in r["announced"]]
 
@@ -218,7 +226,7 @@ def test_multiple_categories_in_one_week_yield_exactly_one_event():
     # process/composition companion ever co-fires (#1628).
     later = []
     for d in _dates("05-09", 12):  # through 2026-05-20
-        table.put_item(Item=_habit_day(d, 9))
+        _put_habit_day(table, d, 9)
         r = _sweep(table, d)
         later += [(d, e["milestone_id"]) for e in r["announced"]]
     assert later == [("2026-05-17", "days_tracked_30")], f"the deferred rung must fire once the 12-day global cooldown expires, got {later}"
@@ -301,7 +309,7 @@ def test_genesis_consumes_already_true_rungs_without_announcing():
     for d in ("2026-04-29", "2026-04-30", "2026-05-01"):
         table.put_item(Item=_weight_day(d, 252.0))
     for i, d in enumerate(_dates("03-01", 40)):
-        table.put_item(Item=_habit_day(d, i + 1))
+        _put_habit_day(table, d, i + 1)
 
     r = _sweep(table, "2026-05-01")
     assert r["genesis"] is True and r["announced"] == []

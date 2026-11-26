@@ -29,6 +29,15 @@ from fakes import FakeDdbTable, json_safe_put_hook, make_session_update_hook  # 
 from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 
 
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
+
+
 def _ai():
     from web import site_api_ai_lambda as ai
 

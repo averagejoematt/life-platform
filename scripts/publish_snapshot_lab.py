@@ -304,6 +304,7 @@ def shape_tests(payload: Any, excluded: list, metric_is_public: Callable[[Any], 
 METHOD_VERSIONED = (
     (re.compile(r"grade", re.IGNORECASE), "day_grade"),
     (re.compile(r"habit", re.IGNORECASE), "habit_pct"),
+    (re.compile(r"tier[\s_-]*0|streak", re.IGNORECASE), "tier0_streak"),  # #6224: the public run is method-versioned too
 )
 
 

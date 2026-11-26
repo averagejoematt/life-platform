@@ -63,9 +63,12 @@ export const driverWords = (ids) => (ids || []).map((id) => DRIVERS[id] || Strin
 // from one day to the next; a whole score beside a tenth of a point could not (#4580 round 1).
 export function areaSentence(p) {
   if (!p) return "";
+  if (p.scores_pending) return p.pending_note || "Being recalculated."; // #6224 containment
+  if (p.not_scored) return p.not_scored_note || "Not scored in public: its inputs are private."; // #6224
   if (p.not_instrumented) return "Not measured yet: nothing records this area.";
   const level = num(p.level);
   const score = num(p.raw_score);
+  if (p.level_pending && score !== null) return `Score ${score.toFixed(1)} of 100; the level is being recalculated.`; // #6224
   if (level === null || score === null) return "Not served right now.";
   // An area held for thin coverage prints its score like every other row (round 2, sheet:
   // "left out", "still counts" and "too little to score yet" sat within one screen); that it is
@@ -127,9 +130,12 @@ export function areasHTML(body) {
 export function countsNote(body) {
   const pillars = ((body && body.pillars) || []).filter((p) => p && p.name);
   const name = (p) => AREAS[p.name] || p.name;
-  const out = pillars.filter((p) => p.not_instrumented).map(name);
+  // #6224: an area the public method does not score is left out for that reason, not for want of an instrument.
+  const unscored = pillars.filter((p) => p.not_scored).map(name);
+  const out = pillars.filter((p) => p.not_instrumented && !p.not_scored).map(name);
   const thin = pillars.filter((p) => p.coverage_hold && !p.not_instrumented).map(name);
   const parts = [];
+  if (unscored.length) parts.push(`${listWords(unscored)} ${unscored.length > 1 ? "are" : "is"} not scored in public, because the inputs are private, and ${unscored.length > 1 ? "are" : "is"} left out`);
   if (out.length) parts.push(`${listWords(out)} ${out.length > 1 ? "have" : "has"} nothing measuring ${out.length > 1 ? "them" : "it"} and ${out.length > 1 ? "are" : "is"} left out`);
   if (thin.length) parts.push(`${listWords(thin)} ${thin.length > 1 ? "are" : "is"} measured thinly and still count${thin.length > 1 ? "" : "s"}`);
   return parts.length ? `${parts.join("; ")}.` : "";
@@ -137,6 +143,7 @@ export function countsNote(body) {
 // The one level, with how many areas it was worked out from and the day it is for.
 export function levelHTML(body) {
   const c = body && body.character;
+  if (c && c.status === "recalculating") return soft(c.pending_note || "Being recalculated."); // #6224 containment
   if (!c || num(c.level) === null) return soft("The level is not served right now.");
   const day = dayInWords(c.as_of_date);
   const [n, of] = [num(c.composite_pillar_count), num(c.composite_pillar_total)];

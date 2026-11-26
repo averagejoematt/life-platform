@@ -344,7 +344,10 @@ def engine_of(payload: Any, day: str) -> dict | None:
     if not isinstance(payload, dict):
         return None
     c = payload.get("character")
-    if not isinstance(c, dict) or c.get("pre_experiment") or str(c.get("as_of_date") or "") != day or _num(c.get("level")) is None:
+    if not isinstance(c, dict) or c.get("pre_experiment") or str(c.get("as_of_date") or "") != day:
+        return None
+    pending = c.get("status") == "recalculating"  # #6224 containment: no level/composite served while recalculated
+    if _num(c.get("level")) is None and not pending:
         return None
     by_name = {str(p.get("name")): p for p in payload.get("pillars") or [] if isinstance(p, dict)}
     pillars = []
@@ -353,8 +356,13 @@ def engine_of(payload: Any, day: str) -> dict | None:
         if p is None:
             continue
         ni = bool(p.get("not_instrumented"))
-        pillars.append({"name": name, "score": None if ni else _num(p.get("raw_score")), "not_instrumented": ni})
-    return {
+        row = {"name": name, "score": None if ni else _num(p.get("raw_score")), "not_instrumented": ni}
+        if p.get("scores_pending"):  # #6224: this pillar's value is being recalculated
+            row["pending"] = True
+        if p.get("not_scored"):  # #6224: not scored in public (its inputs are private) — said so, never "absent" alone
+            row["not_scored"] = True
+        pillars.append(row)
+    out = {
         "level": _num(c.get("level")),
         "composite": _num(c.get("composite_score")),
         "delta": _num(c.get("composite_delta_1d")),
@@ -362,6 +370,9 @@ def engine_of(payload: Any, day: str) -> dict | None:
         # owner ruling 2026-11-05: the served method label (live vs recomputed under the public method), as served
         "method": " ".join(filter(None, ((c.get("method") or {}).get(k) for k in ("label", "notice")))) or None,
     }
+    if pending:
+        out["pending"] = True
+    return out
 
 
 def coach_lines_of(payload: Any, day: str) -> list[dict]:
@@ -538,11 +549,21 @@ def check_layers(o: dict, where: str) -> None:
             raise SchemaError(f"{where}.food.logging_gap: a boolean")
     e = o["engine"]
     if e is not None:
-        _keys(e, {"level", "composite", "delta", "pillars", "method"}, f"{where}.engine")
+        _keys(e, {"level", "composite", "delta", "pillars", "method"} | ({"pending"} if "pending" in e else set()), f"{where}.engine")
+        if "pending" in e and not (e["pending"] is True and e["level"] is None and e["composite"] is None):
+            raise SchemaError(f"{where}.engine: a pending engine carries no level or composite")
         if e["method"] is not None and not (isinstance(e["method"], str) and e["method"]):
             raise SchemaError(f"{where}.engine.method: a sentence or null")
         for p in e["pillars"]:
-            _keys(p, {"name", "score", "not_instrumented"}, f"{where}.engine.pillar")
+            _keys(
+                p,
+                {"name", "score", "not_instrumented"}
+                | ({"not_scored"} if "not_scored" in p else set())
+                | ({"pending"} if "pending" in p else set()),
+                f"{where}.engine.pillar",
+            )
+            if "not_scored" in p and not (p["not_scored"] is True and p["not_instrumented"] and p["score"] is None):
+                raise SchemaError(f"{where}.engine.pillar {p['name']}: a pillar not scored in public carries no score")
             if p["not_instrumented"] and p["score"] is not None:
                 raise SchemaError(f"{where}.engine.pillar {p['name']}: an absent area carries no score (never 50)")
     for ln in o["coach_lines"]:

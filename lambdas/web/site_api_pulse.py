@@ -330,7 +330,16 @@ def pulse(*, _g) -> dict:
     # Water: get the PT-date record specifically (user logs water throughout the day in their timezone)
     water_ml = float(ah.get("water_intake_ml", 0)) if ah and ah.get("water_intake_ml") else None
     water_l = round(water_ml / 1000, 2) if water_ml else None
-    t0_pct = float(habitify.get("tier0_pct", 0)) if habitify.get("tier0_pct") else None
+    # #6224: the PUBLIC tier-0 share (0-100, restraint habits out — ``site_api_habits.public_tier0_summary``, the one
+    # predicate), never the stored ``habit_scores.tier0_pct`` (a 0-1 fraction that counts restraint habits; compared with
+    # 80 below it never fired). A failed read is no figure, never a stored one.
+    t0_pct = None
+    _hs_day = str(habitify.get("date") or str(habitify.get("sk", "")).replace("DATE#", ""))[:10]
+    if _hs_day:
+        from web import site_api_habits  # noqa: PLC0415 — the pulse does not otherwise depend on the habits module
+
+        _t0 = site_api_habits.public_tier0_or_none(table, _hs_day, _hs_day)
+        t0_pct = float(_t0["pct"]) if _t0 and _t0.get("total") else None
 
     # --- Lift glyph: check for a strength session today (Hevy or Strava) ---
     trained_today = False

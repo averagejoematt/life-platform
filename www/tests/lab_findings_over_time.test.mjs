@@ -14,7 +14,7 @@ import { findingIsPublic, findingsOverTime, latestFindings, stabilityFigure, sta
 const WWW = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const LAB = JSON.parse(readFileSync(join(WWW, "content", "fixtures", "lab.json"), "utf8"));
 const DG = { day_grade: "day-grade-public-v1" };
-const HP = { habit_pct: "habit-pct-public-v1" };
+const HP = { habit_pct: "habit-pct-public-v2" };
 
 const f = (week, a, b, r, lo, hi, methods = {}) => ({ id: `${week}-${a}-${b}`, week, metric_a: a, metric_b: b, r, ci95_low: lo, ci95_high: hi, n: 90, n_eff: 50, methods });
 const pairOf = (rows) => findingsOverTime(rows).pairs[0];

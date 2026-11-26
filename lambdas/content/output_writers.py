@@ -110,7 +110,7 @@ def _get_current_phase(profile, current_weight_lbs):
 
 def _build_avatar_data(character_sheet, profile, current_weight=None):
     """Build avatar display state from character sheet + weight data."""
-    if not character_sheet:
+    if not character_sheet or character_sheet.get("scores_pending"):  # #6224: no tier/level to draw while recalculated
         return None
 
     tier = (character_sheet.get("character_tier") or "Foundation").lower().replace(" ", "_")
@@ -133,6 +133,9 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
     badges = {}
     for pn in pillar_names:
         pd = character_sheet.get(f"pillar_{pn}", {})
+        if isinstance(pd, dict) and pd.get("not_scored"):
+            badges[pn] = "not_scored"  # #6224: Mind is not scored in public — no level to light a badge from
+            continue
         lvl = pd.get("level", 1) if pd else 1
         if lvl >= 61:
             badges[pn] = "bright"
@@ -156,9 +159,10 @@ def _build_avatar_data(character_sheet, profile, current_weight=None):
     }
 
     char_lvl = character_sheet.get("character_level", 1)
-    all_discipline = all(badges[p] != "hidden" for p in pillar_names)
+    scored = [p for p in pillar_names if badges[p] != "not_scored"]  # #6224: judged over the scored pillars only
+    all_discipline = all(badges[p] != "hidden" for p in scored)
     elite_crown = char_lvl >= 81
-    alignment_ring = all_discipline and all(badges[p] == "bright" for p in pillar_names)
+    alignment_ring = all_discipline and all(badges[p] == "bright" for p in scored)
 
     return {
         "tier": tier,
@@ -900,6 +904,28 @@ def _buddy_friendly_name(name, sport_type):
     return name
 
 
+def _buddy_character(character_sheet):
+    """buddy/data.json's character block from the PUBLIC sheet — #6224: the "being recalculated" state while pending."""
+    if not character_sheet:
+        return None
+    if character_sheet.get("scores_pending"):  # #6224 containment: the state, never a number
+        return {"status": "recalculating", "note": character_sheet.get("pending_note"), "level": None, "tier": None, "xp": None}
+    return {
+        "level": character_sheet.get("character_level", 1),
+        "tier": character_sheet.get("character_tier"),
+        "tier_emoji": character_sheet.get("character_tier_emoji"),
+        "xp": character_sheet.get("character_xp", 0),
+        "events": character_sheet.get("level_events", []),
+        "pillars": {
+            pn: {
+                "level": (character_sheet.get("pillar_" + pn) or {}).get("level"),
+                "tier": (character_sheet.get("pillar_" + pn) or {}).get("tier"),
+            }
+            for pn in _PILLAR_ORDER
+        },
+    }
+
+
 def write_buddy_json(data, profile, yesterday, character_sheet=None):
     """Generate buddy/data.json for accountability partner page."""
     try:
@@ -1150,24 +1176,7 @@ def write_buddy_json(data, profile, yesterday, character_sheet=None):
                 "goal_lbs": int(goal_weight),
             },
             "last_updated_friendly": friendly_time,
-            "character_sheet": (
-                {
-                    "level": character_sheet.get("character_level", 1),
-                    "tier": character_sheet.get("character_tier"),
-                    "tier_emoji": character_sheet.get("character_tier_emoji"),
-                    "xp": character_sheet.get("character_xp", 0),
-                    "events": character_sheet.get("level_events", []),
-                    "pillars": {
-                        pn: {
-                            "level": (character_sheet.get("pillar_" + pn) or {}).get("level"),
-                            "tier": (character_sheet.get("pillar_" + pn) or {}).get("tier"),
-                        }
-                        for pn in _PILLAR_ORDER
-                    },
-                }
-                if character_sheet
-                else None
-            ),
+            "character_sheet": _buddy_character(character_sheet),
             "avatar": _build_avatar_data(character_sheet, profile, current_weight),
         }
 

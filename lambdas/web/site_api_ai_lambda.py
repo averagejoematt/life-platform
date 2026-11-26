@@ -460,12 +460,21 @@ def _blocked_terms_clause() -> str:
     return ", ".join(content_filter_channel.blocked_keywords(require=True))
 
 
+def _character_head(ctx: dict) -> str:
+    """#6224: the character line of the Ask prompt — the public level when served, else the plain line (never '?')."""
+    note = ctx.get("character_note")
+    if ctx.get("character_level") is None:
+        return note or "not available"
+    head = f"level {ctx['character_level']} (tier: {ctx.get('character_tier', '?')})"
+    return f"{head}; {note}" if note else head
+
+
 def _ask_build_prompt(ctx: dict) -> str:
     pillars_str = ""
     if "pillars" in ctx:
-        pillars_str = "\n".join(
-            f"    {n} pillar: level {p['level']:.0f}, score {p['raw_score']:.1f}, tier {p['tier']}" for n, p in ctx["pillars"].items()
-        )
+        from web.site_api_ai_context import pillar_line  # #6224: the one renderer — no number for an unscored/pending pillar
+
+        pillars_str = "\n".join(f"    {pillar_line(n, p)}" for n, p in ctx["pillars"].items())
     # #387: hand the model what Python already worked out — drivers, trends, significant
     # correlations, presence — so "what drove it?" gets the platform's computed read.
     reads_block = _ask_reads_block(ctx.get("reads") or {})
@@ -487,7 +496,7 @@ CURRENT DATA:
   RHR: {ctx.get('rhr_bpm', '?')} bpm{_v_ann}
   Whoop recovery score: {ctx.get('recovery_pct', '?')}%{_v_ann} (whole-body readiness from HRV/RHR/sleep — NOT a pillar score, and NOT specific to any pillar)
   Sleep: {ctx.get('sleep_hours', '?')} hours{_v_ann}
-  Character level: {ctx.get('character_level', '?')} (tier: {ctx.get('character_tier', '?')})
+  Character: {_character_head(ctx)}
   T0 habit streak: {ctx.get('tier0_streak', '?')} days
   Pillars:
 {pillars_str or '    Not available'}

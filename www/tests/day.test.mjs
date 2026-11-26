@@ -128,6 +128,14 @@ test("the engine: absent is 'absent', never 50", () => {
   assert.equal(mind.low, true);
 });
 
+test("#6224: a pillar not scored in public says so, with no number and no bar", () => {
+  const e = { level: 15, composite: 43.1, delta: 0.6, pillars: [{ name: "mind", score: null, not_instrumented: true, not_scored: true }] };
+  const [mind] = engineRows(e);
+  assert.equal(mind.value, "not scored in public");
+  assert.equal(mind.width, 0);
+  assert.equal(mind.low, false);
+});
+
 test("the nearest graded day before, and every unavailable state has its own sentence", () => {
   const days = [{ calls_settled: [{}] }, { calls_settled: [] }, { calls_settled: [] }];
   assert.equal(nearestGraded(days, 2), days[0]);

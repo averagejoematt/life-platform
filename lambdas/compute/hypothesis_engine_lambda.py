@@ -373,7 +373,7 @@ def update_hypothesis_status(sk: str, status: str, evidence_note: str = "", stat
         logger.error(f"Failed to update hypothesis {sk}: {e}")
 
 
-def build_data_narrative(data):
+def build_data_narrative(data, registry=None):
     """Build day-by-day narrative rows for hypothesis evaluation."""
     if not data:
         return []
@@ -463,9 +463,9 @@ def build_data_narrative(data):
         # habit_pct calc (0-1 fraction) so the same concept means the same number
         # on both engines.
         hab = next((i for i in data.get("habitify", []) if i.get("date") == date), {})
-        # Owner ruling 2026-11-06: over PUBLIC habits only (health.habit_pct_public, habit-pct-public-v1) — the
-        # Morning/Evening Journal habits never count; a day with no public habit has no value, never a 0.
-        _hab_pct = habit_pct_public.public_habit_pct(hab) if hab else None
+        # Owner rulings 2026-11-06/26: over PUBLIC, non-restraint habits only (health.habit_pct_public v2) — the
+        # Morning/Evening Journal habits and every restraint habit never count; no public habit is no value, never a 0.
+        _hab_pct = habit_pct_public.public_habit_pct(hab, registry, window=data.get("habitify")) if hab else None
         if _hab_pct is not None:
             row["habit_pct"] = _hab_pct
 
@@ -1520,7 +1520,7 @@ def lambda_handler(event, context):
             return {"statusCode": 500, "body": "Failed to gather data"}
         profile = fetch_profile()
 
-        daily_rows = build_data_narrative(data)
+        daily_rows = build_data_narrative(data, (profile or {}).get("habit_registry") or {})
         logger.info(f"Built data narrative: {len(daily_rows)} days")
 
         # AI-4: Check data completeness before any hypothesis work

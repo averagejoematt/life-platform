@@ -38,12 +38,22 @@ of the new code fails one of the two tests in its pair.
 
 import json
 
+import pytest
 from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: public readers serve the public variant
 from web import site_api_character as ch_mod, site_api_common as common, site_api_vitals as vitals
 
 # ══════════════════════════════════════════════════════════════════════════════
 # _public_input_manifest — moved to site_api_common, re-exported unchanged
 # ══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def test_public_input_manifest_lives_on_site_api_common():
@@ -172,10 +182,11 @@ def test_composite_discloses_when_a_pillar_is_excluded(monkeypatch):
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
     body = json.loads(vitals.handle_character()["body"])
     ch = body["character"]
-    assert ch["composite_pillar_count"] == 6
+    # #6224: Mind is not scored in public — out too, and the note says why
+    assert ch["composite_pillar_count"] == 5
     assert ch["composite_pillar_total"] == 7
     assert ch["composite_note"] is not None
-    assert "6 of 7" in ch["composite_note"]
+    assert "5 of 7" in ch["composite_note"] and "Mind (not scored in public: its inputs are private)" in ch["composite_note"]
 
 
 def test_composite_note_is_silent_once_every_pillar_is_instrumented(monkeypatch):
@@ -188,9 +199,13 @@ def test_composite_note_is_silent_once_every_pillar_is_instrumented(monkeypatch)
     monkeypatch.setattr(vitals, "table", _FakeTable([rec]))
     monkeypatch.setattr(vitals, "EXPERIMENT_START", _GENESIS)
     ch = json.loads(vitals.handle_character()["body"])["character"]
-    assert (ch["composite_pillar_count"], ch["composite_pillar_total"]) == (6, 7) and ch["composite_note"]
+    assert (ch["composite_pillar_count"], ch["composite_pillar_total"]) == (5, 7) and ch["composite_note"]
     monkeypatch.setattr(activity_publication, "source_is_public", lambda s: True)
     ch = json.loads(vitals.handle_character()["body"])["character"]
-    assert ch["composite_pillar_count"] == 7
+    # #6224: Mind stays unscored in public whatever the source policy says (owner rulings 2026-11-26)
+    assert ch["composite_pillar_count"] == 6
     assert ch["composite_pillar_total"] == 7
-    assert ch["composite_note"] is None
+    assert ch["composite_note"] == (
+        "composite_score is the mean of 6 of 7 pillars — Mind (not scored in public: its inputs are private) is excluded, "
+        "not averaged in at a neutral score."
+    )

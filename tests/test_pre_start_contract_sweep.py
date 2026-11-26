@@ -33,6 +33,8 @@ import os
 import sys
 from datetime import datetime, timedelta
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from coach import persona_registry  # noqa: E402  (#1986 — the byline's single source)
@@ -48,6 +50,15 @@ from web import (  # noqa: E402
 )
 
 FUTURE_GENESIS_DAYS = 2  # the real reset window: constants regenerate ~2 days ahead
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def _today_pt():

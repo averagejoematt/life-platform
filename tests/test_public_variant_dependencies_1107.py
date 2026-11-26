@@ -17,6 +17,8 @@ import os
 import re
 import sys
 
+import pytest
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
@@ -29,6 +31,15 @@ from health import character_privacy, character_public, public_corrections  # no
 histories = T.histories
 CONFIG = T.CONFIG
 DAY = "2026-11-04"
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def _hs(**over):
@@ -78,10 +89,11 @@ def test_a_day_whose_habit_scores_are_not_ready_reads_them_as_missing_never_zero
             "habit_scores_status": status,
         }
         assert character_public.attach_public_variant(rec, data, prev, hist, CONFIG) is None
-        out[status] = rec[B.PUBLIC]["pillar_mind"]
-    assert out["ready"]["components"]["t0_habit_compliance"]["score"] > 0
-    assert out["missing"]["components"]["t0_habit_compliance"]["score"] is None  # missing data, not a 0
-    assert "t0_habit_compliance" not in out["missing"]["absent_behaviors"]
+        out[status] = {k: v for k, v in rec[B.PUBLIC].items() if k != "computed_at"}
+    # #6224 (owner rulings 2026-11-26): Mind is not scored in public, and it was the only public consumer of the habit
+    # scores — so a day whose habit scores are not ready publishes exactly what a ready day does: no Mind number either way.
+    assert out["ready"]["pillar_mind"] == out["missing"]["pillar_mind"] == character_privacy.not_scored_pillar("mind")
+    assert T._canon(out["ready"]) == T._canon(out["missing"])
 
 
 # ── recalculated history is labelled, and fires nothing ─────────────────────────────────
@@ -151,27 +163,29 @@ def test_the_timeline_draws_no_level_up_from_recalculated_history(monkeypatch):
 
 
 def _ledger(records):
-    before = B.replay_character(records, T._engagement(records), T._habit_scores(records), CONFIG, "t", order_fix=False)
     after = B.replay_character(records, T._engagement(records), T._habit_scores(records), CONFIG, "t")
-    return public_corrections.build_ledger(
-        {d: r["public"] for d, r in before.items()}, {d: r["public"] for d, r in after.items()}, "2026-11-08"
-    )
+    return public_corrections.build_ledger({d: r["public"] for d, r in after.items()}, "2026-11-08")
 
 
 def test_the_public_correction_ledger_cannot_identify_private_activity(histories):
     quiet, private, _q, _p = histories
     a, b = _ledger(quiet), _ledger(private)
-    assert T._canon(a) == T._canon(b)  # every row, every reason: the same whatever the journal did
-    assert a["rows"] and a["reason_categories"] == list(public_corrections.REASON_CATEGORIES)
+    assert T._canon(a) == T._canon(b)  # every field, every reason: the same whatever the journal did
+    # #6224 (v2): no per-date rows at all — a v1 value of a date included Mind, whose inputs are private
+    assert (
+        a["rows"] == [] and a["dates_recalculated"] == len(quiet) and a["reason_categories"] == list(public_corrections.REASON_CATEGORIES)
+    )
     served = public_corrections.served_ledger(a)
     assert set(served) == set(public_corrections.SERVED_KEYS)
 
 
-def test_mutation_control_a_ledger_with_method1_befores_would_leak(histories):
-    quiet, private, q, p = histories
-    a = public_corrections.build_ledger(dict(quiet), {d: r["public"] for d, r in q.items()}, "x")
-    b = public_corrections.build_ledger(dict(private), {d: r["public"] for d, r in p.items()}, "x")
-    assert T._canon(a) != T._canon(b)
+def test_mutation_control_a_v1_ledger_with_per_date_mind_rows_is_not_served(histories):
+    """#6224: the stored v1 ledger carried per-date Mind levels (and overall levels that included Mind); under v2 a
+    route serves only the current version's ledger, so a v1 item — rows and all — is never served."""
+    quiet, _private, _q, _p = histories
+    v1 = dict(_ledger(quiet), ledger_version="public-correction-ledger-v1", rows=[{"date": "2026-09-06", "mind_level": [3, 4]}])
+    assert public_corrections.served_ledger(v1) is None
+    assert public_corrections.correction_sk() == "CORRECTION#" + character_privacy.PUBLIC_METHOD_VERSION
 
 
 # ── the reader inventory: evaluation keeps method-1 as-of values ────────────────────────

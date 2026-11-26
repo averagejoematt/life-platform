@@ -501,7 +501,9 @@ class TestAssembleDailySeries:
         assert m["carbs_g"] == 250.0 and m["fat_g"] == 80.0
         assert m["steps"] == 11000.0
         assert m["tsb"] == -8.5 and m["day_grade"] == 84.0
-        assert m["readiness"] == 77.0 and m["tier0_streak"] == 12.0
+        # #6224: tier0_streak is the PUBLIC run, computed only with the owner's registry (none here) — the stored
+        # computed_metrics.tier0_streak counts restraint habits and is never read.
+        assert m["readiness"] == 77.0 and m["tier0_streak"] is None
         assert m["diary_sessions"] == 2.0
         assert m["habit_pct"] == 0.5  # 2 of 4 done
         assert m["glucose_cv"] == 17.5
@@ -1022,7 +1024,7 @@ class TestLambdaHandler:
         monkeypatch.setattr(wc, "datetime", _FrozenDatetime)
         freeze_pacific(monkeypatch, wc, _FrozenDatetime)
         monkeypatch.setattr(wc, "table", table)
-        monkeypatch.setattr(wc, "assemble_daily_series", lambda s, e: series)
+        monkeypatch.setattr(wc, "assemble_daily_series", lambda s, e, registry=None: series)
         monkeypatch.setattr(wc, "fetch_range", _fetch_stub({}))
 
     def test_idempotent_skip_when_the_week_is_already_stored(self, monkeypatch):

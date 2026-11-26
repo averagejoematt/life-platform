@@ -21,6 +21,8 @@ import json
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from health import character_privacy  # noqa: E402
@@ -29,6 +31,15 @@ from web import site_api_vitals as vitals  # noqa: E402
 
 _GENESIS = "2026-06-08"  # pinned: fixture records at 2026-06-20 are in-experiment
 _NOTE = "No relationship data source feeds this pillar yet — tracked as future work (#747)."
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def _pillar(raw_score, not_instrumented=False, note=None):
@@ -115,8 +126,10 @@ def test_handle_character_instrumented_pillar_unaffected(monkeypatch):
     assert met["not_instrumented"] is False and met["not_instrumented_note"] is None and met["raw_score"] == 62.0
     rel = next(p for p in body["pillars"] if p["name"] == "relationships")
     assert rel["not_instrumented"] is True and rel["raw_score"] == 50.0
-    # six public pillars: the composite is their average
-    assert body["character"]["composite_score"] == round((70.0 * 5 + 62.0) / 6, 1)
+    # five scored public pillars: the composite is their average (#6224: Mind is not scored in public, so it is out)
+    mind = next(p for p in body["pillars"] if p["name"] == "mind")
+    assert mind["not_scored"] is True and mind["raw_score"] is None and mind["level"] is None
+    assert body["character"]["composite_score"] == round((70.0 * 4 + 62.0) / 5, 1)
 
 
 def test_handle_character_pre_genesis_record_serves_zeroed_sheet(monkeypatch):

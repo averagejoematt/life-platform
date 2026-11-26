@@ -39,6 +39,15 @@ from test_character_math_v2 import V2_CONFIG  # noqa: E402 — the engine-test c
 PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
 
 
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
+
+
 def _cfg():
     return copy.deepcopy(V2_CONFIG)
 

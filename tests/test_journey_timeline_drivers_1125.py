@@ -18,6 +18,8 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
 from fakes import FakeDdbTable  # noqa: E402
@@ -25,6 +27,15 @@ from public_variant_fixtures import with_public  # noqa: E402 — 2026-11-05: pu
 from web import site_api_vitals as vitals  # noqa: E402
 
 CS_PK = f"{vitals.USER_PREFIX}character_sheet"
+
+
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
 
 
 def _iso_days_ago(days):
@@ -86,7 +97,8 @@ def test_timeline_prefers_persisted_drivers(monkeypatch):
     ups = _level_up_events(vitals.handle_journey_timeline())
     assert len(ups) == 1
     assert ups[0]["title"] == "Reached Character Level 5"
-    assert ups[0]["body"] == "Driven by: Sleep (88), Mind (77)"
+    # #6224 (owner rulings 2026-11-26): Mind is not scored in public — never named as a driver
+    assert ups[0]["body"] == "Driven by: Sleep (88)"
 
 
 def test_timeline_falls_back_to_read_time_enrichment(monkeypatch):
@@ -105,7 +117,7 @@ def test_timeline_falls_back_to_read_time_enrichment(monkeypatch):
     _setup(monkeypatch, [row])
     ups = _level_up_events(vitals.handle_journey_timeline())
     assert len(ups) == 1
-    assert ups[0]["body"] == "Driven by: Movement (91), Sleep (82), Mind (70)"
+    assert ups[0]["body"] == "Driven by: Movement (91), Sleep (82), Nutrition (10)"  # #6224: never Mind
 
 
 def test_timeline_mixed_legacy_and_persisted(monkeypatch):
@@ -153,4 +165,4 @@ def test_timeline_persisted_drivers_must_match_the_level(monkeypatch):
     _setup(monkeypatch, [row])
     ups = _level_up_events(vitals.handle_journey_timeline())
     assert len(ups) == 1
-    assert ups[0]["body"] == "Driven by: Movement (88), Mind (66)"
+    assert ups[0]["body"] == "Driven by: Movement (88)"  # #6224: Mind is not scored in public

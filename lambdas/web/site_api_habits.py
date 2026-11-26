@@ -219,26 +219,7 @@ def public_tier0_summary(table, as_of: str, start: str, *, streak_names=None):
         ).get("Items", [])
     )
     restraints = {str(n) for n in (streak_names or ())} | {str(k) for k in streak_map}
-    for row in rows:
-        restraints |= RP.restraint_names(row.get("habit_statuses") or {}, registry)
-    by_date = {}
-    for row in rows:
-        d = str(row.get("date") or str(row.get("sk", "")).replace("DATE#", ""))[:10]
-        by_date[d] = AP.public_tier0_counts(row.get("habit_statuses") or {}, registry, restraints)
-    done, total = by_date.get(as_of, (0, 0))
-    # The run walks back one calendar day at a time: a day with no tracker row breaks it (never skipped over).
-    run_days = []
-    day = datetime.strptime(as_of, "%Y-%m-%d")
-    while day.strftime("%Y-%m-%d") >= start:
-        run_days.append(by_date.get(day.strftime("%Y-%m-%d"), (0, 0)))
-        day -= timedelta(days=1)
-    return {
-        "as_of_date": as_of,
-        "done": done,
-        "total": total,
-        "pct": round(done / total * 100) if total else 0,
-        "streak": AP.public_tier0_streak(run_days),
-    }
+    return AP.public_tier0_figures(rows, registry, restraints, as_of, start)
 
 
 def public_tier0_or_none(table, as_of: str, start: str):

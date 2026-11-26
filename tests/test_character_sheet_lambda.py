@@ -69,6 +69,15 @@ DATE = "2026-08-05"
 _NOW = datetime(2026, 8, 6, 17, 35, tzinfo=timezone.utc)  # the 17:35 UTC cron slot, the day after
 
 
+@pytest.fixture(autouse=True)
+def _scores_live_6224(monkeypatch):
+    """#6224: this file tests the SCORED public serving — the state after a verified recompute flips
+    ``PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE`` off. The pending state is tests/test_public_mind_unscored_6224.py's."""
+    from health import character_privacy as _cp
+
+    monkeypatch.setattr(_cp, "PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE", False)
+
+
 class _FrozenDatetime(datetime):
     """datetime subclass with a fixed now(); strptime/strftime stay real."""
 
@@ -1179,7 +1188,8 @@ class TestHandlerFullCompute:
         assert [h["week_end"] for h in history] == ["2026-07-28", DATE]
         assert history[-1]["week_start"] == "2026-08-03"  # Monday of the week
         assert history[-1]["week_label"].startswith("Wk ")
-        assert set(history[-1]["pillars"]) == set(csl.PILLAR_ORDER)
+        # #6224: Mind is not scored in public — it has no weekly value (omitted, never a 0)
+        assert set(history[-1]["pillars"]) == set(csl.PILLAR_ORDER) - {"mind"}
         assert history[0]["pillars"]["sleep"] == 45.0
 
     def test_site_writer_failure_never_fails_the_compute(self, monkeypatch, wired):
