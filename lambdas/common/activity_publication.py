@@ -714,3 +714,48 @@ def public_group_pcts(statuses: Any, groups: Iterable[Any], registry: Any = None
         if st.get("status") == "completed":
             done[g] = done.get(g, 0) + 1
     return {g: round(done.get(g, 0) / n * 100) for g, n in sorted(possible.items()) if n}
+
+
+# ── the public TIER-0 figures (#6224) ───────────────────────────────────────────────────────
+
+
+def public_tier0_counts(statuses: Any, registry: Any = None, restraints: Optional[Iterable[Any]] = None) -> tuple:
+    """``(done, total)`` over the day's PUBLIC tier-0 habits — THE one predicate every public tier-0 figure is counted
+    through (``/api/habits``, ``/api/habit_streaks``, ``public_stats.json`` and the cards drawn from it).
+
+    A habit counts when it is classified public here, sits in tier 0 of the owner's registry, was scheduled that day,
+    and is not a restraint habit (owner ruling 2026-11-24, ``common.restraint_publication``: no restraint figure — and a
+    tier-0 share that counts one is a figure its behaviour can be read from — while ``RESTRAINT_DATA_PUBLISHED`` is
+    False). A restraint is any habit ``restraint_publication.restraint_names`` marks (its tracker group or the registry
+    flag) plus every name in ``restraints`` (a stored streak key, which the caller has and this function does not).
+    The stored ``habit_scores.tier0_done/tier0_total`` count every tier-0 habit, private ones included, so a public
+    surface never reads them."""
+    from common import restraint_publication as RP  # noqa: PLC0415 — keeps this module's import surface unchanged
+    from common.habit_registry import habit_tier  # noqa: PLC0415
+
+    reg = registry if isinstance(registry, Mapping) else {}
+    excluded: set = set()
+    if not RP.RESTRAINT_DATA_PUBLISHED:
+        excluded = RP.restraint_names(statuses, reg) | {str(r) for r in (restraints or ())}
+    done = total = 0
+    for name, st in public_habit_statuses(statuses, reg).items():
+        meta = reg.get(name)
+        if str(name) in excluded or not isinstance(meta, Mapping) or habit_tier(dict(meta)) != 0:
+            continue
+        if not isinstance(st, Mapping) or not st.get("scheduled_today", True):
+            continue
+        total += 1
+        done += 1 if st.get("status") == "completed" else 0
+    return done, total
+
+
+def public_tier0_streak(days_newest_first: Iterable[Any]) -> int:
+    """The run of PERFECT public tier-0 days ending at the newest: each item is a ``(done, total)`` pair from
+    ``public_tier0_counts``, newest first. A day with no public tier-0 habit (total 0) is not perfect and ends the run."""
+    run = 0
+    for pair in days_newest_first or ():
+        done, total = pair
+        if not total or done != total:
+            break
+        run += 1
+    return run

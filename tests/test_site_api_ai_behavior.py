@@ -1013,14 +1013,17 @@ def test_explain_refuses_a_corrupted_figure_even_when_the_prompt_string_contains
     assert "98765" not in explanation
 
 
-def test_the_tier_zero_streak_reaches_the_prompt_when_habit_scores_exist(monkeypatch):
+def test_the_prompt_carries_the_public_tier_zero_run_never_the_stored_streak(monkeypatch):
+    """#6224: the stored `t0_perfect_streak` counts restraint habits, and this context reaches a public answer, so the
+    prompt carries the PUBLIC run (site_api_habits.public_tier0_summary). This table holds no Habitify statuses — no
+    public tier-0 habit — so the run is 0, whatever the stored 12 says."""
     ai = _ai()
     monkeypatch.setattr(ai, "_latest_item", lambda s: None)
     monkeypatch.setattr(ai, "_ask_fetch_computed_reads", lambda: {})
-    tbl = FakeDdbTable(rows=[{"t0_perfect_streak": 12}])
+    tbl = FakeDdbTable(rows=[{"date": "2026-11-20", "t0_perfect_streak": 12}])
     monkeypatch.setattr(ai, "table", tbl)
     ctx = ai._ask_fetch_context()
-    assert ctx["tier0_streak"] == 12
+    assert ctx["tier0_streak"] == 0
 
 
 def test_the_character_sheet_falls_back_to_yesterday_when_today_has_not_computed(monkeypatch):

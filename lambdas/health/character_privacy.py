@@ -46,6 +46,28 @@ PRIVATE_SOURCE_COMPONENTS = {
 }
 
 
+# #6224 (owner ruling 2026-11-24): component -> the RESTRAINT input it is computed from. Restraint habits are private —
+# no name, streak or count, and no figure from which their behaviour can be derived — unless an owner approval is on
+# record (``common.restraint_publication.RESTRAINT_DATA_PUBLISHED``). Such a component is never NAMED on a published
+# surface, and the public method holds it out of the arithmetic (``health.character_public``).
+RESTRAINT_COMPONENTS = {"vice_control": "habit_scores.vice_streaks"}
+# A cross-pillar effect whose condition reads a restraint input (``character_engine._evaluate_condition``): its name
+# says the restraint streaks crossed a threshold, so the public method never evaluates it and no public view serves it.
+RESTRAINT_CONDITION_MARKER = "vice_streak"
+
+
+def restraint_published() -> bool:
+    from common import restraint_publication
+
+    return bool(restraint_publication.RESTRAINT_DATA_PUBLISHED)
+
+
+def effect_reads_restraint(effect: Any) -> bool:
+    """True for a cross-pillar effect whose condition reads a restraint input (fail closed on any mention)."""
+    cond = effect.get("condition") if isinstance(effect, dict) else None
+    return RESTRAINT_CONDITION_MARKER in str(cond or "").lower()
+
+
 # pillar -> the sources EVERY one of its components reads. A pillar whose sources are all non-public is
 # not published at all (owner rulings 2026-11-03/04: journal-derived values are private, and a public score
 # must not move when only private journal inputs change). Relationships reads only the journal and its
@@ -125,17 +147,20 @@ PUBLIC_METHOD_HISTORY = (
         "version": PUBLIC_METHOD_VERSION,
         "from": PUBLIC_METHOD_EFFECTIVE_FROM,
         "defined_on": PUBLIC_METHOD_DEFINED_ON,
-        "note": "Public-eligible inputs only. Dates before it was adopted were recomputed from the stored inputs; what "
-        "the site showed on those dates at the time was computed under method 1.",
+        "note": "Public-eligible inputs only. Restraint-habit streaks are private: they are held out of the Mind score and "
+        "its data coverage, and no effect that reads them is applied (ruling of 2026-11-24). Dates before it was adopted "
+        "were recomputed from the stored inputs; what the site showed on those dates at the time was computed under method 1.",
     },
 )
 # The label a public history surface prints beside a value. It depends on the method and the record's origin only
 # (a live compute vs. a recomputation of the past) — never on whether a private input existed that day, so it is the
 # same sentence on a journal day and on a quiet day.
 PUBLIC_METHOD_LABELS = {
-    "live": "Computed that morning under the public method (v1), from the records available then. Private inputs are left out.",
+    "live": "Computed that morning under the public method (v1), from the records available then. Private inputs, "
+    "restraint-habit streaks among them, are left out.",
     "recomputed": "Recalculated later under the public method (v1), from the records available when it was recalculated, "
-    "not from what was available on this date. Private inputs are left out. The score shown on this date at the time came "
+    "not from what was available on this date. Private inputs, restraint-habit streaks among them, are left out. The score "
+    "shown on this date at the time came "
     "from an earlier method and is not republished.",
 }
 # Owner ruling 2026-11-06: the difference between a score recalculated from today's records and a score actually
@@ -274,10 +299,53 @@ def public_sheet(record: Any) -> Any:
         key = f"pillar_{name}"
         if key in out:
             out[key] = public_pillar(name, out[key])
+    if not restraint_published():
+        scrub_restraint(out)
     if _origin(out) != "live":  # owner ruling 2026-11-06: a recalculation is not an event — no reader can celebrate it
         out["recalculated_level_events"] = out.get("level_events") or []
         out["level_events"] = []
     return out
+
+
+def _slug(label: Any) -> str:
+    return "_".join(str(label or "").lower().split())
+
+
+def scrub_restraint(view: dict[str, Any]) -> dict[str, Any]:
+    """#6224: remove every restraint-derived NAME from a public view, in place — the effects whose condition reads a
+    restraint input, the restraint components from each pillar's component details, driver lists and absent list, and
+    a level event's ``top_driver`` when it names one. A variant computed after #6224 carries none of them (the public
+    method never evaluates them); this covers a variant stored before it until the recompute replaces it. The SCORES
+    of such a stored variant still carry the restraint contribution — only the recompute
+    (``scripts/backfill_public_variant.py``) removes that."""
+    if isinstance(view.get("active_effects"), list):
+        view["active_effects"] = [e for e in view["active_effects"] if not effect_reads_restraint(e)]
+    names = set(RESTRAINT_COMPONENTS)
+    for key, pillar in list(view.items()):
+        if not (str(key).startswith("pillar_") and isinstance(pillar, dict)):
+            continue
+        pillar = view[key] = dict(pillar)  # a copy: the view shares its pillar dicts with the stored record
+        comps = pillar.get("components")
+        if isinstance(comps, dict):
+            pillar["components"] = {k: v for k, v in comps.items() if k not in names}
+            if isinstance(comps.get("_absent_behaviors"), list):
+                pillar["components"]["_absent_behaviors"] = [b for b in comps["_absent_behaviors"] if b not in names]
+        drivers = pillar.get("drivers")
+        if isinstance(drivers, dict):
+            pillar["drivers"] = {k: ([x for x in v if str(x) not in names] if isinstance(v, list) else v) for k, v in drivers.items()}
+        if isinstance(pillar.get("absent_behaviors"), list):
+            pillar["absent_behaviors"] = [b for b in pillar["absent_behaviors"] if str(b) not in names]
+    for key in ("level_events", "recalculated_level_events"):
+        if isinstance(view.get(key), list):
+            view[key] = [
+                (
+                    {k: v for k, v in ev.items() if k not in ("top_driver", "top_driver_value")}
+                    if isinstance(ev, dict) and _slug(ev.get("top_driver")) in names
+                    else ev
+                )
+                for ev in view[key]
+            ]
+    return view
 
 
 def public_sheets(records: Any) -> list[dict[str, Any]]:
@@ -289,6 +357,8 @@ def component_is_publishable(name: str) -> bool:
     """False for an owner-only component and for one computed from a non-public source."""
     if name in OWNER_ONLY_COMPONENTS:
         return False
+    if name in RESTRAINT_COMPONENTS and not restraint_published():
+        return False  # #6224: a restraint component is never named while no restraint figure is published
     src = PRIVATE_SOURCE_COMPONENTS.get(name)
     if src is None:
         return True

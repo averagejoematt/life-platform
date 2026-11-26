@@ -264,7 +264,15 @@ def _ask_fetch_context() -> dict:
         )
         hs_items = _decimal_to_float(hs_resp.get("Items", []))
         if hs_items:
-            ctx["tier0_streak"] = int(hs_items[0].get("t0_perfect_streak", 0) or 0)
+            # #6224: the PUBLIC run (one predicate) — the stored t0_perfect_streak counts restraint habits, and this
+            # context reaches a public answer. A failed read raises into _soft_block: no streak in the context.
+            from common.constants import EXPERIMENT_START_DATE  # noqa: PLC0415
+
+            from web import site_api_habits  # noqa: PLC0415
+
+            as_of = str(hs_items[0].get("date") or str(hs_items[0].get("sk", "")).replace("DATE#", ""))[:10]
+            summary = site_api_habits.public_tier0_summary(_table(), as_of, EXPERIMENT_START_DATE)
+            ctx["tier0_streak"] = int(summary["streak"])
 
     def _profile() -> None:
         # Fetch start/goal from profile for dynamic prompt injection.

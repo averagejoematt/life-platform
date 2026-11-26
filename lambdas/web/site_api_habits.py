@@ -143,7 +143,10 @@ def _causality_public(entry: dict) -> dict:
 def habit_streaks(*, _g) -> dict:
     """
     GET /api/habit_streaks
-    Returns: Tier 0 habit streaks for public display (aggregate streak only, no habit names).
+    Returns: the public Tier 0 figures (aggregate only, no habit names) — the day's done/total/pct and the run of
+    perfect days, counted over PUBLIC tier-0 habits only (#6224, ``AP.public_tier0_counts``: restraint habits and
+    private habits are neither in the numerator nor the denominator). The stored ``habit_scores.tier0_done/total``
+    and ``t0_perfect_streak`` counted every tier-0 habit, restraint habits among them, and are not read.
     Cache: 3600s (1 hr).
     """
     # Facade state injected via `_g` (the delegator's globals()) — same module the test patched.
@@ -151,7 +154,7 @@ def habit_streaks(*, _g) -> dict:
     # #2414: "yesterday" is the reader's yesterday — the Pacific calendar day.
     yesterday = (datetime.now(PT) - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # Read latest habit_scores record
+    # The latest scored day (the habit_scores row) is the day the figures describe.
     pk = f"{USER_PREFIX}habit_scores"
     resp = table.query(
         **with_phase_filter(
@@ -173,25 +176,89 @@ def habit_streaks(*, _g) -> dict:
             cache_seconds=300,
         )
 
-    t0_done = int(record.get("tier0_done", 0))
-    t0_total = int(record.get("tier0_total", 1))
-    t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
-
-    # Compute aggregate T0 streak from habit_scores (t0_streak field if present)
-    t0_streak = int(record.get("t0_perfect_streak") or 0)
-
+    as_of = str(record.get("date") or str(record.get("sk", "")).replace("DATE#", "") or yesterday)[:10]
+    # A failed read raises (fail closed): no figure that might count a restraint habit is served.
+    summary = public_tier0_summary(table, as_of, _g["_experiment_date"](366), streak_names=_streak_names(items))
     return _ok(
         {
             "habit_streaks": {
-                "as_of_date": record.get("date", yesterday),
-                "tier0_pct": t0_pct,
-                "tier0_done": t0_done,
-                "tier0_total": t0_total,
-                "aggregate_streak": t0_streak,
+                "as_of_date": as_of,
+                "tier0_pct": summary["pct"],
+                "tier0_done": summary["done"],
+                "tier0_total": summary["total"],
+                "aggregate_streak": summary["streak"],
             }
         },
         cache_seconds=3600,
     )
+
+
+def public_tier0_summary(table, as_of: str, start: str, *, streak_names=None):
+    """#6224: the public Tier 0 figures for ``as_of`` — ``{as_of_date, done, total, pct, streak}`` — counted through
+    THE one predicate (``AP.public_tier0_counts``) over each day's stored Habitify statuses from ``start`` to ``as_of``.
+    Every public tier-0 figure reads this: ``/api/habit_streaks``, and ``public_stats.json`` (the daily brief and the
+    stats refresh), whose ``platform.tier0_streak`` the og cards draw.
+
+    The restraint set is the union ``RP.restraint_names`` takes — every window row's tracker groups, the owner's
+    registry flags, the latest stored streak map's keys — plus ``streak_names``. Reads are Query-only (the stats
+    refresh's role grants nothing else). Any failed read raises: without the registry a tier-0 habit cannot be found
+    and a restraint habit cannot be told from an ordinary one, so the caller publishes no tier-0 figure."""
+    prof = table.query(KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}") & Key("sk").eq("PROFILE#v1"), Limit=1)
+    registry = ((prof.get("Items") or [{}])[0] or {}).get("habit_registry") or {}
+    latest_scores = table.query(KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}habit_scores"), ScanIndexForward=False, Limit=1)
+    streak_map = ((latest_scores.get("Items") or [{}])[0] or {}).get("vice_streaks") or {}
+    rows = _decimal_to_float(
+        query_pages(
+            table,
+            **with_phase_filter(
+                {  # ADR-058: hide pilot habitify records
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}habitify") & Key("sk").between(f"DATE#{start}", f"DATE#{as_of}"),
+                    "ScanIndexForward": False,
+                }
+            ),
+        ).get("Items", [])
+    )
+    restraints = {str(n) for n in (streak_names or ())} | {str(k) for k in streak_map}
+    for row in rows:
+        restraints |= RP.restraint_names(row.get("habit_statuses") or {}, registry)
+    by_date = {}
+    for row in rows:
+        d = str(row.get("date") or str(row.get("sk", "")).replace("DATE#", ""))[:10]
+        by_date[d] = AP.public_tier0_counts(row.get("habit_statuses") or {}, registry, restraints)
+    done, total = by_date.get(as_of, (0, 0))
+    # The run walks back one calendar day at a time: a day with no tracker row breaks it (never skipped over).
+    run_days = []
+    day = datetime.strptime(as_of, "%Y-%m-%d")
+    while day.strftime("%Y-%m-%d") >= start:
+        run_days.append(by_date.get(day.strftime("%Y-%m-%d"), (0, 0)))
+        day -= timedelta(days=1)
+    return {
+        "as_of_date": as_of,
+        "done": done,
+        "total": total,
+        "pct": round(done / total * 100) if total else 0,
+        "streak": AP.public_tier0_streak(run_days),
+    }
+
+
+def public_tier0_or_none(table, as_of: str, start: str):
+    """``public_tier0_summary`` for a writer that must not fail on it (the daily brief): None — no tier-0 figure is
+    published — when any read fails."""
+    try:
+        return public_tier0_summary(table, as_of, start)
+    except Exception as e:  # noqa: BLE001 — a figure that cannot be counted publicly is not published
+        logger.warning("[public_tier0] figures unavailable, none published: %s", e)
+        return None
+
+
+def public_tier0_narrative(summary) -> str | None:
+    """The public_stats.json habits line from the PUBLIC tier-0 figures (#6224), or None with no figures."""
+    if not summary:
+        return None
+    msg = f"Tier 0 streak: {summary['streak']} days"
+    if summary.get("total"):
+        msg += f" — {summary['pct']}% completion today"
+    return msg + "."
 
 
 def vice_streaks(*, _g) -> dict:
@@ -209,7 +276,7 @@ def vice_streaks(*, _g) -> dict:
     return _ok(RP.unpublished_vice_portfolio(), cache_seconds=3600)
 
 
-def _history_day(item: dict, habitify_by_date: dict, public_by_date: dict, registry: dict, tier0_private: bool) -> dict:
+def _history_day(item: dict, habitify_by_date: dict, public_by_date: dict, registry: dict, tier0_private: bool, restraints=None) -> dict:
     """One /api/habits history day from its habit_scores row, over PUBLIC habits only.
 
     Owner ruling 2026-11-03: when a private habit sits in tier 0 the stored tier-0 counts include it, so
@@ -222,7 +289,7 @@ def _history_day(item: dict, habitify_by_date: dict, public_by_date: dict, regis
     t01_done = int(item.get("tier01_done", t0_done) or t0_done)
     t01_total = int(item.get("tier01_total", t0_total) or t0_total)
     if tier0_private:
-        t0_done, t0_total = t01_done, t01_total = _public_tier0_counts(public_by_date.get(date_str), registry)
+        t0_done, t0_total = t01_done, t01_total = AP.public_tier0_counts(public_by_date.get(date_str), registry, restraints)
     t0_pct = round(t0_done / t0_total * 100) if t0_total else 0
     day = {
         "date": date_str,
@@ -347,9 +414,11 @@ def habits(*, _g) -> dict:
     # `_absorb_habitify_notes`), and the reflection layer is the owner's own words through MCP, so it
     # is not read here at all. `causality` therefore stays absent until a free-text field is approved
     # for publication; the reflections stay stored for the coaches.
-    tier0_private = _private_tier0_habits(registry)
+    # #6224: the stored tier-0 counts also count every restraint habit in tier 0, so while no restraint figure is
+    # published every day is recounted over the public tier-0 habits (the one predicate, AP.public_tier0_counts).
+    tier0_private = (not RP.RESTRAINT_DATA_PUBLISHED) or _private_tier0_habits(registry)
 
-    history = [_history_day(item, habitify_by_date, public_by_date, registry, tier0_private) for item in items]
+    history = [_history_day(item, habitify_by_date, public_by_date, registry, tier0_private, streak_names) for item in items]
 
     # ── #422 EVR-03: cross-page daily-completion signals feed habit GROUP scores ──────
     # ONE signal per evidence page (habit_causality.CROSS_PAGE_SIGNALS), sourced from the
@@ -396,11 +465,8 @@ def habits(*, _g) -> dict:
         last_item = _decimal_to_float(items[-1])
         latest_streak = int(last_item.get("t0_perfect_streak") or 0)
     elif history:
-        # The stored streak counted the private tier-0 habit too: the public run of perfect days.
-        for _d in reversed(history):
-            if not _d.get("perfect"):
-                break
-            latest_streak += 1
+        # The stored streak counted the private (and restraint, #6224) tier-0 habits too: the public run of perfect days.
+        latest_streak = AP.public_tier0_streak((_d.get("t0_done", 0), _d.get("t0_total", 0)) for _d in reversed(history))
 
     # ── Day-of-week analysis (0=Mon ... 6=Sun)
     dow_sums = [0.0] * 7
@@ -644,18 +710,6 @@ def _private_tier0_habits(registry: dict) -> bool:
         if habit_tier(meta) == 0 and not AP.habit_is_public(name, None, meta):
             return True
     return False
-
-
-def _public_tier0_counts(public_statuses, registry: dict) -> tuple:
-    """(done, total) over the day's PUBLIC tier-0 habits (registry tiers; scheduled habits only)."""
-    done = total = 0
-    for name, st in (public_statuses or {}).items():
-        meta = (registry or {}).get(name)
-        if not isinstance(meta, dict) or habit_tier(meta) != 0 or not isinstance(st, dict) or not st.get("scheduled_today", True):
-            continue
-        total += 1
-        done += 1 if st.get("status") == "completed" else 0
-    return done, total
 
 
 def habit_registry(*, _g) -> dict:
