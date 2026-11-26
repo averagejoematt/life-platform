@@ -98,6 +98,27 @@ def _relative_to_days(text: str) -> Optional[float]:
     return float(m.group(1)) * _UNIT_DAYS.get(m.group(2).lower(), 1.0)
 
 
+def _month_floored(text: str) -> bool:
+    """True when the duration was RENDERED in whole months ('2mo ago'): the surface floored the silence to a month
+    boundary, so it may lag the exact figure (#6268). Days, hours, weeks and years are not month-floored here."""
+    m = _REL_DAYS.search(str(text or "").lower())
+    return bool(m) and m.group(2).lower() in ("mo", "month", "months")
+
+
+def _durations_disagree(a: tuple, b: tuple) -> bool:
+    """Do two (days, month_floored) renderings of ONE source's silence name different last-record dates?
+
+    Same granularity (both exact, or both month-floored): the 20%-of-the-larger rule, as before. One month-floored
+    N mo (30N days) against an exact figure e: the floor may only LAG, so e must lie in [30N, 30N + 30) — never
+    below the floor (beyond the 1.5d slack the 20% rule always carried) and never a month or more past it. The
+    month allowance applies ONLY to a surface that actually rendered months: a day-rendered 60 is exact."""
+    (da, fa), (db, fb) = a, b
+    if fa == fb:
+        return abs(da - db) > max(1.5, 0.2 * max(da, db))
+    floor, exact = (da, db) if fa else (db, da)
+    return not (floor - 1.5 <= exact < floor + _MONTH_DAYS)
+
+
 # ── selectors + transforms (registry-named, dispatched here) ─────────────────
 def _select_newest_post(payload: Any) -> Any:
     posts = (payload or {}).get("posts") if isinstance(payload, dict) else None
@@ -329,6 +350,7 @@ def _extract_freshness_rows(payload: dict) -> dict:
                 "label": str(row.get("name") or row["id"]),
                 "narrating_absence": status in ("paused", "stale", "behavioral-stale", "unknown"),
                 "duration_days": duration,
+                "month_floored": False,
                 "duration_rendered": any(row.get(k) is not None for k in reg.DURATION_FIELDS),
                 "cause_text": cause,
             }
@@ -356,6 +378,7 @@ def _extract_status_components(payload: dict) -> dict:
                     "label": str(comp.get("name") or comp["id"]),
                     "narrating_absence": str(comp.get("status") or "") in ("yellow", "red", "blue") and not unreadable,
                     "duration_days": rel_days,
+                    "month_floored": _month_floored(rel),
                     "duration_rendered": bool(rel) and (rel_days is not None or explicit_never),
                     "cause_text": f"{comment} {comp.get('description') or ''}",
                 }
@@ -439,7 +462,7 @@ def _judge_surface_rows(sid, facet, surface_id, rows, violations, advisories, de
     figure is its FRESHEST row — the partition's last record is its newest sub-feed's, which is
     what a one-row surface (the freshness board) renders for the same id.
     """
-    freshest = None
+    freshest = None  # (days, month_floored) of the freshest row
     for row in rows:
         if not row["narrating_absence"]:
             continue
@@ -454,7 +477,8 @@ def _judge_surface_rows(sid, facet, surface_id, rows, violations, advisories, de
             (violations if facet["status"] == "paused" else advisories).append(line)
         elif row["duration_days"] is not None:
             d = float(row["duration_days"])
-            freshest = d if freshest is None else min(freshest, d)
+            if freshest is None or d < freshest[0]:
+                freshest = (d, bool(row.get("month_floored")))
     return freshest
 
 
@@ -491,23 +515,13 @@ def check_absence_agreement(Check, tier, pt_now, *, site_base_url: str, budget: 
     for sid, pairs in durations.items():
         if len(pairs) < 2:
             continue
-        lo = min(p[1] for p in pairs)
-        hi = max(p[1] for p in pairs)
-        # 20% of the larger figure: surfaces legitimately render the SAME silence at
-        # different granularity — the freshness board says `days_dark: 176` where the
-        # health panel says "5mo ago" — and a month-rounded value is up to a month adrift
-        # by construction. Anything past a fifth is two different last-record dates.
-        tol = max(1.5, 0.2 * hi)
-        # #6268: a surface that renders whole months ("2mo ago" -> 60d) FLOORS the silence, so it can
-        # lag the exact figure by up to a month (80d reads as "2mo") — far past a fifth of the larger
-        # figure between day ~75 and ~89. Size the tolerance to that coarsest granularity, but only
-        # when the lagging value really is a month rendering (a whole multiple of 30d); two surfaces
-        # that both speak in days keep the tight bound, so two different last-record dates still fail.
-        if lo >= _MONTH_DAYS and lo % _MONTH_DAYS == 0:
-            tol = max(tol, _MONTH_DAYS)
-        if hi - lo > tol:
-            shown = ", ".join(f"{s}={d:.0f}d" for s, d in pairs)
-            violations.append(f"{sid}: surfaces disagree on how long it has been silent ({shown}; tolerance {tol:.0f}d)")
+        # Surfaces legitimately render the SAME silence at different granularity — the freshness board says
+        # `days_dark: 176` where the health panel says "5mo ago". `_durations_disagree` holds same-granularity
+        # surfaces to a fifth of the larger figure and lets a month-floored surface lag an exact one by less
+        # than a month, one-directionally (#6268). Anything else is two different last-record dates.
+        if any(_durations_disagree(x[1], y[1]) for i, x in enumerate(pairs) for y in pairs[i + 1 :]):
+            shown = ", ".join(f"{s}={d:.0f}d{'(month-floored)' if f else ''}" for s, (d, f) in pairs)
+            violations.append(f"{sid}: surfaces disagree on how long it has been silent ({shown})")
 
     if violations:
         head = "; ".join(violations[:4])
