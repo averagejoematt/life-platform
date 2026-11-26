@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from boto3.dynamodb.conditions import Key
 from common.macrofactor_fields import latest_day_condition  # #5431: intake reads bounded at the Pacific today
 from common.metric_truth import (
+    metric_truth as _metric_truth_facet,  # #6271: the steps resolver's per-source field, for the projection
     steps_by_date as resolved_steps_by_date,  # #4630 — the ONE steps resolver
     steps_sources_by_date as resolved_steps_sources_by_date,  # #4980 — whose count it is
 )
@@ -772,8 +773,12 @@ def pulse_history(*, _g) -> dict:
     today = datetime.now(PT).strftime("%Y-%m-%d")
     whoop_items = _query_source("whoop", EXPERIMENT_START, today)
     withings_items = _query_source("withings", EXPERIMENT_START, today)
-    garmin_items = _query_source("garmin", EXPERIMENT_START, today)
-    ah_items = _query_source("apple_health", EXPERIMENT_START, today)
+    # #6271: the two step sources carry only what is read off them here — the date, the steps resolver's field and (Apple
+    # Health) the active energy — not every whole Apple Health day since genesis (~1.9 MB of DynamoDB JSON per uncached
+    # read, the largest single read of an uncached /api/edition).
+    _steps_field = _metric_truth_facet("steps")["field_by_source"]
+    garmin_items = _query_source("garmin", EXPERIMENT_START, today, projection=("date", _steps_field["garmin"]))
+    ah_items = _query_source("apple_health", EXPERIMENT_START, today, projection=("date", _steps_field["apple_health"], _ACTIVE_KCAL_FIELD))
 
     # Index by date
     whoop_by_date = {}

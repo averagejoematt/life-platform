@@ -27,6 +27,7 @@ from content.public_claim_screen import last_food_arrival_day, screen_public_lin
 from health import character_privacy  # owner ruling 2026-11-05: the published level is the public variant's
 from health.sensor_absence import carry_forward_ok  # #3204: may a value be republished as current?
 
+from web import site_api_habits  # #6224: the public tier-0 figures (one predicate)
 from web.journey_progress import displayed_progress  # the ONE displayed lost/remaining/progress arithmetic
 from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
 
@@ -155,8 +156,32 @@ def refresh_journey(journey: dict, weight, weight_as_of) -> dict:
     }
 
 
+def public_tier0(table):
+    """#6224: the public tier-0 figures (``web.site_api_habits.public_tier0_summary``) for the reader's yesterday (the
+    day the morning brief scores), or None when they cannot be counted — the file then carries no tier-0 figure."""
+    as_of = (datetime.now(PT).date() - timedelta(days=1)).isoformat()
+    return site_api_habits.public_tier0_or_none(table, as_of, EXPERIMENT_START_DATE)
+
+
+def _rebuild_habits_line(payload, tier0):
+    """#6224: the habits line is rebuilt from the public tier-0 figures on every refresh, so a line the morning wrote
+    from the stored (restraint-counting) share leaves the live file at the next refresh. No figures: no line."""
+    narr = dict(payload.get("group_narratives") or {})
+    if not (narr or tier0):
+        return
+    line = site_api_habits.public_tier0_narrative(tier0)
+    if line:
+        narr["habits"] = line
+    else:
+        narr.pop("habits", None)
+    payload["group_narratives"] = narr
+
+
 def resolve_tier0_streak(computed_metrics_record, existing_platform):
-    """#3172: `tier0_streak` is written by daily-metrics-compute onto the
+    """#6224: NOT the public file's streak any more — ``computed_metrics.tier0_streak`` counts restraint habits, so the
+    refresh publishes ``public_tier0`` instead. Kept as pair 7's contracted reader of that field (the owner-side value).
+
+    #3172: `tier0_streak` is written by daily-metrics-compute onto the
     ``computed_metrics`` ``DATE#`` row (``store_computed_metrics`` in
     ``compute.daily_metrics_compute_lambda``) — it was never on the raw ``habitify``
     ingestion partition this refresh cron used to read it from. habitify's raw
@@ -189,7 +214,6 @@ def lambda_handler(event, context):
     # ── 2. Read fresh records from DynamoDB ───────────────────────────────────
     table = _dynamo.Table(TABLE_NAME)
     withings = _get_latest(table, "withings")
-    computed_metrics = _get_latest(table, "computed_metrics")
     apple_health = _get_latest(table, "apple_health")
     character = character_privacy.public_sheet(_get_latest(table, "character_sheet")) or {}  # the public variant only (2026-11-05)
 
@@ -251,9 +275,13 @@ def lambda_handler(event, context):
         "sleep_hours_30d_n": ev.get("sleep_hours_30d_n"),
     }
 
-    # ── 5. Update tier0_streak from computed_metrics if available (#3172) ────
+    # ── 5. The PUBLIC tier-0 streak (#6224) ──────────────────────────────────
+    # computed_metrics.tier0_streak (``resolve_tier0_streak``, #3172) counts every tier-0 habit, restraint habits
+    # among them (owner ruling 2026-11-24: no restraint figure is published), so the public file carries the run
+    # counted through the one public predicate instead — or None when it cannot be counted.
     ep = existing.get("platform", {})
-    fresh_streak = resolve_tier0_streak(computed_metrics, ep)
+    tier0 = public_tier0(table)
+    fresh_streak = tier0["streak"] if tier0 else None
 
     # ── 5b. Water from apple_health ───────────────────────────────────────────
     water_ml = _safe_float(apple_health, "water_intake_ml")
@@ -346,6 +374,8 @@ def lambda_handler(event, context):
             "days_in": max(1, (datetime.now(PT).date() - exp_start).days + 1) if datetime.now(PT).date() >= exp_start else 0,
         },
     }
+
+    _rebuild_habits_line(payload, tier0)  # 6a. #6224
 
     # ── 6b. #6224: the preserved AI lines pass the public-line screen on every refresh ─────
     # The morning brief screens them when it writes; re-screening here means a line written before the

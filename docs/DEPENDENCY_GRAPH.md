@@ -118,7 +118,7 @@ f-string schedule resolved through module constants; `constructed` = built from 
 
 ## 3. Consumer Edges (module → partition)
 
-804 edges from the two-pass AST sweep (#2805 mechanism). Directions:
+803 edges from the two-pass AST sweep (#2805 mechanism). Directions:
 `read` (query/get/seam call), `write` (put/update/delete), `unknown` (partition
 reference outside a recognized call). Site resolution is counted in §6 — a partition
 built from a runtime variable is tagged dynamic in the model, never guessed.
@@ -151,7 +151,7 @@ built from a runtime variable is tagged dynamic in the model, never guessed.
 | `coach_thread` | intelligence_common.py, training_notes.py | tools_coach_intelligence.py |
 | `coach_vision` | — | coach_vision.py |
 | `computed_insights` | daily_brief_lambda.py, daily_insight_compute_lambda.py | daily_insight_compute_lambda.py, weekly_signal_lambda.py |
-| `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_discovery.py, site_api_habits.py, site_stats_refresh_lambda.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
+| `computed_metrics` | acwr_compute_lambda.py, daily_metrics_compute_lambda.py | ai_calls.py, ai_expert_analyzer_lambda.py, ai_output_validator.py, anomaly_detector_lambda.py, coach_nudge_lambda.py, coherence_sentinel_lambda.py, daily_debrief_lambda.py, field_notes_lambda.py, monday_compass_lambda.py, recap_data.py, site_api_discovery.py, site_api_habits.py, tools_health.py, tools_training.py, weekly_digest_lambda.py |
 | `day_grade` | daily_brief_lambda.py, daily_metrics_compute_lambda.py | adaptive_mode_lambda.py, coherence_sentinel_lambda.py, monday_compass_lambda.py, recap_data.py |
 | `decisions` | — | site_api_thirdwall.py, tools_coach_recommendations.py |
 | `deletion_log` | delete_user_data_lambda.py | — |
@@ -600,7 +600,7 @@ Field-level rulings (only non-default fields are declared):
 
 ## 6. Coverage (honest numbers, ADR-104)
 
-- Edge sites: 1399 total · 1006 resolved · 393 dynamic (unresolvable at AST time, tagged — never guessed)
+- Edge sites: 1401 total · 1007 resolved · 394 dynamic (unresolvable at AST time, tagged — never guessed)
 - Schedules: 80 resolved · 0 dynamic of 80 scheduled lambdas (108 lambdas total)
 - Alarms: 153 literal-named declarations across three idioms, 4 composite; routing digest 109 · digest+paging 2 · digest+urgent 10 · paging 2 · urgent 27 · via-composite 3 (dynamically-named per-Lambda `ingestion-error-*` alarms inside the constructor are a stated scope cut)
 - Privacy: 27 owner-only + 3 owner-published sources; 69 owner-only + 11 owner-published fields — non-default entries only

@@ -52,6 +52,9 @@ from web.site_api_common import (
 # measurement date, or a count of measurements with no dates behind it. Two callers
 # need the same suppression (the pre-start countdown and the Day-1 synthetic
 # baseline), so the set lives here once rather than being restated per branch.
+#: #6271: what ``health.weight_trend.latest_weight`` reads off an Apple Health day row (``_record_date`` /
+#: ``_record_weight_lbs``) — pinned against that function by tests/test_edition_origin_reads_6271.py.
+_AH_WEIGHT_PROJECTION = ("date", "weight_lbs", "weight_kg")
 _WEIGHT_ABSENT_FIELDS = (
     "current_weight_lbs",
     "lost_lbs",
@@ -127,7 +130,8 @@ def journey(*, _g) -> dict:
     try:
         # #4088: genesis DATE clamp — the same "this experiment" frame as the withings series above.
         _ah_start = weight_trend.experiment_rate_window(today, EXPERIMENT_START, lookback_days=7)[0]
-        _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today))
+        # #6271: only what latest_weight reads (the date and the two weight fields), not whole Apple Health days
+        _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today, projection=_AH_WEIGHT_PROJECTION))
         # #3478: against a SYNTHETIC anchor the `>` test is wrong twice over — the
         # anchor is the genesis date, so a real Day-1 weigh-in dated ON genesis
         # compares equal and loses to a constant. Any in-cycle reading supersedes it.
@@ -779,6 +783,23 @@ def achievements(*, _g) -> dict:
     except Exception as _fe:  # noqa: BLE001 — a missing ledger must not 500 the surface
         logger.warning("[achievements] First-earn ledger read failed (serving live conditions only): %s", _fe)
         first_earns = {}
+
+    # #6224 (owner ruling 2026-11-24): the stored tier-0 streak (`t0_perfect_streak`) counts restraint habits, so a
+    # streak badge and the summary's streak are judged on the PUBLIC run instead (the one predicate, through
+    # site_api_habits.public_tier0_summary), and the first-earn ledger's streak records — written from the stored
+    # streak — are not served. A failed read fails closed to a zero run (no streak badge, no streak figure).
+    from web import site_api_habits  # noqa: PLC0415 — journey does not otherwise depend on the habits module
+
+    habit_rows = inputs.get("habits") or []
+    as_of = str((habit_rows[-1] or {}).get("sk", "")).replace("DATE#", "")[:10] if habit_rows else ""
+    try:
+        tier0 = site_api_habits.public_tier0_summary(table, as_of, max(d365, _g["EXPERIMENT_START"])) if as_of else None
+    except Exception as _t0e:  # noqa: BLE001
+        logger.warning("[achievements] public tier-0 run unavailable (streak badges judged at zero): %s", _t0e)
+        tier0 = None
+    signals["current_streak"] = tier0["streak"] if tier0 else 0
+    streak_badges = {r.id for r in achievement_rules.BADGE_RULES if r.signal == "current_streak"}
+    first_earns = {k: v for k, v in first_earns.items() if k not in streak_badges}
 
     achievements = achievement_rules.render(signals, first_earns)
     earned_count = sum(1 for a in achievements if a["earned"])
