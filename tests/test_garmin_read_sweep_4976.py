@@ -60,9 +60,10 @@ def test_no_board_member_lists_garmin_as_a_data_source():
 def _q(rows_by_source):
     asked = []
 
-    def fn(source, start, end, include_pilot=False):
+    def fn(source, start, end, include_pilot=False, projection=None):
         asked.append(source)
-        return list(rows_by_source.get(source, []))
+        keep = None if projection is None else {"sk", "tombstone", *projection}  # #6271: as DynamoDB projects
+        return [r if keep is None else {k: v for k, v in r.items() if k in keep} for r in rows_by_source.get(source, [])]
 
     fn.asked = asked
     return fn

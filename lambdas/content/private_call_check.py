@@ -33,6 +33,7 @@ are not matched: they are no cycle's story.
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import re
 from dataclasses import dataclass, field, replace
@@ -104,6 +105,7 @@ def _real(w: str) -> bool:
     return len(w) >= 3 and not any(ch.isdigit() for ch in w) and w not in _FUNCTION
 
 
+@functools.lru_cache(maxsize=4096)
 def _runs(text: str) -> FrozenSet[tuple]:
     """Every ``SHINGLE``-word run of ``text`` with at least four real words — three letters or more, no figure in it,
     not a function word (measured 2026-11-22: date phrases and lab-marker lists matched without the last two)."""
@@ -201,20 +203,24 @@ def coach_names(coach_ids: Iterable[str]) -> Dict[str, Tuple[str, ...]]:
     return out
 
 
-def load(table: Any) -> CallSet:
-    """Every call and ask of every coach partition, classified. Raises when a partition cannot be read (fail closed)."""
+def load(table: Any, coach_rows: Optional[List[Tuple[str, Mapping]]] = None) -> CallSet:
+    """Every call and ask of every coach partition, classified. Raises when a partition cannot be read (fail closed).
+
+    ``coach_rows`` (#6271): the coach partitions' ``PREDICTION#``/``COMMITMENT#`` rows already read whole, as
+    ``web.publication_snapshot.coach_call_rows`` serves them (same partitions, same order); only the forecast partition
+    is then read here. None reads every partition, as before."""
     from common import public_forecast_policy as FPOL
     from web import publication_snapshot
 
     # The Site API's table is a publication wrapper that drops private calls before any reader sees them; this check
     # must see exactly those, so it reads the raw table underneath.
     table = getattr(table, "wrapped", table)
-    pks = [p for p in publication_snapshot.partitions() if p.startswith("COACH#")] + [FPOL.FORECAST_PK]
-    rows: List[Tuple[str, Mapping]] = []
-    for pk in pks:
+    coach_pks = [p for p in publication_snapshot.partitions() if p.startswith("COACH#")]
+    rows: List[Tuple[str, Mapping]] = list(coach_rows) if coach_rows is not None else []
+    for pk in ([] if coach_rows is not None else coach_pks) + [FPOL.FORECAST_PK]:
         for prefix in ("PREDICTION#", "COMMITMENT#"):
             rows += [(pk, it) for it in _read_rows(table, pk, prefix)]
-    return build(rows, coach_names(sorted({pk.replace("COACH#", "", 1) for pk in pks if pk.startswith("COACH#")})))
+    return build(rows, coach_names(sorted(pk.replace("COACH#", "", 1) for pk in coach_pks)))
 
 
 def _read_rows(table: Any, pk: str, prefix: str) -> List[Mapping]:
