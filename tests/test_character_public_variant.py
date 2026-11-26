@@ -212,14 +212,14 @@ def test_public_mind_holds_the_private_components_out_of_sum_and_coverage():
     }
     cfg = character_public.public_config(CONFIG)
     raw, details = character_public.public_mind(det, "core_set_v1", cfg)
+    # #6224: the restraint component is private too (owner ruling 2026-11-24) — out of the sum AND the coverage.
     assert set(k for k in details if not k.startswith("_")) == {
         "t0_habit_compliance",
         "t1_habit_compliance",
-        "vice_control",
         "reading_practice",
     }
     assert details["_data_coverage"] == 1.0  # none of the private weights in the denominator
-    assert raw == round((60 * 0.3 + 60 * 0.1 + 50 * 0.1 + 0 * 0.1) / 0.6, 1)
+    assert raw == round((60 * 0.3 + 60 * 0.1 + 0 * 0.1) / 0.5, 1)
     _raw2, details2 = character_public.public_mind(det, "tier_weighted_v1", cfg)
     assert "t1_habit_compliance" not in details2  # the tier-1 share counted the journal habits
 

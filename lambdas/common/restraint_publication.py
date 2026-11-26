@@ -145,20 +145,22 @@ def load_restraint_names(table: Any, user_prefix: str, user_id: str) -> Optional
     if table is None:
         return None
     try:
-        from boto3.dynamodb.conditions import Key  # noqa: PLC0415 — the pure half of this module needs no boto3
-
+        # String key conditions, not boto3's Key(): this module stays importable with no boto3 at all (#6224 — the
+        # public tier-0 predicate and the character privacy rules import it from CI jobs that never install boto3).
         def first(resp: Any) -> Mapping:
             items = (resp or {}).get("Items") or []
             return items[0] if items and isinstance(items[0], Mapping) else {}
 
         tracker = table.query(
-            KeyConditionExpression=Key("pk").eq(user_prefix + "habitify"),
+            KeyConditionExpression="pk = :pk",
+            ExpressionAttributeValues={":pk": user_prefix + "habitify"},
             ScanIndexForward=False,
             Limit=1,
             ProjectionExpression="habit_statuses",
         )
         scores = table.query(
-            KeyConditionExpression=Key("pk").eq(user_prefix + "habit_scores"),
+            KeyConditionExpression="pk = :pk",
+            ExpressionAttributeValues={":pk": user_prefix + "habit_scores"},
             ScanIndexForward=False,
             Limit=1,
             ProjectionExpression="vice_streaks",

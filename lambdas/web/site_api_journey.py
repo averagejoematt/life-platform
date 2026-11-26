@@ -780,6 +780,23 @@ def achievements(*, _g) -> dict:
         logger.warning("[achievements] First-earn ledger read failed (serving live conditions only): %s", _fe)
         first_earns = {}
 
+    # #6224 (owner ruling 2026-11-24): the stored tier-0 streak (`t0_perfect_streak`) counts restraint habits, so a
+    # streak badge and the summary's streak are judged on the PUBLIC run instead (the one predicate, through
+    # site_api_habits.public_tier0_summary), and the first-earn ledger's streak records — written from the stored
+    # streak — are not served. A failed read fails closed to a zero run (no streak badge, no streak figure).
+    from web import site_api_habits  # noqa: PLC0415 — journey does not otherwise depend on the habits module
+
+    habit_rows = inputs.get("habits") or []
+    as_of = str((habit_rows[-1] or {}).get("sk", "")).replace("DATE#", "")[:10] if habit_rows else ""
+    try:
+        tier0 = site_api_habits.public_tier0_summary(table, as_of, max(d365, _g["EXPERIMENT_START"])) if as_of else None
+    except Exception as _t0e:  # noqa: BLE001
+        logger.warning("[achievements] public tier-0 run unavailable (streak badges judged at zero): %s", _t0e)
+        tier0 = None
+    signals["current_streak"] = tier0["streak"] if tier0 else 0
+    streak_badges = {r.id for r in achievement_rules.BADGE_RULES if r.signal == "current_streak"}
+    first_earns = {k: v for k, v in first_earns.items() if k not in streak_badges}
+
     achievements = achievement_rules.render(signals, first_earns)
     earned_count = sum(1 for a in achievements if a["earned"])
 

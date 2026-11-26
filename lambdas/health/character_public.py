@@ -17,6 +17,10 @@ streaks, buffers, effects, the mood and the headline level never carry a private
   ``t1_habit_compliance`` is held out unless the day's habit score came from the core-12 set: the tier-weighted share
   counted the Morning and Evening Journal habits (both tier 1). The check-in's PRESENCE inside the core set stays in —
   the owner put it in the core twelve.
+* **Restraint habits** (#6224, owner ruling 2026-11-24) — private: Mind's ``vice_control`` is held out of the sum and
+  the coverage (the journal components' treatment, so the public Mind is a function of public inputs only and moves by
+  nothing when a restraint streak does), and no cross-pillar effect whose condition reads a restraint streak is
+  evaluated. The engine receives no restraint streaks at all. Both reopen only with ``RESTRAINT_DATA_PUBLISHED``.
 * **Relationships** — every input is the journal or its enrichment, so the public method has no reading at all: the
   never-instrumented shape every day (no XP, out of the headline mean), and public routes serve it held.
 * **Consistency** — its own inputs are public (data completeness, the task queue); its cross-pillar variance, its
@@ -67,14 +71,19 @@ CHALLENGES_SOURCE = "challenges"
 
 
 def mind_component_is_public(name: str) -> bool:
+    if name in character_privacy.RESTRAINT_COMPONENTS and not character_privacy.restraint_published():
+        return False  # #6224: restraint streaks are private (owner ruling 2026-11-24) — out of the sum AND the coverage
     src = MIND_COMPONENT_SOURCES.get(name)
     return src is not None and activity_publication.source_is_public(src)
 
 
 def public_config(config: dict[str, Any]) -> dict[str, Any]:
-    """The engine config the public method runs under: a deep copy whose Mind component set is its public components.
-    Leveling, weights, bands and effects are method 1's."""
+    """The engine config the public method runs under: a deep copy whose Mind component set is its public components
+    and whose cross-pillar effects are those that read no restraint input (#6224). Leveling, weights and bands are
+    method 1's."""
     cfg = copy.deepcopy(config or {})
+    if isinstance(cfg.get("cross_pillar_effects"), list) and not character_privacy.restraint_published():
+        cfg["cross_pillar_effects"] = [e for e in cfg["cross_pillar_effects"] if not character_privacy.effect_reads_restraint(e)]
     mind = ((cfg.get("pillars") or {}).get("mind") or {}).get("components")
     if isinstance(mind, dict):
         cfg["pillars"]["mind"]["components"] = {k: v for k, v in mind.items() if mind_component_is_public(k)}
@@ -260,7 +269,10 @@ def compute_public_variant(
     pre["relationships"] = public_relationships(cfg)
     hist = [character_engine._from_decimal(h) for h in public_history or []]
     prev_cs = (m1.get("pillar_consistency") or {}).get("components")
-    data: dict[str, Any] = {"date": date, "precomputed_pillars": pre, "engagement_state": engagement, "vice_streaks": vice_streaks}
+    # #6224: the restraint streaks never reach the public engine (no effect, no component reads them) while no restraint
+    # figure is published — the parameter stays so the live compute and the backfill keep one call shape.
+    restraint_in = vice_streaks if character_privacy.restraint_published() else None
+    data: dict[str, Any] = {"date": date, "precomputed_pillars": pre, "engagement_state": engagement, "vice_streaks": restraint_in}
     data.update(consistency_inputs(prev_cs, hist, date))
     bonus = public_challenge_bonus(challenge_bonus)
     if bonus:

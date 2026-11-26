@@ -109,7 +109,8 @@ def test_public_habit_data_moves_mind_as_expected():
     lo = _mind(dict(base, t0_habit_compliance={"score": 40.0}, t1_habit_compliance={"score": 40.0}))[0]
     hi = _mind(dict(base, t0_habit_compliance={"score": 90.0}, t1_habit_compliance={"score": 90.0}))[0]
     assert hi > lo
-    assert hi == round((90 * 0.3 + 90 * 0.1 + 60 * 0.1 + 50 * 0.1) / 0.6, 1)
+    # #6224: vice_control is held out of the public Mind (sum AND coverage) — restraint streaks are private.
+    assert hi == round((90 * 0.3 + 90 * 0.1 + 50 * 0.1) / 0.5, 1)
 
 
 def test_the_unavailable_mind_leaves_the_composite_and_routes_serve_no_score(histories, monkeypatch):
