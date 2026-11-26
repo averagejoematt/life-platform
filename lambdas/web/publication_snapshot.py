@@ -242,8 +242,13 @@ def coach_call_rows(max_age_s: float = TTL_S) -> Optional[tuple]:
         return None
     now = time.monotonic()
     pks = [pk for pk in partitions() if pk.startswith("COACH#")]
-    held = [_PARTS.get(pk) for pk in pks]
-    if not pks or any(p is None or "call_rows" not in p or now - p["at"] >= max_age_s for p in held):
+    held: list = []
+    for pk in pks:
+        p = _PARTS.get(pk)
+        if p is None or "call_rows" not in p or now - p["at"] >= max_age_s:
+            return None
+        held.append(p)
+    if not held:
         return None
     key = tuple((pk, p["version"]) for pk, p in zip(pks, held))
     return key, [(pk, row) for pk, p in zip(pks, held) for row in p["call_rows"]]
