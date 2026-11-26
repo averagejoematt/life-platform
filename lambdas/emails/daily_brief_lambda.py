@@ -2261,6 +2261,12 @@ def lambda_handler(event, context):
     # #6175: no-op when off, dry run or demo. #6158: `sent` is SES's reply — bound ONLY when SES accepted the send.
     brief_trial.record(table, USER_PREFIX, _trial, len(html), _persist, logger, sent=locals().get("_ses_sent"))
 
+    # #6224: the PUBLIC tier-0 figures (one predicate) — the stored streak and share count restraint habits, so
+    # neither public_stats.json writer below publishes them. None: no tier-0 figure at all.
+    from web.site_api_habits import public_tier0_or_none
+
+    _pub_t0 = public_tier0_or_none(table, yesterday, EXPERIMENT_START_DATE) if _persist else None
+
     if _persist:  # #2255: demo_mode OR dry_run
         output_writers.write_dashboard_json(
             data,
@@ -2278,7 +2284,7 @@ def lambda_handler(event, context):
         output_writers.write_clinical_json(data, profile, yesterday)
         output_writers.write_buddy_json(data, profile, yesterday, character_sheet=character_privacy.public_sheet(character_sheet))
         # BS-02: hero stats for averagejoematt.com homepage (Jordan: delta, not absolute)
-        output_writers.write_public_stats_json(data, profile, streak_data=streak_data)
+        output_writers.write_public_stats_json(data, profile, streak_data={"tier0_streak": _pub_t0["streak"] if _pub_t0 else None})
 
         # IC-15: Insight Ledger — persist AI-generated insights for compounding
         if _HAS_INSIGHT_WRITER:
@@ -2336,8 +2342,8 @@ def lambda_handler(event, context):
             _rhr = data.get("rhr") or {}
             _rhr_trend = rhr_trend_str(_rhr.get("rhr_7d"), _rhr.get("rhr_30d"))
 
-            # G-5/tier0_streak FIX: mvp_streak is always set (from _computed OR streak_data above)
-            _tier0_streak = mvp_streak
+            # #6224: the PUBLIC run (restraint and private habits out), never mvp_streak — that one is the owner's.
+            _tier0_streak = _pub_t0["streak"] if _pub_t0 else None
 
             # Journey start date → days_in
             try:
@@ -2479,16 +2485,12 @@ def lambda_handler(event, context):
                 # it on neither path, so the clause had never rendered. TWO writers store
                 # it, both onto SOURCE#habit_scores, both as a FRACTION — so the old
                 # `round(float(pct))%` would have said "1%" for 0.75.
-                _hab_pct = None
-                _hab_scores = fetch_date("habit_scores", yesterday) or {}
-                _hab_frac = safe_float(_hab_scores, "tier0_pct")
-                if _hab_frac is not None:
-                    _hab_pct = _hab_frac * 100
-                if _tier0_streak is not None:
-                    _hab_msg = f"Tier 0 streak: {_tier0_streak} days"
-                    if _hab_pct is not None:
-                        _hab_msg += f" — {round(float(_hab_pct))}% completion today"
-                    _group_narratives["habits"] = _hab_msg + "."
+                # #6224: the stored tier0_pct counts restraint habits — the line is the PUBLIC figures' (one formatter).
+                from web.site_api_habits import public_tier0_narrative
+
+                _hab_line = public_tier0_narrative(_pub_t0)
+                if _hab_line:
+                    _group_narratives["habits"] = _hab_line
                 # Mind — character level + tier
                 if character_sheet:
                     _cs = character_sheet if isinstance(character_sheet, dict) else {}

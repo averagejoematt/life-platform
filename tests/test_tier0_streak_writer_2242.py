@@ -177,16 +177,18 @@ def test_fallback_brief_writer_agrees_with_the_primary(monkeypatch):
 # ── 2. Writer output → the reader surfaces ────────────────────────────────────
 
 
-def test_habit_streaks_endpoint_reports_the_written_streak(monkeypatch):
-    """/api/habit_streaks returns a nonzero aggregate_streak off the row the
-    writer produced (no hand-typed field name anywhere in this path)."""
+def test_habit_streaks_endpoint_never_serves_the_stored_streak(monkeypatch):
+    """#6224 (owner ruling 2026-11-24): the stored `t0_perfect_streak` counts every tier-0 habit, restraint habits
+    among them, so /api/habit_streaks serves the PUBLIC run (``site_api_habits.public_tier0_summary``) instead — with
+    no Habitify statuses in this table there is no public tier-0 habit and the run is 0, whatever the writer stored.
+    The public run's own behaviour is tests/test_restraint_public_figures_6224.py's."""
     import json
 
     monkeypatch.setattr(dmc, "table", FakeTable(), raising=False)
     table, _row = _write(31)
-    resp = habits.habit_streaks(_g={"table": table})
+    resp = habits.habit_streaks(_g={"table": table, "_experiment_date": lambda _n: "2026-07-01"})
     body = json.loads(resp["body"])["habit_streaks"]
-    assert body["aggregate_streak"] == 31
+    assert body["aggregate_streak"] == 0 and body["tier0_total"] == 0
 
 
 def _achievements(monkeypatch, table):
@@ -199,13 +201,14 @@ def _achievements(monkeypatch, table):
     return {a["id"]: a for a in json.loads(resp["body"])["achievements"]}
 
 
-@pytest.mark.parametrize("streak,expected_earned", [(0, ()), (7, ("week_warrior",)), (180, STREAK_BADGES)])
-def test_streak_badges_transition_from_unearned_to_earned(monkeypatch, streak, expected_earned):
-    monkeypatch.setattr(dmc, "table", FakeTable(), raising=False)
-    table, _row = _write(streak)
-    badges = _achievements(monkeypatch, table)
-    for bid in STREAK_BADGES:
-        assert badges[bid]["earned"] is (bid in expected_earned), f"{bid} earned={badges[bid]['earned']} at streak={streak}"
+def test_the_stored_streak_alone_earns_no_streak_badge(monkeypatch):
+    """#6224: the streak badges are judged on the PUBLIC run, never the stored `t0_perfect_streak` (it counts restraint
+    habits). With no Habitify statuses there is no public run, so no stored value — 0, 7 or 180 — earns one."""
+    for streak in (0, 7, 180):
+        monkeypatch.setattr(dmc, "table", FakeTable(), raising=False)
+        table, _row = _write(streak)
+        badges = _achievements(monkeypatch, table)
+        assert not [b for b in STREAK_BADGES if badges[b]["earned"]], f"a stored streak of {streak} earned a public streak badge"
 
 
 def test_streak_badges_read_the_written_row_directly(monkeypatch):
