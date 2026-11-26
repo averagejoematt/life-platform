@@ -22,6 +22,7 @@ cached ``TTL_S`` per table, like the graded record.
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 TTL_S = 900  # = publication_snapshot.TTL_S: the publication reads age together
@@ -69,14 +70,18 @@ def read(table: Any) -> dict:
     from web import publication_snapshot as PS  # noqa: PLC0415
 
     raw = _raw(table)
-    out: dict = {}
-    for pk in PS.partitions():
-        if pk == PS.DOCKET_PK:
-            continue
-        out[pk] = []
+    pks = [pk for pk in PS.partitions() if pk != PS.DOCKET_PK]
+
+    def _one(pk: str) -> list:
+        rows: list = []
         for prefix in SK_PREFIXES:
-            out[pk] += PS._query_pages(raw, pk, prefix)
-    return out
+            rows += PS._query_pages(raw, pk, prefix)
+        return rows
+
+    # #6271: the partitions are read at once (the snapshot's own pool size), not one after another — the same rows, keyed
+    # in partition order; any failed read still raises out of here.
+    with ThreadPoolExecutor(max(1, min(PS._WORKERS, len(pks)))) as ex:
+        return dict(zip(pks, ex.map(_one, pks)))
 
 
 def load(table: Any) -> tuple:

@@ -321,26 +321,46 @@ def _is_tainted(text: str) -> bool:
     return narrative_publication.is_tainted(text) or withheld_outputs.matcher(withheld_outputs.load(table))(text)
 
 
-_CALLS_CACHE: dict = {"at": None, "calls": None}
+_CALLS_CACHE: dict = {"at": None, "calls": None, "snap": None}
 _CALLS_TTL_S = 900  # = publication_snapshot.TTL_S: the two publication reads age together
+
+
+def _snapshot_call_rows() -> Any:
+    """#6271: ``(key, rows)`` of the coach partitions' calls and asks from the request's complete publication snapshot
+    (``publication_snapshot.coach_call_rows``), or None — no snapshot, or one partition without a fresh good read."""
+    from web import publication_snapshot  # noqa: PLC0415
+
+    try:
+        publication_snapshot.complete()  # the request's freshness check (once per request; the edition gate needs it anyway)
+        return publication_snapshot.coach_call_rows()
+    except Exception:  # noqa: BLE001 — the check then reads every partition itself, exactly as before #6271
+        return None
 
 
 def _private_calls() -> Any:
     """#6199: the calls the publication policy classifies, read from the RAW table (cached ``_CALLS_TTL_S``); None when
-    they cannot be read — every edition is then withheld (fail closed)."""
+    they cannot be read — every edition is then withheld (fail closed).
+
+    #6271: the coach partitions' call and ask rows are the ones the request's publication snapshot already read whole
+    (the same partitions, prefixes and order), so the set is built from them and only the forecast partition is read
+    again — the second full read of every coach partition was a third of an uncached /api/chapters. The set is rebuilt
+    whenever the snapshot re-reads a coach partition, so it is never older than the snapshot's own TTL. Without a fresh
+    snapshot the check reads every partition itself, as before."""
     import time  # noqa: PLC0415
 
     now = time.monotonic()
-    if _CALLS_CACHE["at"] is not None and now - _CALLS_CACHE["at"] < _CALLS_TTL_S and _CALLS_CACHE["calls"] is not None:
+    snap = _snapshot_call_rows()
+    held = _CALLS_CACHE["calls"] is not None and _CALLS_CACHE["at"] is not None and now - _CALLS_CACHE["at"] < _CALLS_TTL_S
+    if held and (snap is None or _CALLS_CACHE["snap"] == snap[0]):
         return _CALLS_CACHE["calls"]
     try:
-        calls = private_call_check.load(table)
+        calls = private_call_check.load(table) if snap is None else private_call_check.load(table, coach_rows=snap[1])
     except Exception as e:  # noqa: BLE001
         logger.error(
             f"[chapters] #6199 private-call check: the coach calls could not be read ({type(e).__name__}: {e}) — editions withheld"
         )
         return None
-    _CALLS_CACHE.update(at=now, calls=calls)
+    _CALLS_CACHE.update(at=now, calls=calls, snap=None if snap is None else snap[0])
     return calls
 
 

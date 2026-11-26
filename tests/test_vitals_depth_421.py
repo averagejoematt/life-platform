@@ -30,12 +30,19 @@ def _strava_day(date, activities):
     return {"sk": f"DATE#{date}", "date": date, "activities": activities, "phase": "pilot"}
 
 
+def _projected(rows, projection):
+    """What DynamoDB returns for ``projection`` (#6271): ``sk``/``tombstone`` and the named attributes only — so a field
+    the handler reads but does not project is missing here, as it would be live."""
+    keep = None if projection is None else {"sk", "tombstone", *projection}
+    return [r if keep is None else {k: v for k, v in r.items() if k in keep} for r in rows]
+
+
 def _fake_query(garmin=None, strava=None):
-    def _q(source, start, end, include_pilot=False):
+    def _q(source, start, end, include_pilot=False, projection=None):
         if source == "garmin":
-            return list(garmin or [])
+            return _projected(list(garmin or []), projection)
         if source == "strava":
-            return list(strava or [])
+            return _projected(list(strava or []), projection)
         return []
 
     return _q

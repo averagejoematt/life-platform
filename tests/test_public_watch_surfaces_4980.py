@@ -167,7 +167,7 @@ def test_vo2max_points_name_their_device(monkeypatch):
             {"date": "2026-10-20", "vo2max": 33.0, **_restricted_apple_fields()},
         ],
     }
-    monkeypatch.setattr(vd, "_query_source", lambda source, start, end, include_pilot=False: rows.get(source, []))
+    monkeypatch.setattr(vd, "_query_source", lambda source, start, end, include_pilot=False, projection=None: rows.get(source, []))
     text = vd.handle_vitals_depth()["body"]
     _assert_clean(text)
     vo = json.loads(text)["vo2max"]

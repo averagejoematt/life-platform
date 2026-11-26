@@ -61,6 +61,8 @@ _SCOPE_MULTI_YEAR = "multi_year"
 _VO2 = metric_truth.VO2_MAX  # #4976: the arc reads through the resolver, never a device field
 _WALK_WINDOW_DAYS = 182  # the rendered walking-HR trend is the last ~6 months (recent read)
 _FITNESS_BASIS_DAYS = 180  # VO2max readings feeding the fitness-age estimate (recent aerobic state)
+#: #6271: what the walking-HR panel reads off a Strava day row (the read seam's dedupe reads only ``activities`` too).
+_WALK_PROJECTION = ("date", "activities")
 
 
 def _today() -> str:
@@ -180,7 +182,14 @@ def _vo2max_arc():
     on, Garmin's stored estimates for the history before it (the direct feed is retired, #4640;
     its rows are read, never rewritten). Real estimates only; gaps stay gaps. Each point carries
     the source that answered for its day, because two vendors' estimators are not one series."""
-    rows_by_source = {src: _query_source(src, _ARC_EARLIEST, _today(), include_pilot=True) for src in metric_truth.sources_for(_VO2)}
+    # #6271: each source's rows carry only the date and the one field the resolver reads for it (``field_by_source``) —
+    # the same rows (DynamoDB filters before it projects), not every whole Apple Health day since 2010 (17 MB of
+    # DynamoDB JSON per uncached request, ~11 s in the Lambda, for one number per day).
+    fields = metric_truth.metric_truth(_VO2)["field_by_source"]
+    rows_by_source = {
+        src: _query_source(src, _ARC_EARLIEST, _today(), include_pilot=True, projection=("date", fields[src]))
+        for src in metric_truth.sources_for(_VO2)
+    }
     series = []
     for d, r in sorted(metric_truth.resolve_by_date(_VO2, rows_by_source).items()):
         if r.value is None or r.value <= 0:
@@ -230,7 +239,7 @@ def _walking_hr():
     Points are per-walk (multiple walks in a day are kept — that's real), positioned by date so a
     sparse cadence renders as real gaps. The rendered series is the recent window; n_total reports
     the full recorded depth."""
-    rows = _query_source("strava", _ARC_EARLIEST, _today(), include_pilot=True)
+    rows = _query_source("strava", _ARC_EARLIEST, _today(), include_pilot=True, projection=_WALK_PROJECTION)
     walks = []
     for r in rows:
         for a in r.get("activities") or []:

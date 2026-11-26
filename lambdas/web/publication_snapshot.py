@@ -39,6 +39,9 @@ TTL_S = 900  # = web.call_publication.LOOKUP_TTL_S: the gate's two caches age to
 DOCKET_PK = "ENSEMBLE#docket"
 _WORKERS = 8
 _MAX_PAGES = 24
+#: The call and ask rows ``coach_call_rows`` keeps (= ``content.private_call_check``'s two prefixes, both inside
+#: ``narrative_publication.COUNTED_SK_PREFIXES``, so this read already carries them — pinned by a test).
+CALL_ROW_PREFIXES = ("PREDICTION#", "COMMITMENT#")
 
 
 class SnapshotUnavailable(RuntimeError):
@@ -189,7 +192,14 @@ def ensure(pks: Optional[Iterable[str]] = None, force: bool = False) -> None:
         STATS["reads"] += 1
         _REQ["sets"] = None
         _STATE["version"] += 1
-        _PARTS[pk] = {"at": time.monotonic(), "version": _STATE["version"], **_digest(raw, pk, rows)}
+        _PARTS[pk] = {
+            "at": time.monotonic(),
+            "version": _STATE["version"],
+            **_digest(raw, pk, rows),
+            # #6271: the same read's calls and asks, whole and in read order — private_call_check builds its set from them
+            # instead of reading every coach partition a second time (``coach_call_rows``)
+            "call_rows": [r for r in rows if str(r.get("sk") or "").startswith(CALL_ROW_PREFIXES)],
+        }
 
 
 def complete() -> tuple:
@@ -218,6 +228,25 @@ def complete() -> tuple:
     sets = (_STATE["exact"], _STATE["shingles"])
     _REQ["sets"] = sets
     return sets
+
+
+def coach_call_rows(max_age_s: float = TTL_S) -> Optional[tuple]:
+    """``(key, [(pk, row), ...])`` — every ``PREDICTION#`` then ``COMMITMENT#`` row of every ``COACH#`` partition, from the
+    snapshot's last good reads, in ``content.private_call_check.load``'s order (partition order, calls before asks, each
+    in key order). ``key`` changes whenever one of those partitions is re-read.
+
+    None — the caller then reads the partitions itself — unless EVERY coach partition has a good read younger than
+    ``max_age_s``: a partition whose re-read failed is served stale to the taint (``ensure``) but never to this (#6271:
+    the private-call check fails closed on a failed read, and reading its rows from here must not change that)."""
+    if not active():
+        return None
+    now = time.monotonic()
+    pks = [pk for pk in partitions() if pk.startswith("COACH#")]
+    held = [_PARTS.get(pk) for pk in pks]
+    if not pks or any(p is None or "call_rows" not in p or now - p["at"] >= max_age_s for p in held):
+        return None
+    key = tuple((pk, p["version"]) for pk, p in zip(pks, held))
+    return key, [(pk, row) for pk, p in zip(pks, held) for row in p["call_rows"]]
 
 
 def calls(pk: str) -> Optional[tuple]:

@@ -68,6 +68,7 @@ the backup script the only writer of ``…#01``, ``/api/chapters`` the only publ
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import html
 import re
@@ -345,6 +346,16 @@ def word_count(text: str) -> int:
 PRIVATE_CALLS_NOT_WIRED: Any = object()
 
 
+@functools.lru_cache(maxsize=256)
+def _truth_findings(text: str) -> tuple:
+    """The ``truth:`` findings of ``text`` — ``content.story_checks``' staged-encounter and reader-surface checks, both pure
+    regex over the text alone, so they are remembered per text (#6271: the Site API gates the same approved edition texts
+    on every /api/chapters request, and these two were a third of that gate's time)."""
+    from content import story_checks  # noqa: PLC0415
+
+    return tuple(f"truth: {f}" for f in (*story_checks.staged_encounter_findings(text), *story_checks.reader_surface(text)))
+
+
 def gate_findings(
     text: Any, *, tainted: Optional[Callable[[str], bool]], private_calls: Any, filter_hits: Optional[Callable[[str], list]] = None
 ) -> list:
@@ -365,15 +376,9 @@ def gate_findings(
       tests/test_chapter_reads_withdrawn_6199.py. ``tainted`` above is a different policy (the narrative record's
       verbatim taint) and stays beside it.
     """
-    from content import story_checks  # noqa: PLC0415
-
     if not isinstance(text, str) or not text.strip():
         return ["empty: no text"]
-    out: list = []
-    for f in story_checks.staged_encounter_findings(text):
-        out.append(f"truth: {f}")
-    for f in story_checks.reader_surface(text):
-        out.append(f"truth: {f}")
+    out: list = list(_truth_findings(text))
     try:
         if filter_hits is None:  # the caller passes privacy_guard.find_violations; none given = nothing unchecked
             raise LookupError("no content-filter vocabulary was given")
