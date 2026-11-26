@@ -171,6 +171,8 @@ def _flatten_key_condition(expr):
         yield None, operand, None
     elif name == "sk" and operator == "BETWEEN":
         yield None, None, (operand, values[2])
+    elif name == "sk" and operator == "=":
+        yield None, None, (operand, operand)
 
 
 class FakeTable:
@@ -1989,8 +1991,38 @@ class TestCockpitGroupNarratives:
         n = self._narratives(handler_env)
         assert "HRV" in n["recovery"] and "recovery 62%" in n["recovery"]
 
-    def test_the_habits_line_reports_the_tier_zero_streak(self, handler_env):
-        assert "Tier 0 streak: 12 days" in self._narratives(handler_env)["habits"]
+    def _seed_public_tier0(self, handler_env, monkeypatch, restraint_done: bool):
+        """#6224: three days of Habitify statuses — one ordinary tier-0 habit kept every day, one restraint tier-0 habit
+        (synthetic name) kept or missed — with the owner's registry. The public figures count the ordinary habit only."""
+        from common import activity_publication as AP
+
+        monkeypatch.setattr(brief, "EXPERIMENT_START_DATE", "2026-08-01")
+        ids = sorted(AP.PUBLIC_HABIT_IDS)
+        t = handler_env["table"]
+        prof = {"pk": f"USER#{brief.USER_ID}", "sk": "PROFILE#v1"}
+        prof["habit_registry"] = {
+            "ordinary_a": {"status": "active", "tier": 0},
+            "restraint_a": {"status": "active", "tier": 0, "vice": True},
+        }
+        t.store[(prof["pk"], prof["sk"])] = prof
+        for d in ("2026-08-04", "2026-08-05", YESTERDAY):
+            st = {
+                "ordinary_a": {"status": "completed", "habit_id": ids[0], "group": "Core", "scheduled_today": True},
+                "restraint_a": {"status": "completed" if restraint_done else "failed", "habit_id": ids[1], "group": "Core"},
+            }
+            r = day_row("habitify", d, habit_statuses=st)
+            t.store[(r["pk"], r["sk"])] = r
+
+    def test_the_habits_line_reports_the_public_tier_zero_figures(self, handler_env, monkeypatch):
+        """#6224: the line is the PUBLIC run and share. The restraint habit was MISSED every day: counted, it would make
+        the share 50% and the run 0. The stored streak (12 here) and tier0_pct count restraint habits and never reach it.
+        (Invariance across the restraint state is tests/test_restraint_public_figures_6224.py's.)"""
+        self._seed_public_tier0(handler_env, monkeypatch, restraint_done=False)
+        hs = day_row("habit_scores", YESTERDAY, tier0_pct=Decimal("0.5"), tier0_done=1, tier0_total=2)
+        handler_env["table"].store[(hs["pk"], hs["sk"])] = hs
+        n = self._narratives(handler_env)
+        assert n["habits"] == "Tier 0 streak: 3 days — 100% completion today."
+        assert _published(handler_env)["platform"]["tier0_streak"] == 3
 
     def test_a_pillar_with_no_data_gets_no_sentence_rather_than_an_empty_one(self, handler_env):
         """Absence is silence, not "0 min" (ADR-104)."""
@@ -1998,10 +2030,12 @@ class TestCockpitGroupNarratives:
         assert "activity" not in n  # no Strava rows seeded
         assert "nutrition" not in n  # no CGM, no delivery streak
 
-    def test_the_habits_line_carries_todays_completion_percentage(self, handler_env):
+    def test_with_no_public_tier_zero_habit_the_line_carries_no_share(self, handler_env):
+        """#6224: no Habitify statuses (so no public tier-0 habit) — the stored 75% is never published."""
         hs = day_row("habit_scores", YESTERDAY, tier0_pct=Decimal("0.75"), tier0_done=3, tier0_total=4)
         handler_env["table"].store[(hs["pk"], hs["sk"])] = hs
-        assert "completion today" in self._narratives(handler_env)["habits"]
+        line = self._narratives(handler_env).get("habits") or ""
+        assert "completion today" not in line and "12 days" not in line
 
     def test_zone_two_minutes_exclude_work_done_above_zone_two(self, handler_env):
         sprint = day_row(

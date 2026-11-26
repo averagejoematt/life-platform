@@ -317,7 +317,8 @@ def test_journal_derived_character_components_are_never_named():
 
     assert not cp.component_is_publishable("journal_consistency")
     assert not cp.component_is_publishable("values_alignment")
-    assert cp.component_is_publishable("vice_control")
+    assert cp.component_is_publishable("t0_habit_compliance")  # the public control (#6224 made vice_control private)
+    assert not cp.component_is_publishable("vice_control")
     assert cp.event_driver_score("journal_consistency", {"score": 90}) is None
 
 

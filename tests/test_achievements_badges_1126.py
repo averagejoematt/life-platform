@@ -129,8 +129,33 @@ def _by_id(body):
     return {a["id"]: a for a in body["achievements"]}
 
 
+def _public_tier0_rows(n):
+    """#6224: the streak badges are judged on the PUBLIC tier-0 run (one ordinary tier-0 habit kept on each of the last
+    n days, plus a restraint tier-0 habit missed every day — counted, it would break every day), so the rungs read the
+    Habitify statuses and the owner's registry, never the stored `t0_perfect_streak`."""
+    from common import activity_publication as AP
+
+    ids = sorted(AP.PUBLIC_HABIT_IDS)
+    today = datetime.now(timezone.utc)
+    rows = [
+        {
+            "pk": "USER#matthew",
+            "sk": "PROFILE#v1",
+            "habit_registry": {"ordinary_a": {"status": "active", "tier": 0}, "restraint_a": {"status": "active", "tier": 0, "vice": True}},
+        }
+    ]
+    for i in range(n):
+        d = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+        st = {
+            "ordinary_a": {"status": "completed", "habit_id": ids[0], "group": "Core", "scheduled_today": True},
+            "restraint_a": {"status": "failed", "habit_id": ids[1], "group": "Core", "scheduled_today": True},
+        }
+        rows.append({"pk": "USER#matthew#SOURCE#habitify", "sk": f"DATE#{d}", "date": d, "habit_statuses": st})
+    return rows
+
+
 def test_streak_rungs_fortnight_and_half_year(monkeypatch):
-    body = _by_id(_call(monkeypatch, rows=_habit_rows(14, streak=14)))
+    body = _by_id(_call(monkeypatch, rows=_habit_rows(14, streak=14) + _public_tier0_rows(14)))
     assert body["week_warrior"]["earned"] is True
     assert body["fortnight"]["earned"] is True
     assert body["monthly_grind"]["earned"] is False
@@ -139,7 +164,7 @@ def test_streak_rungs_fortnight_and_half_year(monkeypatch):
     assert body["monthly_grind"]["unlock_hint"] == "16 days to unlock"
     assert body["half_year_hold"]["unlock_hint"] == "166 days to unlock"
 
-    below = _by_id(_call(monkeypatch, rows=_habit_rows(13, streak=13)))
+    below = _by_id(_call(monkeypatch, rows=_habit_rows(13, streak=13) + _public_tier0_rows(13)))
     assert below["fortnight"]["earned"] is False
     assert below["fortnight"]["unlock_hint"] == "1 days to unlock"
 

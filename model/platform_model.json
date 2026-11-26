@@ -5990,13 +5990,6 @@
       "direction": "read",
       "lambda": "site-stats-refresh",
       "module": "lambdas/web/site_stats_refresh_lambda.py",
-      "partition": "computed_metrics",
-      "via": "local-seam"
-    },
-    {
-      "direction": "read",
-      "lambda": "site-stats-refresh",
-      "module": "lambdas/web/site_stats_refresh_lambda.py",
       "partition": "macrofactor",
       "via": "local-seam"
     },
@@ -8429,7 +8422,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 804,
+      "edges": 803,
       "lambdas": 108,
       "mcp_tool_modules": 45,
       "mcp_tools": 96,
@@ -8443,9 +8436,9 @@
     },
     "coverage": {
       "edge_sites": {
-        "sites_dynamic": 393,
-        "sites_resolved": 1006,
-        "sites_total": 1399
+        "sites_dynamic": 394,
+        "sites_resolved": 1007,
+        "sites_total": 1401
       },
       "schedule_resolution": {
         "dynamic": 0,
