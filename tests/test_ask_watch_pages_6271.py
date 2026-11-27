@@ -27,12 +27,12 @@ from health import watch_signals  # noqa: E402
 from web import site_api_ai_context as A  # noqa: E402
 from web.site_api_common import USER_PREFIX  # noqa: E402
 
-TODAY = "2026-03-15"
+WINDOW_END = "2026-03-15"
 PK = f"{USER_PREFIX}{watch_signals.APPLE}"
 
 
 def _day(offset: int) -> str:
-    return (date.fromisoformat(TODAY) - timedelta(days=offset)).isoformat()
+    return (date.fromisoformat(WINDOW_END) - timedelta(days=offset)).isoformat()
 
 
 def _size(item: dict) -> int:
@@ -77,13 +77,13 @@ def _rows(n_days: int = 30, *, missing=()) -> list:
             continue
         d = _day(o)
         out.append({"pk": PK, "sk": f"DATE#{d}", "date": d, "resting_heart_rate": Decimal(50 + o % 7), "padding": "x" * 2000})
-    out.append({"pk": f"{USER_PREFIX}other", "sk": f"DATE#{TODAY}", "date": TODAY})
+    out.append({"pk": f"{USER_PREFIX}other", "sk": f"DATE#{WINDOW_END}", "date": WINDOW_END})
     return out
 
 
 def _read(table, monkeypatch) -> list:
     monkeypatch.setattr(A, "_table", lambda: table)
-    return A._recent_day_rows(watch_signals.APPLE, watch_signals.ARC_DAYS, TODAY)
+    return A._recent_day_rows(watch_signals.APPLE, watch_signals.ARC_DAYS, WINDOW_END)
 
 
 def _old_rows(table, monkeypatch) -> list:
@@ -98,7 +98,7 @@ def _dates(rows) -> list:
 
 
 def _window_bytes() -> int:
-    return sum(_size(r) for r in _rows() if r["pk"] == PK and _day(watch_signals.ARC_DAYS - 1) <= r["date"] <= TODAY)
+    return sum(_size(r) for r in _rows() if r["pk"] == PK and _day(watch_signals.ARC_DAYS - 1) <= r["date"] <= WINDOW_END)
 
 
 def test_a_window_of_one_page_reads_the_same_rows_as_before(monkeypatch):
@@ -112,9 +112,9 @@ def test_one_item_over_the_boundary_the_newest_day_was_lost_and_is_now_read(monk
     limit = _window_bytes() - 1
     old = _old_rows(PagingTable(_rows(), page_bytes=limit), monkeypatch)
     new = _read(PagingTable(_rows(), page_bytes=limit), monkeypatch)
-    assert TODAY not in _dates(old)  # the defect: the newest day sat on the second page
+    assert WINDOW_END not in _dates(old)  # the defect: the newest day sat on the second page
     assert _dates(new) == _dates(_read(PagingTable(_rows()), monkeypatch))
-    assert _dates(new)[-1] == TODAY and _dates(new) == sorted(_dates(new))
+    assert _dates(new)[-1] == WINDOW_END and _dates(new) == sorted(_dates(new))
 
 
 def test_many_pages_keep_the_order_and_the_window(monkeypatch):
