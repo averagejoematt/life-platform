@@ -30,12 +30,10 @@ N_DAYS = 10
 TREES = {"new": ROOT}
 # A hermetic two-step ladder on the amended tree (the real ladder's first steps need the pre-amendment tree from git):
 # step 1 takes Mind verbatim from the stored row, step 2 is the plan (Mind re-weighted from its stored components).
+_STEP1 = {"tree": "new", "rebuild": ["movement", "nutrition"], "loader": "held_skip", "relationships": "engine"}
 TEST_LADDER = (
-    (
-        "fidelity",
-        "replay_residual",
-        {"tree": "new", "rebuild": ["movement", "nutrition"], "loader": "held_skip", "relationships": "engine"},
-    ),
+    ("fidelity", "replay_residual", _STEP1),
+    ("switch", "tree_switch_residual", dict(_STEP1)),  # a control: the same method again, so it must change nothing
     ("plan", "missing_data", T.PLAN_SPEC),
 )
 
@@ -572,3 +570,48 @@ def test_a_sick_day_freeze_copy_of_a_stale_stress_day_counts_and_is_rewritten(se
     assert planned["sick_day"] is True and planned["frozen_from"] == _d(SICK_DAY - 1)  # the freeze fields kept as stored
     assert planned["pillar_mind"] == planned_prev["pillar_mind"]  # the copy follows the RECOMPUTED previous day
     assert planned["pillar_mind"]["components"]["stress_management"].get("held_out") is True
+
+
+def test_planned_receipts_reader_uses_the_planned_sheets_convention(seeded, tmp_path):
+    _store, plan = seeded
+    (tmp_path / "out").mkdir(exist_ok=True)
+    path = T.write_outputs(plan, str(tmp_path / "out"))["plan"]
+    receipts = A.planned_receipts(path)
+    assert sorted(receipts) == [_d(i) for i in range(N_DAYS) if i % 2 == 0 and i != SICK_DAY]
+    one = receipts[_d(0)]
+    assert one["pk"] == T.RECEIPT_PK and one["engine_version"] == "1.10.0" and isinstance(one["receipt_schema_version"], float)
+    assert one["public"] == {"origin": "synthetic"} and one[T.PROVENANCE]["kind"] == T.PROVENANCE_KIND
+
+
+def test_ladder_states_reconcile_to_the_plan_and_the_control_equals_its_predecessor(seeded, tmp_path):
+    import recompute_character_private_report as R
+
+    _store, plan = seeded
+    (tmp_path / "out").mkdir(exist_ok=True)
+    path = T.write_outputs(plan, str(tmp_path / "out"))["plan"]
+    states = A.ladder_states(path)
+    assert list(states) == [c for _n, c, _s in TEST_LADDER]
+    sheets = A.planned_sheets(path)
+    assert states["missing_data"] == {d: R.chain_state(sheets[d]) for d in sorted(sheets)}  # the last step IS the plan
+    assert states["tree_switch_residual"] == states["replay_residual"]  # the control changes nothing
+    one = states["missing_data"][_d(1)]
+    assert set(one) == {"character_level", "character_xp", "composite", "pillars", "events"}
+    assert one["pillars"]["relationships"] == {"raw_score": None, "level": None}
+    assert set(one["pillars"]) == set(R.STATE_PILLARS)
+    # the ablation question the public side asks: at which step did a value first change?
+    changed = [
+        c
+        for prev, c in zip(list(states), list(states)[1:])
+        if states[prev][_d(0)]["pillars"]["mind"] != states[c][_d(0)]["pillars"]["mind"]
+    ]
+    assert changed == ["missing_data"]  # day 0 is a stale-stress seed: Mind moves when it is re-weighted
+
+
+def test_ladder_states_reader_refuses_a_plan_without_them(seeded, tmp_path):
+    _store, plan = seeded
+    (tmp_path / "out").mkdir(exist_ok=True)
+    old = {k: v for k, v in plan.items() if k != "ladder_states"}
+    path = T.write_outputs(old, str(tmp_path / "out"))["plan"]
+    assert A.planned_sheets(path)  # an older plan still reads (the field is additive)
+    with pytest.raises(T.PlanGuardError):
+        A.ladder_states(path)

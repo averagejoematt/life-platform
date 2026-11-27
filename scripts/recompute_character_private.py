@@ -67,6 +67,19 @@ the stored rows (``planned_sheets(path)`` returns them in the shape ``backfill_p
   accounting         ladder_totals, net_attribute_causes, changed_then_restored, sheet_rows_to_write (reconciled)
   counts / stress_days / served_baseline / events / challenge_xp / preserved_non_engine_attributes / notes
 
+LADDER STATES (``ladder_states`` in the plan; additive, outside the plan id; read with
+``recompute_character_private_apply.ladder_states(path)``) — the chain's values AFTER each step, cumulatively:
+
+  {cause: {date: {"character_level": float|None, "character_xp": float|None, "composite": float|None,
+                  "pillars": {pillar: {"raw_score": float|None, "level": float|None}},
+                  "events": [{"who", "type", "old", "new"}]}}}
+
+  keyed by every cause in ``ladder`` order (replay_residual … missing_data); the last cause's states are the plan's
+  planned sheets. ``composite`` is the mean raw score over the pillars that carry one and are not not-instrumented
+  (``/api/character``'s composite rule); a pillar with no number (Relationships under the amended method) is
+  {"raw_score": None, "level": None}. The first step at which a value differs from the previous step's (or, for
+  replay_residual, from the stored row) is the step that produced the change.
+
 CAUSES (ladder order): replay_residual (not a method change) · stress_days · journal_frequency · model_values ·
 xp_debt · rest_decay · tree_switch_residual (control, must be 0) · relationships_exclusion · missing_data; stamps:
 method_version_stamp · recompute_provenance. Mind's two removals are attributed separately (journal_frequency, then
@@ -776,6 +789,7 @@ def dry_run(
         "ladder": [{"step": n, "cause": c, "spec": s} for n, c, s in ladder],
         "rows": rows,
         "attribution": attribution,
+        "ladder_states": R.ladder_states(ladder_f),
         "accounting": accounting,
         "counts": R.counts(rows, snap),
         "stress_days": {
