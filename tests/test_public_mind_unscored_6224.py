@@ -636,7 +636,8 @@ def test_the_public_ask_context_states_no_overall_level_and_no_mind_number(monke
         and ctx["character_note"] == "the character scores are being recalculated; Mind is not scored in public"
     )
     for text in (prompt, facts):
-        assert not re.search(r"\b27(\.0)?\b|219\.5|\b39\b|59\.1", text)
+        # the level 27 / Mind 39 never appear as numbers; "-27" in an ISO date (the 27th of a month) is not the level
+        assert not re.search(r"(?<![-\d])\b27(\.0)?\b(?!-)|219\.5|(?<![-\d])\b39\b(?!-)|59\.1", text)
         assert "mind pillar: not scored in public" in text
         assert not re.search(r"(?i)character level: \d", text)
     assert "the character scores are being recalculated" in prompt and "the character scores are being recalculated" in facts
