@@ -105,6 +105,9 @@ REFLECT = [
     ("stop exploring", "distress stops the interview"),
     ("does not monitor him", "no implied emergency monitoring"),
     ("no reminders", "no follow-up schedule or rating form"),
+    ("manage_personal_hypothesis", "open questions about him are read and written through the hypothesis record (#6292)"),
+    ("never re-propose a question it shows as rejected", "a rejected hypothesis stays closed until he reopens it"),
+    ("a confidence word, never a number", "no numeric confidence on a hypothesis"),
     ("open like a person, not a status report", "first real use opened with queue and sync status (2026-11-26)"),
 ]
 
