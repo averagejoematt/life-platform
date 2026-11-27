@@ -36,7 +36,8 @@ EVAL_PREFIX = "EVAL#"
 
 SENT = "sent"
 # Sanctioned skips: the worker deliberately stood down. Each is a rule firing, not the feature failing.
-SANCTIONED_SKIPS = ("dark", "quiet_hours", "silence_respected", "budget", "capped", "held")
+HELD_BY_RULING = "held_by_owner_ruling"  # #6290: evaluated and deliberately not sent (outbound_trial.TELEGRAM_MORNING_CHECKIN_HELD)
+SANCTIONED_SKIPS = ("dark", "quiet_hours", "silence_respected", "budget", "capped", "held", HELD_BY_RULING)
 SANCTIONED = (SENT,) + SANCTIONED_SKIPS
 
 # worker result["reason"] -> stored token. ``weekend`` is deliberately absent: a weekend run is never stamped.
@@ -76,6 +77,16 @@ def run_stamped(run: Callable[[], dict], table, now_pt: datetime) -> dict:
     ``error:<class>`` (not a sanctioned outcome) and re-raised so the Lambda still fails loudly.
     """
     day = now_pt.strftime("%Y-%m-%d")
+    from common import outbound_trial
+
+    if outbound_trial.is_on(outbound_trial.TELEGRAM_MORNING_CHECKIN_HELD) and now_pt.weekday() < 5:
+        # #6290: held by owner ruling. Nothing is sent and ``run`` is never called; the day is still stamped (a
+        # deliberate hold, not a gap and not a send) so the dead-man stays honest.
+        outbound_trial.suppressed(
+            outbound_trial.TELEGRAM_MORNING_CHECKIN_HELD, "telegram-coach-worker#TelegramMorningCheckin", log=logger.info
+        )
+        stamp(table, day, HELD_BY_RULING, datetime.now(timezone.utc))
+        return {"ok": True, "reason": "held by owner ruling", "sent": False}
     try:
         result = run()
     except Exception as e:  # noqa: BLE001
