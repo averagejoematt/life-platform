@@ -105,6 +105,8 @@ def tokens() -> list:
     out += [k.lower() for k in CP.PROVENANCE_KEYS]
     # #6293 planned_rest: the owner-only planned-pause detail never reaches a public body
     out += [k.lower() for k in CP.PLANNED_REST_KEYS]
+    if TOMBSTONED["plant"]:  # the tombstoned old-method blocks' own canary name
+        out += [TOMB_CANARY.lower(), TOMB_XP]
     return out
 
 
@@ -145,6 +147,56 @@ def _restraint_done(i: int, k: int) -> bool:
 
 
 PROVENANCE: dict = {"plant": False}  # #6224: --provenance plants a corrected-chain variant with reconstructed events
+# #6224 (2026-11-27): --tombstoned plants a TOMBSTONED character_sheet and character_receipt, newest of all, each holding an
+# OLD-method (v1) public block with a level, XP debt and a restraint-derived name; no public route may serve any of it.
+TOMBSTONED: dict = {"plant": False}
+TOMB_CANARY = "Tombstoned Old Method Canary"
+TOMB_XP = "7777.5"  # the tombstoned sheet's XP: the overall number itself is the leak token (the effect name is scrubbed anyway)
+
+
+def _tomb_day() -> str:
+    from datetime import timedelta
+
+    from common.pacific_time import PACIFIC
+
+    return (jw.FROZEN.astimezone(PACIFIC).date() + timedelta(days=1)).isoformat()
+
+
+def _tombstoned_rows() -> list:
+    from health import character_privacy as CP
+
+    d, user = _tomb_day(), "USER#matthew"
+    stamp = {"tombstone": True, "tombstoned_at": "2026-11-20T00:00:00Z", "tombstoned_reason": "synthetic", "phase": "experiment"}
+    effect = {"name": TOMB_CANARY, "emoji": "", "condition": RESTRAINT_CONDITION, "targets": {"mind": {"value": Decimal("0.03")}}}
+    sheet_pub = {
+        "public_method_version": CP.PUBLIC_METHOD_V1,
+        "origin": "live",
+        "character_level": Decimal("77"),
+        "character_xp": Decimal("7777.5"),  # a sentinel no live figure carries
+        "character_xp_debt": Decimal("33"),
+        "active_effects": [effect],
+        "level_events": [{"type": "level_up", "pillar": "sleep", "old_level": Decimal("76"), "new_level": Decimal("77")}],
+        "pillar_sleep": {"level": Decimal("77"), "raw_score": Decimal("77"), "tier": "Mastery"},
+    }
+    sheet = {
+        "pk": f"{user}#SOURCE#character_sheet",
+        "sk": f"DATE#{d}",
+        "date": d,
+        "character_level": Decimal("77"),
+        "public": sheet_pub,
+        **stamp,
+    }
+    trans = {"pillars": {"sleep": {"inputs": {"raw_score": Decimal("77")}, "outputs": {"level": Decimal("77"), "xp_debt": Decimal("33")}}}}
+    rec_pub = {
+        "public_method_version": CP.PUBLIC_METHOD_V1,
+        "engine_version": TOMB_CANARY,
+        "date": d,
+        "digest": "x" * 64,
+        "transitions": trans,
+        "input_rows": [],
+    }
+    receipt = {"pk": f"{user}#SOURCE#character_receipt", "sk": f"DATE#{d}", "date": d, "transitions": trans, "public": rec_pub, **stamp}
+    return [sheet, receipt]
 
 
 def _plant_provenance(pv: dict) -> None:
@@ -251,6 +303,8 @@ def _augment(rows: list) -> list:
                 for n, sig in SIGNALS.items():
                     reg[n] = {"status": "active", "tier": 0, **({"vice": True} if sig[2] else {})}
                 reg[ORDINARY] = {"status": "active", "tier": 0}
+    if TOMBSTONED["plant"]:
+        rows += _tombstoned_rows()
     rows.append(
         {
             "pk": f"{user}#SOURCE#protocols",
@@ -466,6 +520,28 @@ def walk(
             out.setdefault("all_bodies", {})[path] = json.dumps(
                 {"status": resp.get("statusCode"), "body": jw._normalise(parsed)}, sort_keys=True, default=str
             )
+    if TOMBSTONED["plant"]:  # the by-date reads of the planted day too (a get_item bypasses the query's phase filter)
+        for path in ("/api/character", "/api/character_receipt"):
+            q = {"date": _tomb_day()}
+            event = {
+                "rawPath": path,
+                "path": path,
+                "httpMethod": "GET",
+                "requestContext": {"http": {"method": "GET"}},
+                "headers": {},
+                "queryStringParameters": q,
+            }
+            try:
+                resp = L._dispatch_route(event, path, "GET")
+            except Exception as e:  # noqa: BLE001
+                out["raised"][f"{path}?date"] = type(e).__name__
+                continue
+            out["answered"] += 1
+            blob = json.dumps(resp, default=str).lower()
+            hits = sorted({t for t in toks if t in blob})
+            if hits:
+                out["leaks"][f"{path}?date"] = hits
+            out.setdefault("by_date_bodies", {})[path] = resp.get("body") if isinstance(resp, dict) else None
     out["unparsed_queries"] = rw.STATS["unparsed_queries"]
     return out
 
@@ -516,6 +592,11 @@ if __name__ == "__main__":
         STATE["value"] = state
         jw._freeze(sys.argv[sys.argv.index("--now") + 1])  # one instant for both states (before any handler import)
     PROVENANCE["plant"] = "--provenance" in sys.argv
+    TOMBSTONED["plant"] = "--tombstoned" in sys.argv
+    if "--tombstone-leak" in sys.argv:  # the control: the visibility predicate off — the tombstoned blocks are served
+        from experiment import phase_filter as _pf
+
+        _pf.singleton_visible = lambda item: bool(item)  # before any reader imports (and binds) it
     if "--provenance-leak" in sys.argv:  # #6224's control: the public strip of provenance and reconstructed events off
         from health import character_privacy as _CP
 

@@ -149,7 +149,10 @@ def _receipt(journal: bool):
     }
     # Owner ruling 2026-11-05: the route serves the public variant's receipt, stored inside the item; these tests keep
     # exercising its row/pillar filter (an unfiltered receipt of the same shape is the mutation control).
-    return dict(body, **{character_privacy.PUBLIC_KEY: copy.deepcopy(body)})
+    # #6224: only a current-method public receipt is served, so the fixture's variant carries the current version.
+    return dict(
+        body, **{character_privacy.PUBLIC_KEY: dict(copy.deepcopy(body), public_method_version=character_privacy.PUBLIC_METHOD_VERSION)}
+    )
 
 
 def test_the_receipt_omits_private_rows_and_the_private_pillar():

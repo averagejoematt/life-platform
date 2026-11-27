@@ -26,6 +26,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from experiment.phase_filter import singleton_visible  # the ONE visibility predicate (tombstone, phase) — #6224
+
 STRESS_SCALE_MAX = 4  # the evening check-in's 0-4 scale (coach/evening_checkin.py), 4 = the most stressed
 
 # component -> the owner-only source it reads (privacy.field_tiers SOURCE_TIERS)
@@ -401,7 +403,12 @@ _ENVELOPE_KEYS = ("pk", "sk", "date", "phase", "cycle", "input_manifest", "input
 
 
 def public_variant(record: Any) -> Optional[dict[str, Any]]:
-    """The stored public variant of a ``character_sheet`` record, or None when there is none a reader may serve."""
+    """The stored public variant of a ``character_sheet`` record, or None when there is none a reader may serve.
+
+    #6224: a tombstoned (or other-phase) record serves nothing, whatever its stored ``public`` block holds — a get_item
+    by date bypasses the query's phase filter, and the filter does not read the tombstone (``singleton_visible``)."""
+    if isinstance(record, dict) and not singleton_visible(record):
+        return None
     pv = record.get(PUBLIC_KEY) if isinstance(record, dict) else None
     if not isinstance(pv, dict) or pv.get("public_method_version") not in PUBLIC_METHOD_VERSIONS:
         return None
@@ -530,7 +537,7 @@ def event_level_series(records: Any) -> list[tuple[str, int]]:
         return out
     event_days = {str(v.get("date")) for v in public_event_sheets(records)}
     for rec in records or []:
-        if not isinstance(rec, dict):
+        if not isinstance(rec, dict) or not singleton_visible(rec):  # #6224: a tombstoned sheet credits no level
             continue
         d = str(rec.get("date") or str(rec.get("sk", "")).replace("DATE#", ""))[:10]
         pv = public_variant(rec)

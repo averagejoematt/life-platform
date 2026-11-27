@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from common import activity_publication
+from experiment.phase_filter import singleton_visible  # #6224: a tombstoned record serves nothing
 
 from health import scoring_engine
 
@@ -133,6 +134,8 @@ def stored_fields(public_inputs: Any) -> dict[str, Any]:
 def public_grade(record: Any) -> Optional[dict[str, Any]]:
     """The public variant of a stored day_grade record — ``{total_score, letter_grade, component_scores, weights,
     public_method_version, ...}`` — or None when it has none a reader may serve (fail closed, never method 1)."""
+    if isinstance(record, dict) and not singleton_visible(record):
+        return None
     pv = record.get(PUBLIC_KEY) if isinstance(record, dict) else None
     if not isinstance(pv, dict) or pv.get("public_method_version") not in METHOD_VERSIONS:
         return None

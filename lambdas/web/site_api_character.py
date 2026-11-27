@@ -667,8 +667,14 @@ def _public_receipt(receipt: dict) -> "dict | None":
     transitions as from the replay's mismatch list. Omit, never mark: no count of what was left out."""
     from common import activity_publication
 
-    receipt = receipt.get(character_privacy.PUBLIC_KEY) if isinstance(receipt, dict) else None
+    if not isinstance(receipt, dict) or not singleton_visible(receipt):  # #6224: a tombstoned receipt serves nothing
+        return None
+    receipt = receipt.get(character_privacy.PUBLIC_KEY)
     if not isinstance(receipt, dict) or not isinstance(receipt.get("transitions"), dict):
+        return None
+    # #6224: a receipt is the chain's transitions and XP — an older-method one carries the pre-fix chain (restraint
+    # inputs, XP debt) that no scrub can repair, so only a current-method receipt is ever served.
+    if receipt.get("public_method_version") != character_privacy.PUBLIC_METHOD_VERSION:
         return None
     out = dict(receipt)
     out["input_rows"] = [
@@ -712,6 +718,8 @@ def character_receipt(date: str | None = None, verify: bool = False, *, _g) -> d
     if date:
         resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{date}"})
         item = resp.get("Item")
+        if item is not None and not singleton_visible(item):
+            item = None  # #6224: a tombstoned (or other-phase) receipt is absent to a public by-date read ("no receipt")
     else:
         resp = table.query(
             **with_phase_filter(

@@ -389,7 +389,13 @@ def _stored_receipt_item(cfg):
     receipt = _receipt(config=cfg)
     # Owner ruling 2026-11-05: the route serves (and verifies) the PUBLIC variant's receipt, stored in the item.
     receipt["public"] = _receipt(config=character_public.public_config(cfg))
+    receipt["public"]["public_method_version"] = character_public.METHOD_VERSION  # #6224: only a current-method receipt is served
     item = pr.store_receipt(_FakeTable(), "USER#matthew#SOURCE#character_receipt", receipt)
+    # #6224: a public by-date read serves only a visible item (``singleton_visible``: no tombstone, the current phase);
+    # this synthetic pre-genesis date is stamped pilot, so the fixture states the current phase it stands in for.
+    from common.constants import EXPERIMENT_PHASE_CURRENT
+
+    item["phase"] = EXPERIMENT_PHASE_CURRENT
     return item
 
 
