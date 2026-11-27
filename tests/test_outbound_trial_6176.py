@@ -98,8 +98,8 @@ def test_the_committed_state_is_consolidated_standing_and_every_item_has_a_descr
     ROLLBACK, per item: set that ONE line to exactly ``False`` in common/outbound_trial.py, then deploy_fleet.sh (and
     deploy_site_api.sh for the status page). See test_rolling_back_one_item_leaves_every_other_item_consolidated.
     """
-    assert len(COMMITTED_TRIAL) == 8 and all(v is True for v in COMMITTED_TRIAL.values()), COMMITTED_TRIAL
-    assert set(ot.ITEMS) == set(COMMITTED_TRIAL) == set(ot.DESCRIPTIONS) and len(ot.ITEMS) == 8
+    assert len(COMMITTED_TRIAL) == 14 and all(v is True for v in COMMITTED_TRIAL.values()), COMMITTED_TRIAL
+    assert set(ot.ITEMS) == set(COMMITTED_TRIAL) == set(ot.DESCRIPTIONS) and len(ot.ITEMS) == 14
     # no expiry of any spelling: the 2026-12-07 lapse that would have restored the old mail is gone
     assert not hasattr(ot, "TRIAL_ENDS_ON") and not hasattr(ot, "trial_ended")
     src = (ROOT / "lambdas" / "common" / "outbound_trial.py").read_text(encoding="utf-8")
@@ -242,6 +242,9 @@ ALLOWED_READERS = {
     "lambdas/emails/wednesday_chronicle_lambda.py",
     "lambdas/emails/evening_nudge_lambda.py",
     "lambdas/coach/evening_checkin.py",
+    "lambdas/coach/morning_checkin_ledger.py",
+    "lambdas/coach/coach_event_triggers.py",
+    "lambdas/coach/calibration_deadman_alert.py",
     "lambdas/operational/dlq_consumer_lambda.py",
     "lambdas/operational/canary_lambda.py",
     "lambdas/operational/traffic_digest_lambda.py",
@@ -599,7 +602,7 @@ def test_story_season_dead_man_reads_the_pause_as_recognised(trial_on, monkeypat
     assert c.passed is True and "paused by the owner's email consolidation" in c.message
 
 
-# ── item 5: one channel at 20:00, and the quiet rule ───────────────────────────────────────────
+# ── item 5: one channel at 20:00, and the quiet rule (items 7-8, #6290: the Telegram prompts have their own switches) ───────────────────────────────────────────
 
 
 def test_telegram_prompt_is_held_and_still_feeds_its_dead_man(trial_on):
@@ -620,7 +623,7 @@ def test_telegram_prompt_is_held_and_still_feeds_its_dead_man(trial_on):
 
     evening = datetime(2026, 11, 20, 20, 0, tzinfo=PACIFIC)
     seat = lambda persona: ("tok", 1)  # noqa: E731
-    trial_on(ot.EVENING_ONE_CHANNEL)
+    trial_on(ot.TELEGRAM_EVENING_PROMPT_HELD)
     out = ec.run_prompt(T(), evening, seat, lambda *a: pytest.fail("held prompt was sent"), now_utc=evening.astimezone(timezone.utc))
     assert out["reason"] == ec.OUTBOUND_TRIAL_REASON
     assert [s["sk"] for s in stamps] == ["EVAL#2026-11-20"] and stamps[0]["reason"] == ec.OUTBOUND_TRIAL_REASON
@@ -767,3 +770,148 @@ def test_measurement_windows_are_consecutive_weeks_ending_on_the_end_day():
     w = oov.windows(date(2026, 11, 20), 2)
     assert w == [(date(2026, 11, 7), date(2026, 11, 13)), (date(2026, 11, 14), date(2026, 11, 20))]
     assert all(group.startswith("/aws/lambda/") for _, group, _ in oov.SENDS)
+
+
+# ── #6290: the Telegram evening prompt and morning check-in are held, evaluated and stamped, never sent ───────────────
+
+
+class _Ledger:
+    def __init__(self):
+        self.puts, self.updates = [], []
+
+    def get_item(self, **kw):
+        return {}
+
+    def put_item(self, Item, **kw):
+        self.puts.append(Item)
+
+    def update_item(self, **kw):
+        self.updates.append(kw)
+
+
+def _evening(trial_on_flag, trial_on, now_extra=None, item_5=False):
+    from coach import evening_checkin as ec
+    from common.pacific_time import PACIFIC
+
+    t, sent = _Ledger(), []
+    when = datetime(2026, 11, 26, 20, 0, tzinfo=PACIFIC)
+    if trial_on_flag:
+        trial_on(ot.TELEGRAM_EVENING_PROMPT_HELD)
+    if item_5:
+        trial_on(ot.EVENING_ONE_CHANNEL)
+    out = ec.run_prompt(t, when.replace(hour=19), lambda p: ("tok", 1), lambda *a: sent.append(a), now_utc=when.astimezone(timezone.utc))
+    return out, t, sent
+
+
+def test_6290_evening_prompt_held_stamps_a_deliberate_hold_and_sends_nothing(trial_on):
+    from coach import evening_checkin as ec
+
+    out, t, sent = _evening(True, trial_on)
+    assert sent == [] and t.updates == [] and out["reason"] == ec.OUTBOUND_TRIAL_REASON
+    assert [p["sk"] for p in t.puts] == ["EVAL#2026-11-26"] and t.puts[0]["reason"] == "held_by_owner_ruling_not_sent"
+    assert "sent" not in {t.puts[0]["reason"]}
+
+
+def test_6290_evening_prompt_restored_by_its_own_one_line(trial_on):
+    out, t, sent = _evening(False, trial_on)
+    assert len(sent) == 1 and out["reason"] == "sent"
+    assert [p["sk"] for p in t.puts] == ["PROMPT#2026-11-26", "EVAL#2026-11-26"]
+
+
+def test_6290_evening_prompt_is_independent_of_the_evening_nudge_email_item(trial_on):
+    """Restoring the Telegram prompt is its own line; the email's item 5 being ON must not hold it, nor OFF restore it."""
+    out, t, sent = _evening(False, trial_on, item_5=True)
+    assert len(sent) == 1 and out["reason"] == "sent"
+    out, t, sent = _evening(True, trial_on, item_5=False)
+    assert sent == []
+
+
+def _morning(trial_on_flag, trial_on, weekday_day=26):
+    from coach import morning_checkin_ledger as mcl
+    from common.pacific_time import PACIFIC
+
+    t, calls = _Ledger(), []
+    if trial_on_flag:
+        trial_on(ot.TELEGRAM_MORNING_CHECKIN_HELD)
+    res = mcl.run_stamped(lambda: calls.append(1) or {"ok": True, "bubbles": 1}, t, datetime(2026, 11, weekday_day, 9, 15, tzinfo=PACIFIC))
+    return res, t, calls
+
+
+def test_6290_morning_checkin_held_runs_nothing_and_stamps_held(trial_on):
+    res, t, calls = _morning(True, trial_on)  # Thu 2026-11-26
+    assert calls == [] and res["sent"] is False and not res.get("bubbles")
+    assert [(p["sk"], p["reason"]) for p in t.puts] == [("EVAL#2026-11-26", "held_by_owner_ruling")]
+
+
+def test_6290_morning_checkin_restored_runs_and_stamps_sent(trial_on):
+    res, t, calls = _morning(False, trial_on)
+    assert calls == [1] and [(p["sk"], p["reason"]) for p in t.puts] == [("EVAL#2026-11-26", "sent")]
+
+
+def test_6290_morning_hold_stamps_nothing_on_a_weekend(trial_on):
+    from coach import morning_checkin_ledger as mcl
+    from common.pacific_time import PACIFIC
+
+    t, calls = _Ledger(), []
+    trial_on(ot.TELEGRAM_MORNING_CHECKIN_HELD)
+    mcl.run_stamped(lambda: calls.append(1) or {"ok": True, "reason": "weekend"}, t, datetime(2026, 11, 28, 9, 15, tzinfo=PACIFIC))  # Sat
+    assert t.puts == []  # the rule is Mon-Fri: a weekend is never stamped, held or not
+
+
+def test_6290_the_dead_man_reads_the_hold_as_a_status_not_a_fault_or_a_send():
+    from coach import morning_checkin_ledger as mcl
+    from operational import nudge_ledger_qa as q
+
+    assert q.HELD_BY_RULING == mcl.HELD_BY_RULING and mcl.HELD_BY_RULING in mcl.SANCTIONED_SKIPS
+
+    class C:
+        def __init__(self, *a):
+            self.state, self.msg = None, ""
+
+        def ok(self, m=""):
+            self.state, self.msg = "ok", m
+
+        def fail(self, m=""):
+            self.state, self.msg = "fail", m
+
+        def warn(self, m="", chronic=False):
+            self.state, self.msg = "warn", m
+
+    days = ["2026-11-%02d" % d for d in (19, 20, 23, 24, 25)]
+    rows = [{"sk": f"EVAL#{d}", "reason": mcl.HELD_BY_RULING} for d in days]
+
+    class Tab:
+        def query(self, **kw):
+            return {"Items": rows}
+
+    out = q.check_morning_checkin_liveness(
+        Tab(), C, "t", lambda: datetime(2026, 11, 26, 18, 30, tzinfo=timezone.utc), armed_on="2026-10-01"
+    )[0]
+    assert out.state == "ok" and "HELD by owner ruling" in out.msg and "sent" not in out.msg.replace("not sent", "")
+
+
+def test_6290_the_evening_dead_man_stays_green_on_a_held_day_and_reds_a_missing_one():
+    from operational import nudge_ledger_qa as q
+
+    class C:
+        def __init__(self, *a):
+            self.state, self.msg = None, ""
+
+        def ok(self, m=""):
+            self.state, self.msg = "ok", m
+
+        def fail(self, m=""):
+            self.state, self.msg = "fail", m
+
+    held = [{"sk": "EVAL#2026-11-25", "reason": "held_by_owner_ruling_not_sent"}]
+
+    class Tab:
+        def __init__(self, items):
+            self.items = items
+
+        def query(self, **kw):
+            return {"Items": self.items}
+
+    now = lambda: datetime(2026, 11, 26, 12, 0, tzinfo=timezone.utc)  # noqa: E731
+    assert q.check_evening_checkin_liveness(Tab(held), C, "t", now, lookback_days=1, armed_on="2026-10-01")[0].state == "ok"
+    assert q.check_evening_checkin_liveness(Tab([]), C, "t", now, lookback_days=1, armed_on="2026-10-01")[0].state == "fail"

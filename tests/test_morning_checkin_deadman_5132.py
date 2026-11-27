@@ -195,7 +195,11 @@ def test_every_reason_the_worker_can_return_has_a_stored_token():
         assert not ledger.reason_token({"ok": True, "reason": r}).startswith("unknown:"), r
     assert ledger.reason_token({"ok": True, "status": "grounded", "bubbles": 2}) == ledger.SENT
     # Every sanctioned token is reachable from the worker; the only unsanctioned ones are empty/unknown.
-    assert {ledger.reason_token({"reason": r}) for r in reasons - {"weekend"}} == set(ledger.SANCTIONED_SKIPS) | {"empty"}
+    assert {ledger.reason_token({"reason": r}) for r in reasons - {"weekend"}} == (
+        set(ledger.SANCTIONED_SKIPS) - {ledger.HELD_BY_RULING}
+    ) | {
+        "empty"
+    }  # #6290: the hold is stamped by the ledger, not returned by the worker
 
 
 @pytest.fixture

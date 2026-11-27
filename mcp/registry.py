@@ -183,6 +183,7 @@ from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, l
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
 from mcp.tools_owner_words import LOG_OWNER_NOTE_DESCRIPTION, LOG_OWNER_NOTE_INPUT, tool_log_owner_note  # #4584
 from mcp.tools_pending_writes import MANAGE_PENDING_WRITES_DESCRIPTION, MANAGE_PENDING_WRITES_INPUT, tool_manage_pending_writes  # #4078
+from mcp.tools_personal_hypotheses import MANAGE_HYPOTHESIS_DESCRIPTION, MANAGE_HYPOTHESIS_INPUT, tool_manage_personal_hypothesis  # #6292
 from mcp.tools_plan import tool_plan_next_session
 
 # #3668: the three hot-path named tools (cycle / habits / cost) over the same waiter
@@ -1472,6 +1473,14 @@ TOOLS = {
     "manage_research_finding": {  # #6208: the research findings store — owner-only, every write his explicit act
         "fn": tool_manage_research_finding,
         "schema": {"name": "manage_research_finding", "description": MANAGE_FINDING_DESCRIPTION, "inputSchema": MANAGE_FINDING_INPUT},
+    },
+    "manage_personal_hypothesis": {  # #6292: his working hypotheses — reads direct, every write queue-only
+        "fn": tool_manage_personal_hypothesis,
+        "schema": {
+            "name": "manage_personal_hypothesis",
+            "description": MANAGE_HYPOTHESIS_DESCRIPTION,
+            "inputSchema": MANAGE_HYPOTHESIS_INPUT,
+        },
     },
     "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing
         "fn": tool_get_advice_link_queue,

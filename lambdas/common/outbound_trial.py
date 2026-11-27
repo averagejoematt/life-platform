@@ -60,6 +60,29 @@ OPS_CANARY_ALARMED = "ops_canary_alarmed"
 #: 6c. The Monday ops pack is written to its log group as a record, not emailed.
 OPS_MONDAY_PACK = "ops_monday_pack"
 
+#: 7. The scheduled evening Telegram prompt (``TelegramEveningCheckin``, 20:00 PT) does not send (owner ruling 2026-11-26,
+#:    #6290: 29 prompts for one reply). A ``/checkin`` he sends himself still logs. Independent of item 5, which is the
+#:    evening-nudge EMAIL's rule.
+TELEGRAM_EVENING_PROMPT_HELD = "telegram_evening_prompt_held"
+#: 8. The weekday Telegram morning check-in (``TelegramMorningCheckin``, 17:15Z Mon-Fri), the routine prompt for an
+#:    answer that is re-asked until two go unanswered, does not send (#6290). The run stamps its outcome row as held.
+TELEGRAM_MORNING_CHECKIN_HELD = "telegram_morning_checkin_held"
+
+#: 9. The event-sweep lift-PR celebration (``coach_event_triggers.KIND_LIFT_PR``) does not send (owner ruling 2026-11-26,
+#:    #6302): a PR congratulation reports a lift he logged himself. The candidate is neither claimed nor spent.
+TELEGRAM_LIFT_PR_HELD = "telegram_lift_pr_held"
+#: 10. The event-sweep milestone celebration does not send UNLESS it reports something he has not otherwise been told
+#:     (``coach_event_triggers.milestone_is_untold``): a count of his own actions, or a milestone the milestone digest already
+#:     mailed, is held; a measured milestone the digest has not delivered still sends (#6302).
+TELEGRAM_MILESTONE_HELD = "telegram_milestone_held"
+#: 11. The event-sweep tape / photo / DEXA due-day prompt (``calibration_prompt``) does not send: a calibration errand
+#:     asked for the platform's benefit (#6302).
+TELEGRAM_CALIBRATION_PROMPT_HELD = "telegram_calibration_prompt_held"
+#: 12. The calibration dead-man's Telegram text for a missed LOG (tape / photos / battery) does not send. The
+#:     ``calibration-deadman`` email alarm is untouched, and a row that names its own alert (the weekly titration's
+#:     missed run: the platform's own failure) still sends (#6302).
+TELEGRAM_CALIBRATION_DEADMAN_TEXT_HELD = "telegram_calibration_deadman_text_held"
+
 #: Every item, fixed here — NOT derived from ``TRIAL``, so a line dropped from ``TRIAL`` still names a known item (and
 #: reads ON, below) instead of raising in a sender.
 ITEMS: tuple[str, ...] = (
@@ -71,6 +94,12 @@ ITEMS: tuple[str, ...] = (
     OPS_DLQ_SUMMARY,
     OPS_CANARY_ALARMED,
     OPS_MONDAY_PACK,
+    TELEGRAM_EVENING_PROMPT_HELD,
+    TELEGRAM_MORNING_CHECKIN_HELD,
+    TELEGRAM_LIFT_PR_HELD,
+    TELEGRAM_MILESTONE_HELD,
+    TELEGRAM_CALIBRATION_PROMPT_HELD,
+    TELEGRAM_CALIBRATION_DEADMAN_TEXT_HELD,
 )
 
 #: ON = consolidated (standing since #6243). Rollback of ONE item: that line → exactly ``False``.
@@ -83,6 +112,12 @@ TRIAL: dict[str, bool] = {
     OPS_DLQ_SUMMARY: True,
     OPS_CANARY_ALARMED: True,
     OPS_MONDAY_PACK: True,
+    TELEGRAM_EVENING_PROMPT_HELD: True,
+    TELEGRAM_MORNING_CHECKIN_HELD: True,
+    TELEGRAM_LIFT_PR_HELD: True,
+    TELEGRAM_MILESTONE_HELD: True,
+    TELEGRAM_CALIBRATION_PROMPT_HELD: True,
+    TELEGRAM_CALIBRATION_DEADMAN_TEXT_HELD: True,
 }
 
 #: Plain-language description per item — the status page note and the suppression log both use it.
@@ -95,6 +130,12 @@ DESCRIPTIONS: dict[str, str] = {
     OPS_DLQ_SUMMARY: "the SNS escalation already carries it to the daily digest record",
     OPS_CANARY_ALARMED: "a declared CloudWatch alarm already carries it to the daily digest record",
     OPS_MONDAY_PACK: "written to its log group as a record for a working session",
+    TELEGRAM_EVENING_PROMPT_HELD: "held by owner ruling 2026-11-26 (#6290): a routine prompt that went unanswered; not sent",
+    TELEGRAM_MORNING_CHECKIN_HELD: "held by owner ruling 2026-11-26 (#6290): a routine check-in that re-asks after silence; not sent",
+    TELEGRAM_LIFT_PR_HELD: "held by owner ruling 2026-11-26 (#6302): a PR congratulation on a lift he logged himself; not sent",
+    TELEGRAM_MILESTONE_HELD: "held by owner ruling 2026-11-26 (#6302): a milestone congratulation he has already been told; not sent",
+    TELEGRAM_CALIBRATION_PROMPT_HELD: "held by owner ruling 2026-11-26 (#6302): a calibration errand for the platform's benefit; not sent",
+    TELEGRAM_CALIBRATION_DEADMAN_TEXT_HELD: "held by owner ruling 2026-11-26 (#6302): a missed-log nudge; the email alarm still carries it",
 }
 
 #: Status-page senders (``web/site_api_status._EMAIL_LAMBDAS`` ids) an item stops, with the item that stops them.

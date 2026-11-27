@@ -73,3 +73,29 @@ The task brief asked for a local copy to be run once *if* the sync were a local 
 the local files are downstream of the account, as shown above. So the synced files were left untouched,
 and the before-state the drift check reported is pasted on the #5086 PR. The after-state comes
 from step 3, once the owner has uploaded.
+
+## Other account skills: `ask` and `reflect` (#6288, #6289)
+
+`ask` (the everyday coaching entry point) and `reflect` (reflective conversations with a
+reviewed record) are used from Claude Desktop and mobile, so each needs an account copy too.
+Their one source is `.claude/skills/ask/SKILL.md` and `.claude/skills/reflect/SKILL.md`.
+
+The same procedure applies, per skill, after a change reaches `main`:
+
+```bash
+python3 scripts/check_synced_skill_drift.py --skill ask --package ~/Downloads/ask.zip
+python3 scripts/check_synced_skill_drift.py --skill reflect --package ~/Downloads/reflect.zip
+# upload each in claude.ai (Settings → Capabilities → Skills), let the app sync, then:
+python3 scripts/check_synced_skill_drift.py --skill ask
+python3 scripts/check_synced_skill_drift.py --skill reflect
+```
+
+Uploading is an owner act, as for `coach-session`. Until a skill has been uploaded once, its
+drift check reports `skipped: no synced copy on this machine`, which is a stated skip, not a pass.
+
+One setting matters for `reflect`'s review-before-save promise: in the Claude app, leave
+`manage_pending_writes` and `write_platform_memory` on "ask each time" rather than "always
+allow". The platform refuses a reviewed personal record that did not pass the approval queue
+(#6287), and the app's own approval prompt is the second check that a write he has not seen
+cannot happen.
+
