@@ -1,6 +1,6 @@
 """coach/personal_context.py — the READERS behind the one personal-context assembly (#6291, epic #6284).
 
-ONE assembly, two interfaces. `coach.coach_context_pilot.build_turn_context` is the single builder of what a coach
+ONE assembly, two interfaces. The coach-context assembly's `build_turn_context` is the single builder of what a coach
 knows about Matthew; the Telegram worker (`for_turn`) and the Claude session packet (`packet_context`) both call it,
 so the two interfaces cannot drift into two different understandings of him. This module holds the reads that
 assembly needs and that used to live in one channel only:
@@ -183,7 +183,9 @@ def _day_rows(table, source: str, lo: str, hi: str, limit: int) -> list:
         if r.get("tombstone") or r.get("deleted_at") or len(sk) != len(DATE_PREFIX) + 10:
             continue  # one row per day: a DATE#<day>#<suffix> sub-row is not the day row
         out.append(r)
-    return out
+    from common.strava_read_seam import strava_read_seam
+
+    return strava_read_seam(source, out)  # #4419: a no-op for every source this module reads; the seam if strava ever is
 
 
 def _flat_scan(row: dict) -> dict:

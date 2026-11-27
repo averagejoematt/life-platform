@@ -1,7 +1,7 @@
 """health/grounded_intake_facts.py — three grounded nutrition and body-composition facts for coach context (#6212, epic #6206).
 
 PURE. Wired by #6291 through ONE reader, ``coach.personal_context``, which loads the series and is reached only
-through the coach-context assembly behind its switch (``coach.coach_context_pilot.LIVE``, committed False). The
+through the coach-context assembly behind its switch (the coach-context switch ``LIVE``, committed False). The
 one-importer guard in ``tests/test_grounded_intake_facts_6212.py`` pins that single importer.
 
 Every function here is pure over series the caller has already loaded: no DynamoDB, no S3, no clock. The one
