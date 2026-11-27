@@ -308,23 +308,13 @@ def _chat_rows(coach_id: str, limit: int = 40) -> list:
 
     Whole items rather than {role, text} because the outbound side needs the
     ``provenance`` attribute too: "did my last two check-ins go unanswered" is a
-    question about which rows were unsolicited, and a role/text projection cannot
-    answer it. Role filter, not just a text filter: CHAT#summary# rows live inside
-    the CHAT# prefix by design (one cross-phase family) and must never be read
-    back as turns.
+    question about which rows were unsolicited. The read itself is
+    `coach.personal_context.chat_rows` (#6291: the session packet reads the SAME
+    rows through the one personal-context assembly). Fail-soft [] inside it.
     """
-    try:
-        resp = _table().query(
-            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
-            ExpressionAttributeValues={":pk": coach_chat.chat_pk(coach_id), ":pfx": coach_chat.CHAT_SK_PREFIX},
-            ScanIndexForward=False,
-            Limit=limit,
-        )
-        items = list(reversed(resp.get("Items") or []))
-        return [i for i in items if i.get("role") in (coach_chat.ROLE_MATTHEW, coach_chat.ROLE_COACH)]
-    except Exception as e:
-        logger.warning("[telegram] thread read failed for %s: %s", coach_id, e)
-        return []
+    from coach.personal_context import chat_rows
+
+    return chat_rows(_table(), coach_id, limit)
 
 
 def _thread_today(coach_id: str, limit: int = 40) -> list:
@@ -403,50 +393,11 @@ def _memory_block(coach_id: str) -> str:
 
     Reads the SAME partition the dossier renders, so the phone conversation and the
     public 'what this coach knows' page cannot diverge. Fail-soft: a coach with an
-    unreadable memory chats from persona + facts alone, honestly."""
-    pk = coach_chat.chat_pk(coach_id)
-    lines = []
-    try:
-        # #946/#1969: a restart tombstones singletons IN PLACE — an unguarded get_item
-        # would feed the wiped cycle's relationship arc into a fresh-cycle chat.
-        from experiment.phase_filter import singleton_visible
+    unreadable memory chats from persona + facts alone, honestly. The reads are
+    `coach.personal_context.memory_core` (#6291), shared with the session packet."""
+    from coach.personal_context import memory_core
 
-        rel = _table().get_item(Key={"pk": pk, "sk": "RELATIONSHIP#state"}).get("Item") or {}
-        if not singleton_visible(rel):
-            rel = {}
-        phase = rel.get("phase")
-        if phase:
-            lines.append(f"Your working relationship with Matthew is in the '{phase}' phase.")
-    except Exception as e:
-        logger.warning("[telegram] relationship read failed: %s", e)
-    for prefix, label, cap in (("COMMITMENT#", "Commitments you hold him to", 3), ("LEARNING#", "Things you have learned about him", 3)):
-        try:
-            resp = _table().query(
-                KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
-                ExpressionAttributeValues={":pk": pk, ":pfx": prefix},
-                ScanIndexForward=False,
-                Limit=cap,
-            )
-            rows = [str(i.get("text") or i.get("commitment") or i.get("learning") or "").strip() for i in resp.get("Items") or []]
-            rows = [r for r in rows if r]
-            if rows:
-                lines.append(f"{label}: " + " · ".join(rows))
-        except Exception as e:
-            logger.warning("[telegram] %s read failed: %s", prefix, e)
-    block = ("WHAT YOU REMEMBER ABOUT MATTHEW:\n" + "\n".join(f"- {ln}" for ln in lines)) if lines else ""
-    # The long memory: yesterday-and-earlier compressed to a paragraph, so what
-    # he told this coach three days ago survives MAX_THREAD_TURNS.
-    try:
-        from coach.coach_chat_summary import read_recent_summaries
-
-        block = "\n\n".join(b for b in (block, read_recent_summaries(_table(), pk)) if b)
-    except Exception as e:
-        logger.warning("[telegram] chat summaries unavailable: %s", e)
-    # #6149: what he has already corrected this coach on (any owner-facing surface) — memory rides the
-    # DYNAMIC tail of the system prompt, never the cached prefix; fail-soft to "" inside the helper.
-    from coach.coach_corrections import chat_corrections_block
-
-    return "\n\n".join(b for b in (block, chat_corrections_block(_table(), coach_id)) if b)
+    return memory_core(_table(), coach_id)
 
 
 def _facts() -> dict:
