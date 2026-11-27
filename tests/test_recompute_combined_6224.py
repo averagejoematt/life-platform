@@ -196,3 +196,16 @@ def test_floats_to_decimal_round_trip_keeps_the_fingerprint(private):
     _base, plan_path = private
     item = next(iter(PI.planned_items(PI.load_private_plan(plan_path), B.SHEET_PK).values()))
     assert B.item_digest(item) == B.item_digest(P._normalise(floats_to_decimal(item, precision=None)))
+
+
+def test_the_public_apply_refusal_names_the_approval_and_the_live_rows(private, tmp_path):
+    base, plan_path = private
+    store = _fresh(base)
+    table = PublicAdapter(store)
+    pub, pid = public_plan(store, plan_path)
+    plan = PI.load_private_plan(plan_path)
+    assert PI.apply_refusal(None, None, pid, table, pub) is None  # without --plan-in: unchanged behaviour
+    assert "not the approved" in PI.apply_refusal(plan, "0" * 16, pid, table, pub)
+    assert "run the private apply first" in PI.apply_refusal(plan, pid, pid, table, pub)
+    A.apply_plan(store, A.load_plan(plan_path), str(tmp_path), "all", TS)
+    assert PI.apply_refusal(plan, pid, pid, table, pub) is None  # control: approved id + planned rows live

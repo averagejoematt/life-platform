@@ -760,14 +760,11 @@ def main(argv: list) -> int:
     snap = load_snapshot(table, args.to)
     import backfill_public_variant_planin as PI
 
-    private_plan, expected = None, {}
-    if args.plan_in:
-        try:
-            private_plan = PI.load_private_plan(args.plan_in)
-            expected = PI.apply_to_snapshot(snap, private_plan)
-        except PI.PlanInError as exc:
-            print(f"REFUSED: {exc}", file=sys.stderr)
-            return 3
+    try:
+        private_plan, expected = PI.load_into_snapshot(args.plan_in, snap)
+    except PI.PlanInError as exc:
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return 3
     config = load_config(table, boto3.client("s3", region_name=region))
     char, receipts, grades = run_replays(snap, config, run_ts, order_fix=not args.no_order_fix)
     privacy_only = char if args.no_order_fix else run_replays(snap, config, run_ts, order_fix=False)[0]
@@ -851,20 +848,10 @@ def main(argv: list) -> int:
     if not args.apply:
         print(f"DRY RUN — nothing written. {len(plan)} planned writes, {len(phase_plan)} in phase {args.phase}; manifest in {args.out}")
         return 0
-    if private_plan is not None:
-        if args.approved_public_plan_id != manifest["plan"]["public_plan_id"]:
-            print(
-                f"REFUSED: public_plan_id {manifest['plan']['public_plan_id']} is not the approved {args.approved_public_plan_id}",
-                file=sys.stderr,
-            )
-            return 3
-        off = PI.unplanned_rows(lambda key: table.get_item(Key=key).get("Item"), phase_plan)
-        if off:
-            print(
-                f"REFUSED: {len(off)} live row(s) are not the approved private plan's rows (e.g. {off[0]}) — run the private apply first",
-                file=sys.stderr,
-            )
-            return 3
+    refusal = PI.apply_refusal(private_plan, args.approved_public_plan_id, manifest["plan"]["public_plan_id"], table, phase_plan)
+    if refusal:
+        print(f"REFUSED: {refusal}", file=sys.stderr)
+        return 3
     export = B.build_export(lambda key: table.get_item(Key=key).get("Item"), phase_plan, run_ts)
     export["phase"] = args.phase
     export_path = os.path.join(args.out, f"export_{args.phase}_{run_ts.replace(':', '')}.json")

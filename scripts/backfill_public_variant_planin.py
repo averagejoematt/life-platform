@@ -130,3 +130,24 @@ def unplanned_rows(get_item: Callable[[dict], Optional[dict]], plan: list) -> li
         if item is None or B.item_digest(item) != want:
             out.append(f"{w['pk'].split('#SOURCE#')[-1]} {w['sk']}")
     return out
+
+
+def load_into_snapshot(path: Optional[str], snap: dict) -> tuple:
+    """(private plan, expected fingerprints) with the snapshot's method-1 rows replaced; (None, {}) without --plan-in."""
+    if not path:
+        return None, {}
+    plan = load_private_plan(path)
+    return plan, apply_to_snapshot(snap, plan)
+
+
+def apply_refusal(private_plan: Optional[dict], approved_id: Optional[str], public_id: str, table: Any, phase_plan: list) -> Optional[str]:
+    """Why a --plan-in public apply must not write (None = it may): the approved public plan id must reproduce, and every
+    live row must be exactly the approved private plan's planned row."""
+    if private_plan is None:
+        return None
+    if approved_id != public_id:
+        return f"public_plan_id {public_id} is not the approved {approved_id}"
+    off = unplanned_rows(lambda key: table.get_item(Key=key).get("Item"), phase_plan)
+    if off:
+        return f"{len(off)} live row(s) are not the approved private plan's rows (e.g. {off[0]}) — run the private apply first"
+    return None
