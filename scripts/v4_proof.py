@@ -157,6 +157,18 @@ PILLAR_LABELS = {
 }
 
 
+# #6285: Mind is not scored in public - it is never baked as a number, in any state
+# (including the committed snapshot, which predates the ruling).
+UNPUBLISHED_PILLARS = ("mind",)
+
+
+def _without_unpublished(pillars: dict) -> dict:
+    return {k: v for k, v in pillars.items() if k not in UNPUBLISHED_PILLARS}
+
+
+RECALC_LINE = "The character level and pillar scores are being recalculated under the corrected public method."
+
+
 def load_character() -> dict:
     """Today's character level + pillar scores from the live API, else the snapshot.
 
@@ -166,21 +178,35 @@ def load_character() -> dict:
     """
     d = _fetch_json("/api/character")
     char = d.get("character") if isinstance(d, dict) else None
+    # #6285: a live answer outranks the snapshot - including a "recalculating" one, which
+    # carries no level on purpose. Falling through to the snapshot re-baked an old level.
+    if isinstance(char, dict) and (char.get("status") == "recalculating" or char.get("scores_pending")):
+        return {
+            "status": "recalculating",
+            "note": str(char.get("pending_note") or "").strip(),
+            "pillars": {},
+            "source": "live",
+        }
     if isinstance(char, dict) and char.get("level") is not None:
         pillars = {}
         for p in d.get("pillars", []) or []:
             name = p.get("name")
             score = p.get("raw_score")
+            if p.get("not_scored"):
+                continue  # the API says this pillar is not scored in public (Mind) - never baked
             if name and isinstance(score, (int, float)):
                 pillars[name] = {"raw_score": float(score), "tier": p.get("tier", "")}
         return {
             "level": _js_round(float(char["level"])),
             "tier": char.get("tier", ""),
             "as_of": char.get("as_of_date", "") or _today(),
-            "pillars": pillars,
+            "pillars": _without_unpublished(pillars),
             "source": "live",
         }
-    return _snapshot().get("cockpit", {})
+    snap = dict(_snapshot().get("cockpit", {}) or {})
+    if isinstance(snap.get("pillars"), dict):
+        snap["pillars"] = _without_unpublished(snap["pillars"])
+    return snap
 
 
 def load_chronicle() -> list:
@@ -458,11 +484,23 @@ def cockpit_block_html(ch: dict) -> str:
     /api/snapshot carries) are baked; a missing pillar is omitted, never a
     fabricated 0 (ADR-104/105). No data at all -> "" and the shell ships unchanged.
     """
+    if ch and ch.get("status") == "recalculating":
+        # #6285: say what the API says - no level, no pillar number, and no "as of" stamp
+        # (nothing here is a dated score, so there is no date to claim).
+        return (
+            '<noscript><section class="proof-static dx-prose" aria-label="Cockpit summary">'
+            '<p class="label">The cockpit — today, in one screen</p>'
+            f"<p><strong>Scores are being recalculated.</strong> {RECALC_LINE} "
+            "Nothing is shown here until the recalculation is done.</p>"
+            "<p>The live view (today's board read, trends, time travel) needs JavaScript. "
+            'What a level means: <a href="/method/character/">the method</a>.</p>'
+            "</section></noscript>"
+        )
     if not ch or ch.get("level") is None:
         return ""
     level = int(ch["level"])
     as_of = ch.get("as_of", "")
-    pillars = ch.get("pillars", {}) or {}
+    pillars = _without_unpublished(ch.get("pillars", {}) or {})
 
     # #4182 (panel ruling 2(iii)): the level NUMBER stays, keyed in plain words; the level
     # NAME ("Foundation") is off the reader surface — no-JS readers included.
@@ -474,13 +512,10 @@ def cockpit_block_html(ch: dict) -> str:
     ]
 
     body_roll = _rollup(pillars, COCKPIT_BODY)
-    mind_roll = _rollup(pillars, COCKPIT_MIND)
     consistency = pillars.get("consistency", {}).get("raw_score")
     rolls = []
     if body_roll is not None:
         rolls.append(f"Body {body_roll}")
-    if mind_roll is not None:
-        rolls.append(f"Mind {mind_roll}")
     if isinstance(consistency, (int, float)):
         rolls.append(f"Consistency {_js_round(consistency)}")
     if rolls:
@@ -960,7 +995,11 @@ def cockpit_og(char: dict) -> dict:
     char = char or {}
     level = char.get("level")
     as_of = char.get("as_of", "") or _today()
-    if level is not None:
+    if char.get("status") == "recalculating":
+        # #6285: no level, no date - the scores are being worked out again.
+        title = "The Cockpit — the daily instrument"
+        desc = f"Am I winning, and what's the one thing right now? The daily instrument. {RECALC_LINE}"
+    elif level is not None:
         lvl = f"level {int(level)}"
         title = f"The Cockpit — character {lvl}"
         desc = (
