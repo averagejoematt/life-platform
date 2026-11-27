@@ -343,6 +343,7 @@ ALLOWED_TO_NAME = frozenset(
         "lambdas/coach/telegram_worker_lambda.py",  # imports the pilot seam (owner's private chat)
         "mcp/tools_coach_packet.py",  # imports the pilot seam (owner's MCP packet)
         "mcp/registry.py",  # registers the tool
+        "mcp/tools_development_profile.py",  # #6294: the owner's read-only development profile (rr.read_rows + fold; builds no row)
         "lambdas/privacy/field_tiers.py",  # TIER_OWNER_ONLY
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
         "cdk/stacks/email_stack.py",  # #6158 pilot: the daily-brief role's no-write Deny names the partition

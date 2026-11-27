@@ -14,6 +14,10 @@ assembly needs and that used to live in one channel only:
     its window and caveats (#6226 case 2), computed by `health.grounded_intake_facts` (#6212), never re-derived here.
   * `latest_message_section` — his newest stored message, marked as the latest thing he asked, ahead of the coach's
     own notes (#6226 case 3; the November miss that named the newest NOTE instead).
+  * `profile_disputes_section` — his OPEN corrections to his private development profile (#6294, owner ruling
+    2026-11-26: "connect appropriately approved corrections to the shared-context work"), attributed and dated, from
+    the existing corrections ledger. Read only by the assembly (behind the switch); the brief and the legacy Telegram
+    memory block do not read this surface.
 
 Every reader is bounded (a `Limit` on every query) and fail-soft: a failed read returns "" / [] / None and logs its
 error CLASS, so a context read can never cost him a reply. Nothing here writes, and nothing here reads a
@@ -357,3 +361,47 @@ def latest_message_section(thread: list, notes: str, *, channel: str = "telegram
         f'{LATEST_HEADER.get(channel, LATEST_HEADER["telegram"])}, sent {label}: "{_clip(newest.get("text"), 280)}" — the latest '
         f"thing he asked or told you. When he asks what he last asked or told you, it is this message, not a note.{rel}"
     )
+
+
+# ── 3d. what he disputed about the platform's reading of him (#6294) ────────────────────────
+
+#: The corrections-ledger surface his development-profile corrections are logged on (`health.development_profile.
+#: PROFILE_SURFACE`; held equal by tests/test_development_profile_6294.py — a coach module never imports the profile).
+PROFILE_SURFACE = "development_profile"
+PROFILE_SIGNAL_PREFIX = "development_profile:"
+PROFILE_AGREE_CLASS = "defense-held"
+PROFILE_DISPUTES_LIMIT = 50
+PROFILE_DISPUTES_HEADER = (
+    "3d. WHAT HE DISPUTED ABOUT THE PLATFORM'S READING OF HIM (his open corrections to his private development profile, "
+    "in his words, dated; where he disputed a reading, never state that reading as fact):"
+)
+
+
+def profile_disputes_section(table) -> str:
+    """His OPEN disagreements with lines of his development profile, newest first, attributed and dated. An agreement or
+    a closed correction is not a dispute. "" when there is none or the read fails."""
+    try:
+        from coach import coach_corrections as cc
+
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": cc.PK, ":pfx": cc.SK_PREFIX},
+            ScanIndexForward=False,
+            Limit=PROFILE_DISPUTES_LIMIT,
+        )
+        lines = []
+        for r in resp.get("Items") or []:
+            ref = r.get("item_ref") or {}
+            signal = str(ref.get("signal") or "")
+            if ref.get("surface") != PROFILE_SURFACE or not signal.startswith(PROFILE_SIGNAL_PREFIX):
+                continue
+            if r.get("status") == cc.CLOSED or r.get("error_class") == PROFILE_AGREE_CLASS:
+                continue
+            sk = str(r.get("sk") or "")
+            day = sk.split("#")[1] if sk.count("#") >= 2 else str(r.get("created_at") or "")[:10]
+            about = signal[len(PROFILE_SIGNAL_PREFIX) :].replace(":", " / ").replace("_", " ")
+            lines.append(f'- {_in_words(day)}, on the profile\'s reading of his {about}: "{_clip(r.get("correction_text"), 280)}"')
+        return f"{PROFILE_DISPUTES_HEADER}\n" + "\n".join(lines) if lines else ""
+    except Exception as e:  # noqa: BLE001 — a context read never costs a reply
+        logger.warning("[personal_context] profile disputes unavailable: %s", type(e).__name__)
+        return ""

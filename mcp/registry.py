@@ -148,6 +148,11 @@ from mcp.tools_descriptions import (
     UPDATE_TODOIST_TASK_DESCRIPTION,
     WRITE_PLATFORM_MEMORY_DESCRIPTION,
 )
+from mcp.tools_development_profile import (  # #6294
+    GET_DEVELOPMENT_PROFILE_DESCRIPTION,
+    GET_DEVELOPMENT_PROFILE_INPUT,
+    tool_get_development_profile,
+)
 from mcp.tools_habits import tool_get_habit_reflection_queue, tool_log_habit_reflection
 from mcp.tools_health import tool_get_daily_metrics, tool_get_readiness_score, tool_get_weight_loss_progress
 
@@ -1480,6 +1485,14 @@ TOOLS = {
             "name": "manage_personal_hypothesis",
             "description": MANAGE_HYPOTHESIS_DESCRIPTION,
             "inputSchema": MANAGE_HYPOTHESIS_INPUT,
+        },
+    },
+    "get_development_profile": {  # #6294: owner-only, read-only — per-domain status with its evidence, no roll-up
+        "fn": tool_get_development_profile,
+        "schema": {
+            "name": "get_development_profile",
+            "description": GET_DEVELOPMENT_PROFILE_DESCRIPTION,
+            "inputSchema": GET_DEVELOPMENT_PROFILE_INPUT,
         },
     },
     "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing

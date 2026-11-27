@@ -686,6 +686,7 @@ ALLOWED_TO_NAME = frozenset(
         "deploy/config_ownership_audit.py",  # the allowlist's ownership ruling names the verifier
         "lambdas/research/hypotheses.py",  # #6292: the personal-hypothesis kind in the same partition (its own sk family)
         "mcp/tools_personal_hypotheses.py",  # #6292: that kind's owner tool (reads direct, writes queue-only); builds no finding row
+        "mcp/tools_development_profile.py",  # #6294: the owner's read-only development profile (hypotheses.read_rows + fold); builds no row
     }
 )
 RUNTIME_TREES = ("lambdas/", "mcp/", "deploy/", "cdk/")

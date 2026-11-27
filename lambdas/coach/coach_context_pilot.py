@@ -552,6 +552,7 @@ def build_turn_context(
         "notes": f"{NOTES_HEADER}\n{notes}" if notes else "",
         "thread_dates": "" if session else thread_dates_section(new_thread, notes),
         "corrections": corrections,
+        "profile_disputes": _safe("profile_disputes", lambda: pc.profile_disputes_section(table)),  # #6294
         "capability": CAPABILITY_SESSION if session else CAPABILITY,
     }
     return {
