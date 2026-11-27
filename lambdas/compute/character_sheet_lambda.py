@@ -44,8 +44,10 @@ from health import (
     character_privacy,  # owner ruling 2026-11-05: character_stats.json is read through the public variant
     character_public,  # owner ruling 2026-11-05: the public variant computed beside method 1
     character_public_rows,  # #6224: the rows of a pillar/headline with no public number
+    character_rest,  # noqa: E402 — #6293: planned rest + rest-day activity (the two final inputs)
     personal_baselines,  # #1412: personal-variance targets overlay (ADR-105 rule 4)
 )
+from health.character_rest import activity_elsewhere  # noqa: E402 — module-level name: tests patch csl.activity_elsewhere
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -460,6 +462,9 @@ def assemble_data(yesterday_str):
     # #965: hevy strength days (trailing 7) — movement's strength_sessions
     data["hevy_workout_days_7d"] = fetch_hevy_workout_days(strava_7d_start, yesterday_str)
 
+    # #6293 planned_rest: the window's recorded planned-pause days (sick / travel) — Movement's window targets prorate
+    data["planned_rest_days_7d"] = character_rest.planned_rest_days(table, USER_ID, strava_7d_start, yesterday_str)
+
     # #965: reading-session days (trailing 7, ADR-097 GSI2) — mind's reading_practice
     data["reading_session_days_7d"] = fetch_reading_session_days(strava_7d_start, yesterday_str)
 
@@ -524,23 +529,18 @@ def assemble_data(yesterday_str):
             pass
     data["journal_14d_count"] = j14d_count
 
-    # Data completeness — use already-fetched data where possible
-    expected_count = 5  # whoop, macrofactor, apple_health, strava, habitify
-    present = 0
-    if data["whoop"]:
-        present += 1
-    if data["macrofactor"]:
-        present += 1
-    if data["apple"]:
-        present += 1
-    # Strava: check if yesterday is in our 7d window (avoids re-fetch)
+    # Data completeness — use already-fetched data where possible.
+    # Strava: check if yesterday is in our 7d window (avoids re-fetch); Habitify: a separate fetch (not queried elsewhere).
     strava_dates = {r.get("date") or r.get("sk", "").replace("DATE#", "") for r in data["strava_7d"]}
-    if yesterday_str in strava_dates:
-        present += 1
-    # Habitify: need a separate fetch (not queried elsewhere)
-    if fetch_date("habitify", yesterday_str):
-        present += 1
-    data["data_completeness_pct"] = round((present / expected_count) * 100, 1)
+    present = {
+        "whoop": bool(data["whoop"]),
+        "macrofactor": bool(data["macrofactor"]),
+        "apple": bool(data["apple"]),
+        "strava": yesterday_str in strava_dates,
+        "habitify": bool(fetch_date("habitify", yesterday_str)),
+    }
+    # #6293 rest_day_completeness: the Strava row is expected only when another source shows a session that day.
+    data["data_completeness_pct"] = character_engine.data_completeness_pct(present, activity_elsewhere(data, yesterday_str))
 
     elapsed = time.time() - t0
     logger.info(

@@ -13,7 +13,7 @@ scores crashed (movement 54→9, mind 64→15). Four fixes:
   2. Presence-driven atrophy — RETIRED by #6293: silence, inactivity or rest
      never lowers a level or its EMA (sections 2 and 3 below now guard that).
   3. Visible XP bleed (xp_debt) — RETIRED by #6293: XP never falls, debt is 0.
-  4. Deterministic character_mood — thriving/steady/fading/dormant, pure code.
+  4. Deterministic character_mood — thriving/steady/fading/unavailable (#6293 retires "dormant"), pure code.
 
 Run with:   python3 -m pytest tests/test_character_neglect.py -v
 """
@@ -172,7 +172,7 @@ def test_fresh_character_never_logs_stays_level_one_forever():
         for p in ("movement", "sleep"):
             histories[p].append(rec[f"pillar_{p}"]["raw_score"])
         events.extend(rec["level_events"])
-        if rec["character_mood"] == "dormant":
+        if rec["character_mood"] in ("dormant", "unavailable"):
             dormant_ups.extend(e for e in rec["level_events"] if e["type"] == "level_up")
         prev = rec
 
@@ -180,7 +180,7 @@ def test_fresh_character_never_logs_stays_level_one_forever():
     assert dormant_ups == []
     assert rec["character_level"] == 1
     assert rec["pillar_movement"]["level"] == 1
-    assert rec["character_mood"] == "dormant"
+    assert rec["character_mood"] == "unavailable"  # #6293: silence is not observed, never "dormant"
 
 
 def test_up_gate_judges_unblended_raw_not_the_blend_floor():
@@ -316,17 +316,21 @@ def test_xp_debt_is_zero_in_the_record_payload():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_mood_dormant_on_dark_presence():
+def test_mood_unavailable_on_dark_presence():
+    """#6293 mood_label_presence: logging silence is not observed — "unavailable", never "dormant"."""
     v = compute_character_mood(_dark(15), {"movement": 9.0}, {"movement": [50.0] * 7})
-    assert v["mood"] == "dormant"
+    assert v["mood"] == "unavailable"
     assert v["inputs"]["gap_days"] == 15
 
 
-def test_mood_fading_on_quiet_presence_or_falling_trend():
+def test_mood_fading_only_on_a_measured_falling_trend():
+    """#6293: a quiet presence alone is "unavailable"; "fading" needs the measured trend (<= -5), presence or not."""
     v = compute_character_mood({"presence_class": "quiet", "gap_days": 3}, {"m": 40.0}, {"m": [50.0] * 7})
-    assert v["mood"] == "fading"
+    assert v["mood"] == "unavailable"
     falling = {"m": [70.0, 70.0, 70.0, 70.0, 50.0, 45.0, 40.0]}
     v = compute_character_mood({"presence_class": "present", "gap_days": 0}, {"m": 40.0}, falling)
+    assert v["mood"] == "fading"
+    v = compute_character_mood(_dark(9), {"m": 40.0}, falling)
     assert v["mood"] == "fading"
 
 
@@ -343,5 +347,5 @@ def test_mood_steady_default_and_no_engagement():
 
 def test_mood_rides_the_daily_record():
     rec = _sheet_for_gap(15)
-    assert rec["character_mood"] == "dormant"
+    assert rec["character_mood"] == "unavailable"
     assert rec["character_mood_inputs"]["presence_class"] == "dark"
