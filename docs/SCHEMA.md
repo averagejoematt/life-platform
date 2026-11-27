@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-11-23 (v8.6.0 — 96 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-11-27 (v8.6.0 — 96 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -2238,7 +2238,7 @@ Queried by MCP tools: `get_habit_tier_report`, `get_vice_streak_history`.
 **pk:** `USER#matthew#SOURCE#character_sheet`
 **sk:** `DATE#YYYY-MM-DD`
 
-One item per day. Computed by the backfill script initially, then by the Daily Brief Lambda (Phase 2). Contains the full character state: overall level, all 7 pillar scores, XP, tier info, cross-pillar effects, and level events. Sequential dependency — each day's computation requires the previous day's state for streak tracking and level transitions. Engine v1.1.0 adds confidence scoring, XP decay, progressive difficulty, and per-pillar EMA smoothing. Engine v1.2.0 (ADR-104) adds behavioral-absence semantics (an unlogged behavior scores 0, a missing sensor reading stays neutral), the coverage gate (thin-data days can't move levels), the raw-day gate on level-ups, graduated step bands, and per-pillar drivers provenance. Engine v1.3.0 (#913/#919) adds the deterministic `character_mood`, visible XP debt (the below-zero bleed, no longer hidden by a 0-floor), engagement-driven neglect atrophy, and the up-gate scale fix (`round(raw_score) >= target_level`) — mechanics in `docs/engines/CHARACTER.md`.
+One item per day. Computed by the backfill script initially, then by the Daily Brief Lambda (Phase 2). Contains the full character state: overall level, all 7 pillar scores, XP, tier info, cross-pillar effects, and level events. Sequential dependency — each day's computation requires the previous day's state for streak tracking and level transitions. Engine v1.1.0 adds confidence scoring, XP decay, progressive difficulty, and per-pillar EMA smoothing. Engine v1.2.0 (ADR-104) adds behavioral-absence semantics (an unlogged behavior scores 0, a missing sensor reading stays neutral), the coverage gate (thin-data days can't move levels), the raw-day gate on level-ups, graduated step bands, and per-pillar drivers provenance. Engine v1.3.0 (#913/#919) adds the deterministic `character_mood`, visible XP debt (the below-zero bleed, no longer hidden by a 0-floor), engagement-driven neglect atrophy, and the up-gate scale fix (`round(raw_score) >= target_level`) — mechanics in `docs/engines/CHARACTER.md`. Engine v1.10.0 (#6293 amendment) retires the debt, the decay and the atrophy (the fields stay, always 0 / `null`), stores an uninstrumented pillar (Relationships) as its reason with no number and lists it in `uninstrumented_pillars`, and scores only the T0/T1 habits 0 when absent.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -2247,10 +2247,10 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `character_tier` | string | Current tier name: Foundation / Momentum / Discipline / Mastery / Elite |
 | `character_tier_emoji` | string | Tier emoji |
 | `character_xp` | number | Cumulative total XP across all pillars |
-| `character_xp_debt` | number | v1.3.0 (#919): summed per-pillar `xp_debt` — the visible below-zero bleed |
+| `character_xp_debt` | number | v1.3.0 (#919): summed per-pillar `xp_debt`. Retired by #6293 (engine v1.10.0): always 0 — XP never falls |
 | `character_mood` | string | v1.3.0 (#919): deterministic mood, `thriving` \| `steady` \| `fading` \| `dormant` — pure code (ADR-105), never narrated into existence |
 | `character_mood_inputs` | map | v1.3.0 (#919): the inputs the mood verdict was derived from (presence class, 7d composite trend) — ADR-104 provenance |
-| `neglect_decay` | map \| null | v1.3.0 (#919): today's engagement-atrophy state (gap days, multiplier); `null` when engaged or on a planned pause |
+| `neglect_decay` | map \| null | v1.3.0 (#919): today's engagement-atrophy state (gap days, multiplier); `null` when engaged or on a planned pause. Retired by #6293 (engine v1.10.0): always `null`. |
 | `min_confidence` | number | Lowest pillar confidence (0.0–1.0). v1.1.0+ |
 | `avg_confidence` | number | Average pillar confidence (0.0–1.0). v1.1.0+ |
 | `active_effects` | list | Active cross-pillar effects (e.g., Sleep Drag, Training Boost) |
@@ -2276,9 +2276,9 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `level` | number | Discrete level (1-100), changes subject to progressive streak rules |
 | `tier` | string | Pillar tier name |
 | `tier_emoji` | string | Tier emoji |
-| `xp_total` | number | Cumulative XP for this pillar (decays daily by `daily_xp_decay`); v1.3.0: the positive part only — the below-zero remainder goes to `xp_debt` |
+| `xp_total` | number | Cumulative XP for this pillar (decays daily by `daily_xp_decay`); v1.3.0: the positive part only — the below-zero remainder goes to `xp_debt`. #6293 (engine v1.10.0): never falls — no daily decay; a measured day credits the positive part of its band. |
 | `xp_delta` | number | Net XP change today (earned − decay) |
-| `xp_debt` | number | v1.3.0 (#919): the hole dug below zero, capped at `leveling.xp_debt_cap` (100 = one level's worth) — good days pay debt before XP grows |
+| `xp_debt` | number | v1.3.0 (#919): the hole dug below zero, capped at `leveling.xp_debt_cap` (100 = one level's worth) — good days pay debt before XP grows. Retired by #6293 (engine v1.10.0): always 0; a stored debt is forgiven. |
 | `xp_earned` | number | Raw XP earned today before decay. v1.1.0+ |
 | `xp_buffer` | number | XP within current level (0 to xp_per_level). Protects against level-down. v1.1.0+ |
 | `confidence` | number | Data completeness confidence (0.0–1.0). v1.1.0+ |
@@ -2288,7 +2288,7 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `coverage_hold` | bool | ADR-104 (v1.2.0+): day was below `level_change_min_coverage` — no leveling signal, levels frozen both directions |
 | `absent_behaviors` | list | ADR-104 (v1.2.0+): behavioral components with no data this day (scored 0 at full weight — "didn't happen") |
 | `drivers` | map | ADR-104 (v1.2.0+): engine-computed provenance `{top, dragging, absent, no_data}` (component-name lists) — feeds the page's per-pillar "why" line |
-| `neglect_decay` | map \| null | v1.3.0 (#919): this pillar's atrophy state when the engagement gap decayed its level score (`0.98^(gap−3)` after 3 dark days on behavioral-heavy pillars, floored at raw — config `leveling.neglect_decay`); `null` when not decaying |
+| `neglect_decay` | map \| null | v1.3.0 (#919): this pillar's atrophy state when the engagement gap decayed its level score (`0.98^(gap−3)` after 3 dark days on behavioral-heavy pillars, floored at raw — config `leveling.neglect_decay`); `null` when not decaying Retired by #6293 (engine v1.10.0): always `null`. |
 | `components` | map | Per-component scores: `{"component_name": {"score": N, "weight": W[, "absent": true]}, "_confidence": N, "_data_coverage": N, "_absent_behaviors": [...]}` |
 
 Config: `s3://matthew-life-platform/config/character_sheet.json`  
