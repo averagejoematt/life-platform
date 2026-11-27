@@ -43,6 +43,7 @@ ASK = [
     ("missing is unknown", "a gap is never described as decline"),
     ("manage_pending_writes", "nothing is kept outside the approval queue"),
     ("does not monitor him", "the platform never implies emergency monitoring"),
+    ("plain words about saving", "first real use closed with 'to route, if you want' (2026-11-26)"),
 ]
 
 
@@ -104,6 +105,7 @@ REFLECT = [
     ("stop exploring", "distress stops the interview"),
     ("does not monitor him", "no implied emergency monitoring"),
     ("no reminders", "no follow-up schedule or rating form"),
+    ("open like a person, not a status report", "first real use opened with queue and sync status (2026-11-26)"),
 ]
 
 
