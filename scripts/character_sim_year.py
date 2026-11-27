@@ -5,7 +5,7 @@ char_sim_year.py — YEAR-SCALE defensibility simulation of the character engine
 Drives the REAL lambdas/character_engine.py orchestrator (compute_character_sheet)
 day by day for 420+ days across 6 scenarios, by monkeypatching PILLAR_COMPUTERS /
 compute_consistency_raw to return scripted (raw_score, details) pairs. Everything
-downstream — EMA, cross-pillar effects, neglect decay, level/tier/streak gates,
+downstream — EMA, cross-pillar effects, level/tier/streak gates (#6293: no neglect decay),
 XP/debt, mood — is the production code path, untouched.
 
 No AWS calls. Local config config/character_sheet.json.
@@ -40,7 +40,10 @@ sys.path.insert(0, str(REPO / "lambdas"))
 from health import character_engine as ce  # noqa: E402
 
 CONFIG = json.loads((REPO / "config" / "character_sheet.json").read_text())
-PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+# #6293: an uninstrumented pillar (Relationships) has no chain — no raw score, level or XP to simulate
+PILLARS = [
+    p for p in ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency") if p not in ce.UNINSTRUMENTED_PILLARS
+]
 GENESIS = date(2026, 7, 12)
 
 # ---------------------------------------------------------------------------
@@ -171,7 +174,8 @@ def run(days_fn, n_days, genesis=GENESIS, state=None):
         data = {"date": (genesis + timedelta(days=i)).isoformat(), "_script": script, "engagement_state": engagement}
         rec = ce.compute_character_sheet(data, prev, histories, cfg)
         for p in PILLARS:
-            histories[p].append(rec[f"pillar_{p}"]["raw_score"])
+            if not ce.day_is_held(rec[f"pillar_{p}"]):  # #6293: the loader's rule — held days never enter a history
+                histories[p].append(rec[f"pillar_{p}"]["raw_score"])
         out.append(rec)
         prev = rec
     return out
@@ -360,24 +364,21 @@ def main():
     dormant_climbs = [
         (i + 1, ev["type"])
         for i, r in enumerate(recs_f)
-        if r["character_mood"] == "dormant"
+        if r["character_mood"] in ("dormant", "unavailable")
         for ev in r["level_events"]
         if ev["type"] == "level_up"
     ]
     print(
         f"  >> #957 invariant — 90 silent days: climbs {len(climbs)} (MUST be 0) | "
-        f"level_up on dormant days {len(dormant_climbs)} (MUST be 0) | final char level {recs_f[-1]['character_level']} (MUST be 1)"
+        f"level_up on unavailable-mood days {len(dormant_climbs)} (MUST be 0) | final char level {recs_f[-1]['character_level']} (MUST be 1)"
     )
 
-    # focused probe: XP mechanics on a NOT-INSTRUMENTED pillar (relationships)
-    print(f"\n{'=' * 78}\nPROBE: relationships (not instrumented, coverage 0.0) XP over scenario (a)")
+    # focused probe: a NOT-INSTRUMENTED pillar (relationships) — #6293: out of the chain, no number at all
+    print(f"\n{'=' * 78}\nPROBE: relationships (not instrumented) over scenario (a)")
     for day in (14, 30, 60, 120, 400):
-        r = recs_a[day - 1]
-        pr = r["pillar_relationships"]
-        print(
-            f"  day {day:>3}: raw {pr['raw_score']} cov {pr['data_coverage']} hold {pr['coverage_hold']} "
-            f"level {pr['level']} xp {pr['xp_total']} debt {pr['xp_debt']} xp_earned {pr['xp_earned']}"
-        )
+        pr = recs_a[day - 1]["pillar_relationships"]
+        numbers = sorted(k for k in ("raw_score", "level", "xp_total", "xp_debt") if k in pr)
+        print(f"  day {day:>3}: not_instrumented {pr.get('not_instrumented')} numbers {numbers or 'none'} (MUST be none)")
 
     # focused probe: WHY metabolic freezes at L1 in (a) — the #913 up-gate compares
     # the day's raw against the cross-pillar-BOOSTED target (character_engine.py:1099

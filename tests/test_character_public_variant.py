@@ -49,6 +49,10 @@ def _public_inputs(i, d):
     return {
         "date": d,
         "sleep": {"sleep_duration_hours": 6.0 + (i % 5) * 0.5, "sleep_efficiency_percentage": 80 + (i % 7) * 2},
+        # #6293: Movement and Metabolic judged too, so the cross-pillar variance (which reads judged pillars only) runs
+        "apple": {"steps": 7000 + (i % 4) * 1000, "blood_glucose_time_in_range_pct": 85 + (i % 5)},
+        "whoop": {"resting_heart_rate": 56 + (i % 3)},
+        "bp_data": {"systolic": 116 + (i % 4), "diastolic": 75},
         "habit_scores": {
             "scoring_method": "core_set_v1",
             "core_pct": round(0.4 + (i % 6) * 0.1, 3),
@@ -137,12 +141,14 @@ def histories():
 
 
 def test_method1_really_differs_between_the_two_histories(histories):
-    """The control: the private inputs reach method 1 (Mind, Relationships XP, the composite, consistency)."""
+    """The control: the private inputs reach method 1 (Mind and the state its EMA carries forward, the composite,
+    consistency). #6293: Relationships reads no input at all now, so it is no longer one of the carriers."""
     quiet, private, _q, _p = histories
     d = _days()[PRIVATE_DAYS.__iter__().__next__()]
     assert _canon(quiet) != _canon(private)
     assert any(quiet[d]["pillar_mind"]["raw_score"] != private[d]["pillar_mind"]["raw_score"] for d in quiet)
-    assert any(quiet[d]["character_xp"] != private[d]["character_xp"] for d in quiet)
+    assert any(quiet[d]["pillar_mind"]["level_score"] != private[d]["pillar_mind"]["level_score"] for d in quiet)
+    assert all(quiet[d]["pillar_relationships"] == private[d]["pillar_relationships"] for d in quiet)
     assert d in quiet
 
 
@@ -174,9 +180,14 @@ def test_mutation_control_a_public_method_that_kept_the_private_components_would
 def test_mutation_control_chaining_from_method1_state_would_move(histories):
     """The public chain must start from the previous PUBLIC state: chaining from method 1's leaks private inputs."""
     quiet, private, _q, _p = histories
+    # #6293: with Relationships out of method 1 and the variance reading judged pillars only, this fixture's private days
+    # move method 1's consistency raw by tenths and its chained state not at all — so the control plants the drift a
+    # private input would leave in the method-1 state (its consistency level and streak) and shows the public variant
+    # reads it: the public chain must start from the PUBLIC state.
     d = _days()[max(PRIVATE_DAYS) + 1]
     pa = B.previous_record(quiet, d)
-    pb = B.previous_record(private, d)
+    pb = copy.deepcopy(B.previous_record(private, d))
+    pb["pillar_consistency"] = dict(pb["pillar_consistency"], level=pb["pillar_consistency"]["level"] + 6, streak_below=3)
     a, _ = character_public.compute_public_variant(quiet[d], pa, [], CONFIG, computed_at="t")
     b, _ = character_public.compute_public_variant(private[d], pb, [], CONFIG, computed_at="t")
     assert _canon(a) != _canon(b)
@@ -229,8 +240,11 @@ def test_public_mind_holds_the_private_components_out_of_sum_and_coverage():
         "t1_habit_compliance",
         "reading_practice",
     }
-    assert details["_data_coverage"] == 1.0  # none of the private weights in the denominator
-    assert raw == round((60 * 0.3 + 60 * 0.1 + 0 * 0.1) / 0.5, 1)
+    # none of the private weights in the denominator; #6293: the absent reading log is unknown (out of the sum, lowering
+    # the coverage), no longer a 0 — the habits keep their two-state rule
+    assert details["_data_coverage"] == 0.8
+    assert details["reading_practice"]["score"] is None
+    assert raw == 60.0
     _raw2, details2 = character_public.public_mind(det, "tier_weighted_v1", cfg)
     assert "t1_habit_compliance" not in details2  # the tier-1 share counted the journal habits
 
@@ -256,7 +270,7 @@ def test_relationships_has_no_public_reading_and_no_xp(histories):
     _quiet, _private, _q, p = histories
     for r in p.values():
         rel = r["public"]["pillar_relationships"]
-        assert rel["not_instrumented"] is True and rel["xp_total"] == 0 and rel["level"] == 1
+        assert rel == character_privacy.not_scored_pillar("relationships")  # #6293: the reason, no number
         assert "relationships" in r["public"]["headline_excluded_pillars"]
 
 

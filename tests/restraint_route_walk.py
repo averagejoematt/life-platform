@@ -101,6 +101,14 @@ def tokens() -> list:
     from health import character_privacy as CP
 
     out += CP.withheld_public_tokens(_engine_config())
+    # #6224 (owner ruling 2026-11-26 23:50Z): a reconstructed event's INTERNAL provenance never reaches a public body
+    out += [k.lower() for k in CP.PROVENANCE_KEYS]
+    # #6293 planned_rest: the owner-only planned-pause detail never reaches a public body
+    out += [k.lower() for k in CP.PLANNED_REST_KEYS]
+    if TOMBSTONED["plant"]:  # the tombstoned old-method blocks' own canary name
+        out += [TOMB_CANARY.lower(), TOMB_XP]
+    if OLDER["plant"]:
+        out += [OLDER_XP]
     return out
 
 
@@ -140,9 +148,114 @@ def _restraint_done(i: int, k: int) -> bool:
     return state == "high"
 
 
+PROVENANCE: dict = {"plant": False}  # #6224: --provenance plants a corrected-chain variant with reconstructed events
+# #6224 (2026-11-27): --tombstoned plants a TOMBSTONED character_sheet and character_receipt, newest of all, each holding an
+# OLD-method (v1) public block with a level, XP debt and a restraint-derived name; no public route may serve any of it.
+TOMBSTONED: dict = {"plant": False}
+TOMB_CANARY = "Tombstoned Old Method Canary"
+TOMB_XP = "7777.5"  # the tombstoned sheet's XP: the overall number itself is the leak token (the effect name is scrubbed anyway)
+
+
+def _tomb_day() -> str:
+    from datetime import timedelta
+
+    from common.pacific_time import PACIFIC
+
+    return (jw.FROZEN.astimezone(PACIFIC).date() + timedelta(days=1)).isoformat()
+
+
+OLDER: dict = {"plant": False}  # #6224: --older-method plants the newest sheets as v1 and v2 blocks (not tombstoned)
+OLDER_XP = "8888.5"  # the older-method sheets' sentinel XP (and level 88, debt 44): no public route may carry them
+
+
+def _older_rows() -> list:
+    from datetime import timedelta
+
+    from common.pacific_time import PACIFIC
+    from health import character_privacy as CP
+
+    user, base = "USER#matthew", jw.FROZEN.astimezone(PACIFIC).date()
+    rows = []
+    for k, version in ((2, CP.PUBLIC_METHOD_V1), (1, CP.PUBLIC_METHOD_V2)):
+        d = (base + timedelta(days=k)).isoformat()
+        pv = {
+            "public_method_version": version,
+            "origin": "live",
+            "character_level": Decimal("88"),
+            "character_tier": "Mastery",
+            "character_xp": Decimal(OLDER_XP),
+            "character_xp_debt": Decimal("44"),
+            "character_mood": "fading",
+            "level_events": [{"type": "character_level_up", "old_level": Decimal("87"), "new_level": Decimal("88")}],
+            "pillar_sleep": {"level": Decimal("88"), "raw_score": Decimal("70"), "tier": "Mastery", "xp_total": Decimal(OLDER_XP)},
+        }
+        rows.append({"pk": f"{user}#SOURCE#character_sheet", "sk": f"DATE#{d}", "date": d, "phase": "experiment", "public": pv})
+    return rows
+
+
+def _tombstoned_rows() -> list:
+    from health import character_privacy as CP
+
+    d, user = _tomb_day(), "USER#matthew"
+    stamp = {"tombstone": True, "tombstoned_at": "2026-11-20T00:00:00Z", "tombstoned_reason": "synthetic", "phase": "experiment"}
+    effect = {"name": TOMB_CANARY, "emoji": "", "condition": RESTRAINT_CONDITION, "targets": {"mind": {"value": Decimal("0.03")}}}
+    sheet_pub = {
+        "public_method_version": CP.PUBLIC_METHOD_V1,
+        "origin": "live",
+        "character_level": Decimal("77"),
+        "character_xp": Decimal("7777.5"),  # a sentinel no live figure carries
+        "character_xp_debt": Decimal("33"),
+        "active_effects": [effect],
+        "level_events": [{"type": "level_up", "pillar": "sleep", "old_level": Decimal("76"), "new_level": Decimal("77")}],
+        "pillar_sleep": {"level": Decimal("77"), "raw_score": Decimal("77"), "tier": "Mastery"},
+    }
+    sheet = {
+        "pk": f"{user}#SOURCE#character_sheet",
+        "sk": f"DATE#{d}",
+        "date": d,
+        "character_level": Decimal("77"),
+        "public": sheet_pub,
+        **stamp,
+    }
+    trans = {"pillars": {"sleep": {"inputs": {"raw_score": Decimal("77")}, "outputs": {"level": Decimal("77"), "xp_debt": Decimal("33")}}}}
+    rec_pub = {
+        "public_method_version": CP.PUBLIC_METHOD_V1,
+        "engine_version": TOMB_CANARY,
+        "date": d,
+        "digest": "x" * 64,
+        "transitions": trans,
+        "input_rows": [],
+    }
+    receipt = {"pk": f"{user}#SOURCE#character_receipt", "sk": f"DATE#{d}", "date": d, "transitions": trans, "public": rec_pub, **stamp}
+    return [sheet, receipt]
+
+
+def _plant_provenance(pv: dict) -> None:
+    """The stored row as a CURRENT-method (corrected-chain) variant whose events carry internal provenance: one original
+    public-input pillar event, one reconstructed pillar event and one reconstructed, re-dated character level-up."""
+    from health import character_privacy as CP
+
+    pv["public_method_version"] = CP.PUBLIC_METHOD_VERSION
+    rec = {"event_provenance": CP.RECONSTRUCTED, "reconstructed_at": "2026-11-26", "reconstructed_method": CP.PUBLIC_METHOD_VERSION}
+    pv["level_events"] = [
+        {"type": "level_up", "pillar": "sleep", "old_level": Decimal("3"), "new_level": Decimal("4")},
+        dict(rec, type="level_up", pillar="movement", old_level=Decimal("6"), new_level=Decimal("7")),
+        dict(rec, type="character_level_up", old_level=Decimal("4"), new_level=Decimal("5"), redated_from="2026-09-01"),
+    ]
+
+
 def _plant_character(r: dict) -> None:
     pv = r.get("public")
     if not isinstance(pv, dict):
+        return
+    from health import character_privacy as CP
+
+    # #6224 (2026-11-27): an older-method block is always "being recalculated" (the per-block rule), so the walk's
+    # stored variant is a CURRENT-method one — its numbers reach the routes when the switch is off, and every scrub
+    # (restraint, Mind, Relationships, provenance) is exercised on what is actually served.
+    pv["public_method_version"] = CP.PUBLIC_METHOD_VERSION
+    if PROVENANCE["plant"]:
+        _plant_provenance(pv)
         return
     pv["active_effects"] = [{"name": EFFECT_CANARY, "emoji": "", "condition": RESTRAINT_CONDITION, "targets": {"mind": {"value": 0.03}}}]
     mind = pv.setdefault("pillar_mind", {})
@@ -227,6 +340,10 @@ def _augment(rows: list) -> list:
                 for n, sig in SIGNALS.items():
                     reg[n] = {"status": "active", "tier": 0, **({"vice": True} if sig[2] else {})}
                 reg[ORDINARY] = {"status": "active", "tier": 0}
+    if TOMBSTONED["plant"]:
+        rows += _tombstoned_rows()
+    if OLDER["plant"]:
+        rows += _older_rows()
     rows.append(
         {
             "pk": f"{user}#SOURCE#protocols",
@@ -281,12 +398,15 @@ def _mind_scored() -> None:
 
 # #6224: the keys that carry a Mind score, level, tier or XP on a served body.
 MIND_SCORE_KEYS = frozenset({"level", "raw_score", "score", "level_score", "tier", "xp_total", "xp_delta", "xp_earned", "xp_debt"})
-MIND_KEYS = frozenset({"mind", "pillar_mind", "mind_pillar"})
+# #6293 amendment: Relationships is not scored in public either (not instrumented), so the detector covers it too.
+UNSCORED_NAMES = ("mind", "relationships")
+MIND_KEYS = frozenset({k for n in UNSCORED_NAMES for k in (n, f"pillar_{n}", f"{n}_pillar")})
 
 
 def mind_numbers(body) -> list:
-    """Every place a served body carries a Mind score/level/tier/XP value (#6224: Mind is not scored in public) — a
-    pillar row named "mind", or the value under a Mind key — as sorted key paths. None is not a value."""
+    """Every place a served body carries a Mind (#6224) or Relationships (#6293) score/level/tier/XP value — neither is
+    scored in public — a pillar row named for one, or the value under its key — as sorted key paths. None is not a
+    value. (The name is historical; ``unscored_numbers`` is the same function.)"""
     if isinstance(body, str):
         try:
             body = json.loads(body)
@@ -299,7 +419,7 @@ def mind_numbers(body) -> list:
 
     def walk_(node, path):
         if isinstance(node, dict):
-            if str(node.get("name") or "").lower() == "mind" or str(node.get("pillar") or "").lower() == "mind":
+            if str(node.get("name") or "").lower() in UNSCORED_NAMES or str(node.get("pillar") or "").lower() in UNSCORED_NAMES:
                 found.update(f"{path}.{k}" for k in MIND_SCORE_KEYS | {"old_level", "new_level"} if value(node.get(k)))
             for k, v in node.items():
                 if k in MIND_KEYS:
@@ -314,6 +434,9 @@ def mind_numbers(body) -> list:
 
     walk_(body, "")
     return sorted(found)
+
+
+unscored_numbers = mind_numbers
 
 
 # #6224 (containment, owner ruling 2026-11-26): while the character scores are pending a recompute no public body carries
@@ -381,6 +504,10 @@ def walk(
     if scores_live:
         _scores_live()
     L = jw._wire("gaps")
+    if OLDER.get("leak"):  # after the wiring (it re-imports the readers): the per-block rule off
+        from health import character_privacy as _cp
+
+        _cp.older_method = lambda _v: False
     import boto3
 
     boto3.client = lambda *a, **k: _ConfigS3()  # type: ignore[assignment]
@@ -436,6 +563,28 @@ def walk(
             out.setdefault("all_bodies", {})[path] = json.dumps(
                 {"status": resp.get("statusCode"), "body": jw._normalise(parsed)}, sort_keys=True, default=str
             )
+    if TOMBSTONED["plant"]:  # the by-date reads of the planted day too (a get_item bypasses the query's phase filter)
+        for path in ("/api/character", "/api/character_receipt"):
+            q = {"date": _tomb_day()}
+            event = {
+                "rawPath": path,
+                "path": path,
+                "httpMethod": "GET",
+                "requestContext": {"http": {"method": "GET"}},
+                "headers": {},
+                "queryStringParameters": q,
+            }
+            try:
+                resp = L._dispatch_route(event, path, "GET")
+            except Exception as e:  # noqa: BLE001
+                out["raised"][f"{path}?date"] = type(e).__name__
+                continue
+            out["answered"] += 1
+            blob = json.dumps(resp, default=str).lower()
+            hits = sorted({t for t in toks if t in blob})
+            if hits:
+                out["leaks"][f"{path}?date"] = hits
+            out.setdefault("by_date_bodies", {})[path] = resp.get("body") if isinstance(resp, dict) else None
     out["unparsed_queries"] = rw.STATS["unparsed_queries"]
     return out
 
@@ -485,6 +634,19 @@ if __name__ == "__main__":
         assert state in ("low", "high"), state
         STATE["value"] = state
         jw._freeze(sys.argv[sys.argv.index("--now") + 1])  # one instant for both states (before any handler import)
+    PROVENANCE["plant"] = "--provenance" in sys.argv
+    TOMBSTONED["plant"] = "--tombstoned" in sys.argv
+    OLDER["plant"] = "--older-method" in sys.argv
+    OLDER["leak"] = "--older-method-leak" in sys.argv  # the control: the per-block rule off (applied after the wiring)
+    if "--tombstone-leak" in sys.argv:  # the control: the visibility predicate off — the tombstoned blocks are served
+        from experiment import phase_filter as _pf
+
+        _pf.singleton_visible = lambda item: bool(item)  # before any reader imports (and binds) it
+    if "--provenance-leak" in sys.argv:  # #6224's control: the public strip of provenance and reconstructed events off
+        from health import character_privacy as _CP
+
+        _CP.without_provenance = lambda e: e
+        _CP.is_reconstructed = lambda e: False
     if "--fd" in sys.argv:
         FD["day_offset"] = FD_OFFSETS[sys.argv[sys.argv.index("--fd") + 1]]
     try:

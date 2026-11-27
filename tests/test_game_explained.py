@@ -68,16 +68,19 @@ def test_engine_mechanics_fingerprint_current():
 
 
 def test_load_bearing_config_values_render():
+    from health import character_engine as ce
+
     config = gx.load_config()
     page = _page()
     leveling = config["leveling"]
     # every pillar, its weight, and its owner
     for name, p in config["pillars"].items():
         assert name.capitalize() in page, f"pillar {name} missing from the page"
-        assert gx.pct(p["weight"]) in page, f"{name} weight {p['weight']} not rendered"
+        if name not in ce.UNINSTRUMENTED_PILLARS:  # #6293: an uninstrumented pillar's weight is not part of the headline
+            assert gx.pct(p["weight"]) in page, f"{name} weight {p['weight']} not rendered"
         assert p.get("owner", "") in page
-    # the XP economy
-    for key in ("xp_per_level", "xp_debt_cap", "xp_buffer_threshold", "xp_buffer_cap"):
+    # the XP economy (#6293: no decay, no debt cap — XP never falls)
+    for key in ("xp_per_level", "xp_buffer_threshold", "xp_buffer_cap"):
         assert gx.num(leveling[key]) in page, f"leveling.{key} not rendered"
     # every tier band and its streak gates
     for t in config["tiers"]:
@@ -94,13 +97,11 @@ def test_load_bearing_config_values_render():
     # every XP band's score floor
     for band in config.get("xp_bands", []):
         assert f'{band["min_raw_score"]}–' in page
-    # the coverage freeze + neglect knobs
+    # the coverage freeze; #6293: no neglect knobs remain, and the page says silence costs nothing
     assert gx.pct(leveling["level_change_min_coverage"]) in page
-    nd = leveling["neglect_decay"]
-    assert gx.num(nd["rate"]) in page and gx.num(nd["n_grace_days"]) in page
+    assert "neglect_decay" not in leveling
+    assert "XP never goes down" in page and "No neglect decay" in page
     # versions: the page must state the engine + config it was generated from
-    from health import character_engine as ce
-
     assert f"engine v{ce.ENGINE_VERSION}" in page
     assert f'config v{config["_meta"]["version"]}' in page
 

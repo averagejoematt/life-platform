@@ -91,8 +91,9 @@ def test_handle_character_passes_through_not_instrumented(monkeypatch):
 
     rel = by_name["relationships"]
     assert rel["not_instrumented"] is True
-    # owner rulings 2026-11-03/04: relationships reads only private sources, so its public note is the held one
-    assert rel["not_instrumented_note"] == character_privacy.PRIVATE_PILLAR_NOTE
+    # #6293 amendment: relationships is not instrumented in either method — not scored in public, with its own reason
+    assert rel["not_scored"] is True and rel["raw_score"] is None and rel["level"] is None
+    assert rel["not_instrumented_note"] == character_privacy.UNSCORED_PUBLIC_PILLARS["relationships"]
 
     sleep = by_name["sleep"]
     assert sleep["not_instrumented"] is False
@@ -125,7 +126,7 @@ def test_handle_character_instrumented_pillar_unaffected(monkeypatch):
     met = next(p for p in body["pillars"] if p["name"] == "metabolic")
     assert met["not_instrumented"] is False and met["not_instrumented_note"] is None and met["raw_score"] == 62.0
     rel = next(p for p in body["pillars"] if p["name"] == "relationships")
-    assert rel["not_instrumented"] is True and rel["raw_score"] == 50.0
+    assert rel["not_instrumented"] is True and rel["raw_score"] is None  # #6293: never a number, not even a stored one
     # five scored public pillars: the composite is their average (#6224: Mind is not scored in public, so it is out)
     mind = next(p for p in body["pillars"] if p["name"] == "mind")
     assert mind["not_scored"] is True and mind["raw_score"] is None and mind["level"] is None

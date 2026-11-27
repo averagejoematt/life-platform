@@ -154,7 +154,7 @@ def test_the_public_variant_carries_no_mind_number_and_says_why(histories):
     _, _, pub, _ = histories
     for d, block in pub.items():
         assert block["pillar_mind"] == character_privacy.not_scored_pillar("mind"), d
-        assert "mind" in block["headline_excluded_pillars"] and block["unscored_pillars"] == ["mind"], d
+        assert "mind" in block["headline_excluded_pillars"] and block["unscored_pillars"] == ["mind", "relationships"], d
         assert RW.mind_numbers(block) == [], d
         assert not [e for e in block.get("level_events") or [] if e.get("pillar") == "mind"], d
         for ev in block.get("level_events") or []:
@@ -207,7 +207,10 @@ def _v1_variant() -> dict:
     return {"sk": "DATE#2026-11-20", "date": "2026-11-20", "public": pv}
 
 
-def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed():
+def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed(monkeypatch):
+    # The scrub is its own layer: here it is held with the per-block rule off (an older-method block is otherwise
+    # always "being recalculated" — tests/test_tombstoned_public_blocks_6224.py), so it is exercised on a served view.
+    monkeypatch.setattr(character_privacy, "older_method", lambda _v: False)
     record = _v1_variant()
     before = copy.deepcopy(record)
     view = character_privacy.public_sheet(record, pending=False)  # the Mind scrub, apart from the containment switch
@@ -217,12 +220,13 @@ def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed():
     assert view["active_effects"][0]["targets"] == {"movement": {"value": -0.08}}
     assert [e["type"] for e in view["level_events"]] == ["character_level_up"]
     assert view["level_events"][0]["drivers"] == [{"pillar": "sleep"}]
-    assert view["headline_excluded_pillars"] == ["relationships", "mind"]
+    assert view["headline_excluded_pillars"] == ["mind", "relationships"]  # #6293: both not scored in public
     assert RW.mind_numbers(view) == []
     assert view["pillar_sleep"] == record["public"]["pillar_sleep"]
 
 
 def test_must_fail_control_without_the_scrub_the_v1_mind_numbers_are_served(monkeypatch):
+    monkeypatch.setattr(character_privacy, "older_method", lambda _v: False)
     monkeypatch.setattr(character_privacy, "scrub_unscored", lambda view: view)
     view = character_privacy.public_sheet(_v1_variant(), pending=False)
     assert RW.mind_numbers(view), "the detector must see a v1 Mind served as stored"
@@ -252,12 +256,13 @@ def test_a_method_change_is_never_a_headline_event(histories):
 
 
 def test_the_method_is_versioned_and_says_mind_is_not_scored():
-    assert character_privacy.PUBLIC_METHOD_VERSION == "character-public-v2"
-    assert character_privacy.PUBLIC_METHOD_VERSIONS == ("character-public-v1", "character-public-v2")
-    note = character_privacy.PUBLIC_METHOD_HISTORY[-1]["note"]
-    assert "Mind is not scored in public" in note and "food-delivery" in note
+    # #6224/#6293: v3 is current (Relationships not scored, no neutral fill, no XP debt); v2's entry keeps its own words
+    assert character_privacy.PUBLIC_METHOD_VERSION == "character-public-v3"
+    assert character_privacy.PUBLIC_METHOD_VERSIONS == ("character-public-v1", "character-public-v2", "character-public-v3")
+    v2_note = next(m for m in character_privacy.PUBLIC_METHOD_HISTORY if m["version"] == character_privacy.PUBLIC_METHOD_V2)["note"]
+    assert "Mind is not scored in public" in v2_note and "food-delivery" in v2_note
     for origin, label in character_privacy.PUBLIC_METHOD_LABELS.items():
-        assert "Mind is not scored in public" in label and "(v2)" in label, origin
+        assert "Mind and Relationships are not scored in public" in label and "(v3)" in label, origin
     v1 = {"public_method_version": character_privacy.PUBLIC_METHOD_V1, "origin": "recomputed", "character_level": 3}
     assert "(v1)" in character_privacy.public_method_label({"public": v1})["label"]  # a v1 value keeps its own words
 
@@ -606,7 +611,7 @@ def _ask_prompt(monkeypatch, pending: bool) -> tuple:
     from web import site_api_ai_context as AC, site_api_ai_lambda as AI
 
     block = {
-        "public_method_version": character_privacy.PUBLIC_METHOD_V1,
+        "public_method_version": character_privacy.PUBLIC_METHOD_VERSION,  # a current-method block (an older one never serves a level)
         "origin": "live",
         "character_level": 27,
         "character_tier": "Momentum",

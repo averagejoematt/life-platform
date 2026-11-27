@@ -63,8 +63,8 @@ def entry_channel(entry):
     return _TEMPLATE_CHANNEL.get(entry.get("template"), CHANNEL_JOURNAL)
 
 
-# Ordered rungs of the categorical social_quality — mirrors
-# character_engine._SOCIAL_QUALITY_RANK (#910) on the same 0-10 scale.
+# Ordered rungs of the categorical social_quality on a 0-10 scale (#910). An interpretation stored on the row; since
+# #6293 it feeds no character score.
 _SOCIAL_RANK = {"alone": 0, "surface": 1, "meaningful": 2, "deep": 3}
 
 # The daily signals a row carries (numeric attrs on the row, EMA-trended by the
@@ -180,20 +180,9 @@ def write_flourishing_row(table, user_id, date_str, entries, model, schema_versi
     return True
 
 
-def values_alignment_score(values_count, has_row):
-    """The Mind pillar's values_alignment component (#1403).
-
-    A journaled+enriched day with zero values-in-action is a REAL low signal
-    (the LLM read the prose and found none) — scored 20, not None and not 0.
-    No flourishing row at all → None (uninstrumented day, ADR-104).
-    1 value = 60, 2 = 80, 3+ = 100.
-    """
-    if not has_row or values_count is None:
-        return None
-    c = int(values_count)
-    if c <= 0:
-        return 20.0
-    return {1: 60.0, 2: 80.0}.get(c, 100.0)
+# #6293 (owner ruling 2026-11-26): no flourishing signal feeds a character score. Mind's `values_alignment` (a mapping of
+# `values_lived_count` to 20/60/80/100) and Relationships' social components were retired; the row is stored and read as
+# the model's interpretation of the journal, never as a measurement.
 
 
 def ema_series(values, span=14):

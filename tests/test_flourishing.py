@@ -1,10 +1,9 @@
 """tests/test_flourishing.py — #1403: the PERMA fact layer over journal enrichment.
 
 Guards: the aggregation projection (pure), the Decimal row writer + provenance
-stamp, the Mind values_alignment mapping (ADR-104: journaled-zero is a real 20,
-no row is None), the Relationships primary-input preference, the MCP trend tool
-(EMA + provenance + anti-rumination framing), the taxonomy registration, and
-the live config's rebalanced Mind weights. Red on the pre-#1403 tree.
+stamp, that no flourishing signal feeds a character score (#6293), the MCP trend
+tool (EMA + provenance + anti-rumination framing), the taxonomy registration, and
+the live config's rebalanced Mind weights.
 """
 
 import json
@@ -103,58 +102,27 @@ def test_write_row_skips_uninstrumented_day():
     assert t.item is None
 
 
-# ── values_alignment mapping (ADR-104) ────────────────────────────────────────
+# ── #6293: no flourishing signal feeds a character score ─────────────────────
 
 
-def test_values_alignment_mapping():
-    assert fl.values_alignment_score(None, has_row=False) is None  # uninstrumented
-    assert fl.values_alignment_score(0, has_row=True) == 20.0  # journaled zero = real low
-    assert fl.values_alignment_score(1, has_row=True) == 60.0
-    assert fl.values_alignment_score(2, has_row=True) == 80.0
-    assert fl.values_alignment_score(3, has_row=True) == 100.0
-    assert fl.values_alignment_score(7, has_row=True) == 100.0
-
-
-# ── pillar wiring ─────────────────────────────────────────────────────────────
-
-
-def test_relationships_prefers_flourishing_row_over_entry_fallback():
+def test_flourishing_row_feeds_neither_mind_nor_relationships():
+    """Owner ruling 2026-11-26: the row stays stored and readable as interpretation; a model's count of values or its
+    social-quality reading moves no score, even under a config that still lists the retired components."""
     from health import character_engine as ce
 
-    cfg = {"pillars": {"relationships": {"components": {"social_interaction_frequency": {"weight": 1.0}}}}}
-    data = {
-        "flourishing": {"social_quality_score": 10.0, "enrichment_model": "claude-haiku-4-5"},
-        # entry fallback says "alone" (0) — the row must win
-        "journal_entries": [{"enriched_social_quality": "alone"}],
-        "journal": {},
+    stale_cfg = {
+        "pillars": {
+            "mind": {"components": {"values_alignment": {"weight": 1.0}, "state_of_mind_valence": {"weight": 1.0}}},
+            "relationships": {"components": {"social_interaction_frequency": {"weight": 1.0}}},
+        }
     }
-    raw, details = ce.compute_relationships_raw(data, cfg)
-    assert raw == 100.0
-    assert "LLM-coded from journal text" in details["_flourishing_provenance"]
-
-
-def test_relationships_fallback_still_works_without_row():
-    from health import character_engine as ce
-
-    cfg = {"pillars": {"relationships": {"components": {"social_interaction_frequency": {"weight": 1.0}}}}}
-    data = {"journal_entries": [{"enriched_social_quality": "deep"}], "journal": {}}
-    raw, details = ce.compute_relationships_raw(data, cfg)
-    assert raw == 100.0
-    assert "_flourishing_provenance" not in details
-
-
-def test_mind_values_alignment_component_config_gated():
-    from health import character_engine as ce
-
-    cfg_with = {"pillars": {"mind": {"components": {"values_alignment": {"weight": 1.0}}}}}
-    data = {"flourishing": {"values_lived_count": 2, "enrichment_model": "claude-haiku-4-5"}}
-    raw, details = ce.compute_mind_raw(data, cfg_with)
-    assert raw == 80.0
-    assert "LLM-coded from journal text" in details["_flourishing_provenance"]
-
-    # No flourishing row → component is None → zero coverage, no fabricated score.
-    raw2, details2 = ce.compute_mind_raw({}, cfg_with)
-    assert details2["_data_coverage"] == 0.0
+    row = {"values_lived_count": 3, "social_quality_score": 10.0, "enrichment_model": "synthetic-model"}
+    base = {"state_of_mind": {"som_avg_valence": 0.0}}
+    with_row = dict(base, flourishing=row, journal_entries=[{"enriched_social_quality": "deep"}], journal={"themes": ["friends"]})
+    assert ce.compute_mind_raw(with_row, stale_cfg) == ce.compute_mind_raw(base, stale_cfg)
+    raw, details = ce.compute_relationships_raw(with_row, stale_cfg)
+    assert raw == 50.0 and details["_not_instrumented"] is True
+    assert not hasattr(fl, "values_alignment_score")
 
 
 # ── taxonomy + live config ────────────────────────────────────────────────────
@@ -166,10 +134,10 @@ def test_flourishing_registered_raw_timeseries():
     assert SOURCE_CLASS.get("flourishing") == RAW_TIMESERIES
 
 
-def test_repo_config_carries_values_alignment_balanced():
+def test_repo_config_mind_has_no_journal_components_and_is_balanced():
     cfg = json.load(open(_REPO / "config" / "character_sheet.json"))
     comps = cfg["pillars"]["mind"]["components"]
-    assert "values_alignment" in comps
+    assert "values_alignment" not in comps and "journal_consistency" not in comps  # #6293
     assert abs(sum(c["weight"] for c in comps.values()) - 1.0) < 1e-9
 
 
