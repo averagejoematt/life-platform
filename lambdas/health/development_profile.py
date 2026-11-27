@@ -71,6 +71,7 @@ from typing import Any, Iterable, Mapping, Optional
 
 from ai.platform_memory import LIFE_DIRECTIONS, LIFE_DOMAIN_TAGGABLE_KINDS, LIFE_DOMAINS
 from common.inferred_fields import SELF_REPORT_FIELDS
+from common.pacific_time import parse_day_key
 
 ISSUE = "#6294"
 RULES_VERSION = 1
@@ -186,10 +187,7 @@ SELF_REPORT_DOMAINS = tuple(k for k, d in DOMAINS.items() if d["basis"] in (OWN_
 
 def _day(value: Any) -> Optional[date]:
     s = str(value or "")[:10]
-    try:
-        return date.fromisoformat(s) if len(s) == 10 else None
-    except ValueError:
-        return None
+    return parse_day_key(s) if len(s) == 10 else None
 
 
 def _num(v: Any) -> Optional[float]:
@@ -202,9 +200,16 @@ def _num(v: Any) -> Optional[float]:
     return f if f == f else None
 
 
+def _require_day(value: str) -> date:
+    d = parse_day_key(value)
+    if d is None:
+        raise ValueError(f"not a YYYY-MM-DD day key: {value!r}")
+    return d
+
+
 def windows(today: str, days: int) -> dict[str, tuple[str, str]]:
     """The recent window (ending on `today`, inclusive) and the equal window before it, as day keys."""
-    t = date.fromisoformat(today)
+    t = _require_day(today)
     return {
         "recent": ((t - timedelta(days=days - 1)).isoformat(), t.isoformat()),
         "prior": ((t - timedelta(days=2 * days - 1)).isoformat(), (t - timedelta(days=days)).isoformat()),
@@ -222,7 +227,7 @@ def _which(d: Optional[date], wins: Mapping[str, tuple[str, str]]) -> Optional[s
 
 
 def _days_in(lo: str, hi: str) -> list[str]:
-    a, b = date.fromisoformat(lo), date.fromisoformat(hi)
+    a, b = _require_day(lo), _require_day(hi)
     return [(a + timedelta(days=i)).isoformat() for i in range((b - a).days + 1)]
 
 
@@ -342,14 +347,16 @@ def _habits(inputs: Mapping[str, Any], today: str) -> dict[str, Any]:
     wins = windows(today, MEASURED_WINDOW_DAYS)
     ex = _excluded(inputs)
     paused = ex["sick"] | ex["travel"]
-    vals: dict[str, list[float]] = {name: [] for name in wins}
+    per_day: dict[str, list[float]] = {}
     for row in inputs.get("habit_days") or []:
         d = _day(row.get("date"))
         v = _num(row.get("completion_pct"))
-        w = _which(d, wins)
-        if w is None or v is None or (d is not None and d.isoformat() in paused):
+        if d is None or v is None or _which(d, wins) is None or d.isoformat() in paused:
             continue
-        vals[w].append(v)
+        per_day.setdefault(d.isoformat(), []).append(v)
+    vals: dict[str, list[float]] = {name: [] for name in wins}
+    for day, vs in per_day.items():  # one value per day: two rows for one day are one observation
+        vals[str(_which(_day(day), wins))].append(sum(vs) / len(vs))
     n = {name: len(v) for name, v in vals.items()}
     fig = {name: (round(sum(v) / len(v), 3) if v else None) for name, v in vals.items()}
     ev = {
@@ -804,7 +811,7 @@ def assemble_profile(inputs: Mapping[str, Any], *, today: str) -> dict[str, Any]
       lift_sessions [{date, identity, name, best_e1rm_lb}], weight [{date, weight_lbs}], habit_days [{date,
       completion_pct}], experiments, recommendations (folded views), decisions, hypotheses (folded views),
       personal_records (platform_memory rows), journal_entries, evening_checkins, profile_corrections, read_failed."""
-    date.fromisoformat(today)
+    _require_day(today)
     domains = []
     for key in DOMAINS:
         if key == "physical_capacity":

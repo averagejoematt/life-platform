@@ -365,6 +365,27 @@ REASON_5387_HEVY = (
 )
 
 PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
+    # #6294 (2026-11-27): the owner's read-only development profile (mcp/tools_development_profile.py). Every value it reads
+    # passes through `_num`/`.get` in health.development_profile, and every rule there needs a MINIMUM of observations, so a
+    # writer-side rename or drop empties an indicator — it reads not_enough_to_say, by name in `not_observed` — and can never
+    # produce a wrong figure or a `harder` (absence never reads harder; tests/test_development_profile_6294.py pins it).
+    "evening_checkin::mcp/tools_development_profile.py::read": (
+        "2026-11-27",
+        "#6294: reads `date`, `mood` and `stress` only, each through .get and a numeric coercion that drops a non-number; a "
+        "writer drift leaves fewer than 8 rated days and the indicator reads not_enough_to_say — never a wrong mean, never harder",
+    ),
+    "evening_checkin::lambdas/coach/evening_checkin.py::write": (
+        "2026-11-27",
+        "#6294: the one new reader of this row (mcp/tools_development_profile.py) reads `date`/`mood`/`stress` defensively; "
+        "see the read row — a shape change degrades it to not_enough_to_say, nothing is stored or published",
+    ),
+    "hevy::mcp/tools_development_profile.py::read": (
+        "2026-11-27",
+        "#6294: does NOT parse the hevy wire shape. Reads through `tools_strength._read_hevy_all_phases` (the ONE sanctioned "
+        "cross-phase Hevy read), `normalize_hevy_items` and `strength_helpers.extract_hevy_sessions` (the get_exercise_history "
+        "path), then uses `date`, `identity`, `exercise_name` and `best_1rm`. A drift that empties those leaves fewer than 3 "
+        "lifts in both windows and the indicator reads not_enough_to_say — owner-only, nothing stored or published",
+    ),
     "experiments::mcp/experiment_close.py::read": (
         "2026-11-23",
         "#6209: mcp/experiment_close.py is the close-path body split out of mcp/tools_lifestyle.py (the module-size ceiling); the two are one writer of the experiments row split across two files. experiment_close reads only fields tools_lifestyle.tool_create_experiment writes (sk, start_date, design, baseline_snapshot) and writes exactly one field, `baseline_snapshot`, write-once under attribute_not_exists, which no other module interprets and no PUBLIC reader serves (every public reader projects named fields; site_api_protocols allowlists `analysis` keys) — but owner-only MCP tools that return a whole experiment row do return it. tools_lifestyle now reads the row after experiment_close has written to it (list_experiments / get_experiment_results capture a due baseline through the same module). The create -> capture -> close round trip across both files is pinned by tests/test_lift_outcomes_6209.py.",

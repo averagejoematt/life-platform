@@ -5,12 +5,11 @@ the rows to the pure assembly `health.development_profile.assemble_profile` (whe
 nothing: no put, no update, no delete, no cache write, no queue item (`tests/test_development_profile_6294.py`
 drives it against a table that refuses every write and records every call).
 
-  measured     zone 2 sessions — `training.zone2_minutes.counted_sessions` over strava / whoop / apple_health / hevy
-               (the reads `get_zone2_breakdown` makes, through `mcp.core.query_source`); lifts — hevy through
-               `mcp.core.query_source_cross_phase` and `mcp.strength_helpers.extract_hevy_sessions` (the
-               `get_exercise_history` path); weight — withings `weight_lbs`; habits — habitify `completion_pct`;
-               observed days — any whoop / apple_health / eightsleep row; planned pauses — sick days
-               (`health.sick_day_checker.get_sick_days_range`) and travel-logged days.
+  measured     zone 2 — `get_zone2_breakdown` itself (its per-week zone_2_activities); lifts — `get_exercise_history`'s
+               reader (`tools_strength._read_hevy_all_phases`) and `mcp.strength_helpers.extract_hevy_sessions`;
+               training days — days with a Hevy workout or a zone 2 session; weight — withings `weight_lbs`; habits —
+               habitify `completion_pct`; observed days — days with a habit record or a session; planned pauses — sick
+               days (`health.sick_day_checker.get_sick_days_range`) and travel-logged days.
   counted      experiments (the EXP# rows `list_experiments` reads — read directly, because that tool also captures due
                baselines, which is a write; and with no phase filter, see `_experiments`); the recommendation record (`coach.recommendation_record.fold`); decisions
                (the DECISION# rows `get_decisions` reads); personal hypotheses (`research.hypotheses.fold`); reviewed
@@ -34,15 +33,14 @@ from typing import Any, Callable
 from boto3.dynamodb.conditions import Key
 from coach import coach_corrections, recommendation_record as rr
 from common.inferred_fields import SELF_REPORT_FIELDS
-from common.pacific_time import pacific_today, parse_day_key, shift_day_key
+from common.pacific_time import pacific_today, parse_day_key
 from health import development_profile as dp
 from health.sick_day_checker import get_sick_days_range
 from research import hypotheses as ph
-from training import zone2_minutes as z2m
 from training.muscle_volume import normalize_hevy_items
 
 from mcp.config import EXPERIMENTS_PK, USER_ID as _user_id_ref, table as _table_ref
-from mcp.core import decimal_to_float as _d2f, query_source, query_source_cross_phase
+from mcp.core import decimal_to_float as _d2f, query_source
 from mcp.strength_helpers import extract_hevy_sessions
 
 TOOL = "get_development_profile"
@@ -50,7 +48,6 @@ TOOL = "get_development_profile"
 #: recommendation record, hypotheses, personal records, corrections) are read whole and windowed by the assembly.
 MEASURED_LOOKBACK_DAYS = 2 * max(dp.MEASURED_WINDOW_DAYS, dp.RATING_WINDOW_DAYS)
 _PAGE_CAP = 50
-WEARABLE_SOURCES = ("whoop", "apple_health", "eightsleep")
 _JOURNAL_FIELDS = tuple(sorted({f for fields in SELF_REPORT_FIELDS.values() for f in fields}))
 
 GET_DEVELOPMENT_PROFILE_DESCRIPTION = (
@@ -91,12 +88,18 @@ def _day_of(row: dict[str, Any]) -> str:
 
 
 def _training_reads(start: str, today: str) -> dict[str, Any]:
-    whoop_end = shift_day_key(today, 1)  # Pacific evening -> next UTC key, as get_zone2_breakdown reads it
-    strava = query_source("strava", start, today)
-    whoop = query_source("whoop", start, whoop_end)
-    apple = query_source("apple_health", start, whoop_end)
-    hevy = query_source_cross_phase("hevy", start, today)
-    sessions = [s for s in z2m.counted_sessions(strava, whoop, apple, hevy_rows=hevy) if start <= s["date"] <= today]
+    """Zone 2 through `get_zone2_breakdown` itself, lifts through `get_exercise_history`'s own reader — no second copy."""
+    from mcp.tools_correlation import tool_get_zone2_breakdown
+    from mcp.tools_strength import _read_hevy_all_phases
+
+    z2 = tool_get_zone2_breakdown({"start_date": start, "end_date": today})
+    zone2: list[dict[str, Any]] = []
+    if not (z2.get("error") and "No recorded sessions" in str(z2["error"])):
+        if "weekly_breakdown" not in z2:
+            raise RuntimeError(f"get_zone2_breakdown: {z2.get('error') or 'no weekly_breakdown'}")
+        for wk in z2["weekly_breakdown"]:
+            zone2.extend({"date": a["date"], "minutes": a.get("minutes") or 0} for a in wk.get("zone_2_activities") or [])
+    hevy, _phases = _read_hevy_all_phases(start, today)
     workouts = [w for w in normalize_hevy_items(hevy) if start <= str(w.get("date")) <= today]
     tids = sorted({str(ex.get("template_id") or "").upper() for w in workouts for ex in w["exercises"] if ex.get("template_id")})
     lifts = []
@@ -105,17 +108,10 @@ def _training_reads(start: str, today: str) -> dict[str, Any]:
             if start <= s["date"] <= today and s.get("best_1rm"):
                 lifts.append({"date": s["date"], "identity": s["identity"], "name": s["exercise_name"], "best_e1rm_lb": s["best_1rm"]})
     return {
-        "zone2_sessions": [{"date": s["date"], "minutes": s.get("zone_2_minutes") or 0} for s in sessions],
-        "training_days": sorted({s["date"] for s in sessions} | {str(w["date"]) for w in workouts}),
+        "zone2_sessions": [z for z in zone2 if start <= z["date"] <= today],
+        "training_days": sorted({z["date"] for z in zone2} | {str(w["date"]) for w in workouts}),
         "lift_sessions": lifts,
     }
-
-
-def _observed_days(start: str, today: str) -> list[str]:
-    days: set[str] = set()
-    for src in WEARABLE_SOURCES:
-        days |= {_day_of(r) for r in query_source(src, start, today) or []}
-    return sorted(d for d in days if start <= d <= today)
 
 
 def _excluded_days(table, start: str, today: str) -> dict[str, list[str]]:
@@ -183,7 +179,6 @@ def gather_inputs(table, today: str) -> tuple[dict[str, Any], dict[str, str]]:
             inputs.update({n: got[n] for n in names})
 
     read(("zone2_sessions", "training_days", "lift_sessions"), lambda: _training_reads(measured_start, today))
-    read(("observed_days",), lambda: _observed_days(measured_start, today))
     read(("excluded_days",), lambda: _excluded_days(table, measured_start, today))
     read(
         ("weight",),
@@ -195,6 +190,12 @@ def gather_inputs(table, today: str) -> tuple[dict[str, Any], dict[str, str]]:
             {"date": _day_of(r), "completion_pct": r.get("completion_pct")} for r in query_source("habitify", measured_start, today) or []
         ],
     )
+    # An OBSERVED day is one with a habit record (Habitify writes a row for every tracked day) or a recorded session —
+    # the session days are added by the assembly. A day with neither is not observed: out of the denominator, never a zero.
+    if "habit_days" in inputs:
+        inputs["observed_days"] = sorted({h["date"] for h in inputs["habit_days"] if h.get("date")})
+    else:
+        failed["observed_days"] = failed.get("habit_days", "unread")
     read(("experiments",), lambda: _experiments(table))
     read(("recommendations",), lambda: rr.fold(rr.read_rows(table, _user_id_ref)))
     read(("decisions",), lambda: _decisions(table))

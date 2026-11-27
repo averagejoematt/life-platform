@@ -589,7 +589,11 @@ def test_the_tool_is_a_read_and_writes_nothing(monkeypatch):
     monkeypatch.setattr(tdp, "_table_ref", t)
     monkeypatch.setattr(tdp, "_user_id_ref", "matthew")
     monkeypatch.setattr(tdp, "query_source", lambda *a, **k: [])
-    monkeypatch.setattr(tdp, "query_source_cross_phase", lambda *a, **k: [])
+    import mcp.tools_correlation as tcorr
+    import mcp.tools_strength as tstr
+
+    monkeypatch.setattr(tcorr, "tool_get_zone2_breakdown", lambda args: {"error": "No recorded sessions for range."})
+    monkeypatch.setattr(tstr, "_read_hevy_all_phases", lambda *a, **k: ([], []))
     import mcp.tools_journal as tj
 
     monkeypatch.setattr(tj, "_query_journal", lambda *a, **k: [])
