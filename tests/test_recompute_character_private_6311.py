@@ -106,10 +106,16 @@ class StubStore:
     def bucket_versioning(self):
         return self.versioning
 
-    def put_backup(self, key, body):
-        assert key.startswith("backups/") and key not in self.objects
+    def put_backup(self, key, body):  # S3's conditional put: IfNoneMatch="*" refuses an existing key (HTTP 412)
+        assert key.startswith("backups/")
+        if key in self.objects:
+            raise T.BackupExists(f"{key}: PreconditionFailed (HTTP 412)")
         self.objects[key] = bytes(body)
         self.s3_writes.append(key)
+        return {"http_status": 200, "version_id": "stub-v1"}
+
+    def object_version(self, key):
+        return "stub-v1" if key in self.objects else None
 
     def get_backup(self, key):
         return self.objects[key]
@@ -1002,3 +1008,77 @@ def test_the_approval_rederives_the_original_plan_through_the_preimage_overlay(s
     assert again["plan_id"] == plan["plan_id"]
     with pytest.raises(RuntimeError):
         overlay.put({}, [])
+
+
+# ── the owner-authorized synthetic conditional-put probe (2026-11-27) ───────────────────────────────────────────────
+
+
+def test_probe_creates_reads_back_and_is_refused_a_second_put():
+    store = StubStore()
+    key = A.probe_key("20261127T000000Z", "abcd1234")
+    out = A.probe_conditional_put(store, key)
+    assert out["ok"] is True and out["deleted"] is False and out["key"] == key
+    st = out["steps"]
+    assert st["a_absent_before"]["ok"] and st["b_conditional_put"]["http_status"] == 200
+    assert st["c_read_back"]["sha256"] == st["c_read_back"]["read_back_sha256"]
+    assert st["d_second_put_refused"]["outcome"] == "refused" and st["d_second_put_refused"]["still_first"] is True
+    assert st["e_versioning"] == {"bucket_versioning": "Enabled", "version_id": "stub-v1"}
+    assert store.s3_writes == [key] and store.writes == []  # one object, no table write
+    body = json.loads(store.objects[key])
+    assert body["probe"] is True and body["variant"] == "first" and body["entries"][0]["pk"].startswith("USER#synthetic#")
+
+
+def test_probe_reports_an_overwrite_that_was_not_refused():
+    class NoCondition(StubStore):
+        def put_backup(self, key, body):  # a store that ignores IfNoneMatch
+            self.objects[key] = bytes(body)
+            self.s3_writes.append(key)
+            return {"http_status": 200, "version_id": None}
+
+    out = A.probe_conditional_put(NoCondition(), A.probe_key("20261127T000000Z", "deadbeef"))
+    assert out["ok"] is False and out["steps"]["d_second_put_refused"]["outcome"].startswith("ACCEPTED")
+    assert out["steps"]["d_second_put_refused"]["still_first"] is False
+
+
+def test_probe_stops_when_the_key_already_exists():
+    store = StubStore()
+    key = A.probe_key("20261127T000000Z", "00000000")
+    store.objects[key] = b"{}"
+    out = A.probe_conditional_put(store, key)
+    assert out["ok"] is False and out["steps"]["a_absent_before"]["ok"] is False and "b_conditional_put" not in out["steps"]
+    assert store.s3_writes == []
+
+
+@pytest.mark.parametrize(
+    "key", ["backups/character-private-recompute/x/export.json", "generated/x.json", "backups/_probex/x.json", "site/x.json"]
+)
+def test_probe_refuses_any_key_outside_the_probe_prefix(key):
+    store = StubStore()
+    with pytest.raises(T.PlanGuardError):
+        A.probe_conditional_put(store, key)
+    assert store.s3_writes == []
+
+
+def test_probe_cli_uses_an_s3_only_writable_store(tmp_path, monkeypatch):
+    store = StubStore()
+    seen = {}
+
+    def fake_live_store(writable, s3_writable=False):
+        seen.update(writable=writable, s3_writable=s3_writable)
+        return store
+
+    monkeypatch.setattr(T, "live_store", fake_live_store)
+    assert T.main(["--out", str(tmp_path / "probe"), "--probe-conditional-put"]) == 0
+    assert seen == {"writable": False, "s3_writable": True}  # the table stays behind the read-only proxy
+    assert len(store.s3_writes) == 1 and store.s3_writes[0].startswith(A.PROBE_PREFIX) and store.writes == []
+    assert list((tmp_path / "probe").glob("probe_*.json"))
+
+
+def test_the_live_store_keeps_the_table_read_only_when_only_s3_is_writable():
+    class Inner:
+        def put_item(self, **kw):
+            raise AssertionError("must not be reached")
+
+    st = T.LiveStore(Inner(), object(), "bucket", writable=False, s3_writable=True)
+    with pytest.raises(RuntimeError):
+        st.table.put_item(Item={})
