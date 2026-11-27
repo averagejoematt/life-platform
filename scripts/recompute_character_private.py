@@ -1075,9 +1075,24 @@ def main(argv: list) -> int:
         if later:
             print(f"REFUSED: stored sheets exist after the plan's window ({later[:3]}…) — re-plan to include them", file=sys.stderr)
             return 3
-        result = A.apply_plan(
-            live_store(writable=True), plan, out_dir, args.phase, now, args.from_date, args.limit, approved_plan_id=args.approved_plan_id
-        )
+        try:
+            result = A.apply_plan(
+                live_store(writable=True),
+                plan,
+                out_dir,
+                args.phase,
+                now,
+                args.from_date,
+                args.limit,
+                approved_plan_id=args.approved_plan_id,
+            )
+        except Exception as e:  # noqa: BLE001 — a failed or mismatched backup (or any refusal) stops before the data writes
+            print(
+                f"REFUSED: the apply stopped — {type(e).__name__}: {e}. A failed or mismatched backup stops it before any row "
+                "write; after a later failure, re-run --apply (it resumes against the one pre-image) or --rollback that export.",
+                file=sys.stderr,
+            )
+            return 5
         print(json.dumps({"written": len(result["written"]), "aborted": len(result["aborted"]), "export": result["export"]}, indent=1))
         return 0 if not result["aborted"] and all(w["verified"] for w in result["written"]) else 2
     plan = dry_run(live_store(writable=False), out_dir, args.start, args.end, planned_at=now)

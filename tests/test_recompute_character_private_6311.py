@@ -1082,3 +1082,83 @@ def test_the_live_store_keeps_the_table_read_only_when_only_s3_is_writable():
     st = T.LiveStore(Inner(), object(), "bucket", writable=False, s3_writable=True)
     with pytest.raises(RuntimeError):
         st.table.put_item(Item={})
+
+
+# ── the owner's release requirement: the backup is created and verified before any historical row is modified ────
+
+
+class _AccessDenied(Exception):
+    """Stands in for botocore's ClientError(AccessDenied) — any exception from the put."""
+
+
+def test_a_failed_backup_put_stops_the_apply_with_zero_writes_and_no_local_export(seeded, tmp_path):
+    store, plan = seeded
+    plan = saved_plan(plan, tmp_path)
+
+    def denied(key, body):
+        raise _AccessDenied("AccessDenied: s3:PutObject")
+
+    store.put_backup = denied
+    with pytest.raises(_AccessDenied):
+        A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00", approved_plan_id=plan["plan_id"])
+    assert store.writes == [] and store.s3_writes == []
+    left = sorted(p.name for p in (tmp_path / "out").iterdir() if p.name.startswith("export_"))
+    assert left == []  # no export (nor its .sha256, nor a .pending) claims a backup exists
+
+
+def test_a_failed_backup_put_through_the_cli_exits_non_zero_with_zero_writes(seeded, tmp_path, monkeypatch, capsys):
+    store, plan = seeded
+    path = _plan_path(plan, tmp_path)
+
+    def denied(key, body):
+        raise _AccessDenied("AccessDenied: s3:PutObject")
+
+    store.put_backup = denied
+    monkeypatch.setattr(T, "live_store", lambda writable, s3_writable=False: store)
+    monkeypatch.setattr(T, "dry_run", lambda *_a, **_k: plan)  # the live re-derivation reproduces the approved plan
+    rc = T.main(["--out", str(tmp_path / "cli"), "--apply", "--plan-in", path, "--approved-plan-id", plan["plan_id"]])
+    assert rc == 5 and store.writes == [] and store.s3_writes == []
+    err = capsys.readouterr().err
+    assert "REFUSED: the apply stopped" in err and "AccessDenied" in err
+
+
+def test_a_412_on_the_first_backup_put_stops_with_zero_writes(seeded, tmp_path):
+    store, plan = seeded
+    plan = saved_plan(plan, tmp_path)
+
+    def exists(key, body):  # another object appeared at the key between the listing and the put
+        raise T.BackupExists(f"{key}: PreconditionFailed (HTTP 412)")
+
+    store.put_backup = exists
+    with pytest.raises(T.BackupExists):
+        A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
+    assert store.writes == [] and not list((tmp_path / "out").glob("export_*"))
+
+
+def test_an_existing_backup_of_a_different_export_stops_with_zero_writes(seeded, tmp_path):
+    store, plan = seeded
+    plan = saved_plan(plan, tmp_path)
+    store.objects[A.backup_key(plan["plan_id"])] = json.dumps({"schema": T.EXPORT_SCHEMA, "plan_id": "0" * 16, "entries": []}).encode()
+    with pytest.raises(T.PlanGuardError, match="not this plan's export"):
+        A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
+    assert store.writes == []
+
+
+@pytest.mark.parametrize("phases", [("sheets",), ("receipts",), ("sheets", "receipts")])
+def test_the_backup_put_and_read_back_precede_every_row_write(seeded, tmp_path, phases):
+    store, plan = seeded
+    plan = saved_plan(plan, tmp_path)
+    log = []
+    put, put_backup, get_backup = store.put, store.put_backup, store.get_backup
+    store.put = lambda item, cond: (log.append("row_put"), put(item, cond))[1]
+    store.put_backup = lambda key, body: (log.append("backup_put"), put_backup(key, body))[1]
+    store.get_backup = lambda key: (log.append("backup_read_back"), get_backup(key))[1]
+    for i, phase in enumerate(phases):
+        start = len(log)
+        A.apply_plan(store, plan, str(tmp_path / "out"), phase, f"2026-11-26T0{i + 1}:00:00+00:00")
+        run = log[start:]
+        first_row = run.index("row_put")
+        if i == 0:  # the run that creates the backup: put, then read-back, then rows
+            assert run[:2] == ["backup_put", "backup_read_back"] and first_row == 2
+        else:  # a later phase: the one backup is read back and verified before its first row write; never put again
+            assert "backup_put" not in run and run.index("backup_read_back") < first_row
