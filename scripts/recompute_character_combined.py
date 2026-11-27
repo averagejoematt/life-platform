@@ -505,7 +505,9 @@ def main(argv: list) -> int:
     silent = None if args.skip_tests else S.run_silent_tests()
     combined = build(out, args.preliminary, generated, e2e, walk, args.previous, silent)
     combined["preflight"] = S.preflights(out, plan_path, combined["public"]["public_plan_id"])
-    combined["unplanned_public"] = S.unplanned_public_items(S.read_public_items(), S.accounted_keys(out))  # read-only
+    stored_items = S.read_public_items()  # read-only
+    combined["unplanned_public"] = S.unplanned_public_items(stored_items, S.accounted_keys(out))
+    combined["stored_versions"] = S.version_counts(stored_items)
     with open(os.path.join(out, "combined.json"), "w", encoding="utf-8") as fh:
         json.dump(combined, fh, indent=1, sort_keys=True, default=str)
     with open(os.path.join(out, "COMBINED_SUMMARY.md"), "w", encoding="utf-8") as fh:

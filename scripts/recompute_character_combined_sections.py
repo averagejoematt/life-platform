@@ -218,6 +218,8 @@ def operations_lines(c: dict) -> list:
     pc = p["counts"]
     silent = c.get("silent_tests")
     lines = [
+        *deploy_meaning_lines(c),
+        "",
         "**When a public score is served — two independent conditions.** A public character number (overall level, tier, "
         "XP, XP debt, composite, mood, effects, level events, pillar levels) is served only when (1) the stored block is "
         "CURRENT-method (`character_privacy.older_method` is false: v3) AND (2) the global containment switch "
@@ -452,3 +454,30 @@ def unplanned_lines(c: dict) -> list:
             f"  - {r['source']} {r['date']}: {r['why']} — the public routes will serve {'IT (FAIL)' if r['servable'] else 'nothing'}"
         )
     return lines
+
+
+def version_counts(items: dict) -> dict:
+    """{source: {public_method_version: count}} of the stored public blocks (read-only, from ``read_public_items``)."""
+    out: dict = {}
+    for source, its in items.items():
+        for it in its:
+            pub = it.get("public")
+            if isinstance(pub, dict):
+                v = str(pub.get("public_method_version"))
+                out.setdefault(source, {})[v] = out.setdefault(source, {}).get(v, 0) + 1
+    return out
+
+
+def deploy_meaning_lines(c: dict) -> list:
+    sv = c.get("stored_versions") or {}
+    return [
+        "**What changes at deploy (before the public apply).** Stored public blocks today: "
+        + "; ".join(f"`{src}` " + ", ".join(f"{v} {n}" for v, n in sorted(vs.items())) for src, vs in sorted(sv.items()))
+        + ". Every character serving path — the routes, `public_stats.json`, `character_stats.json`, `buddy/data.json`, "
+        "the og card, the Ask context and the daily brief's published character block — reads through "
+        '`character_privacy.public_sheet` / `public_headline`, which today serve every one of these blocks as "being '
+        'recalculated" because the global switch is on. The only other readers of a stored character `public` block '
+        "(`milestone_ledger`, `achievement_rules`) ask only whether it is the corrected chain (v3). So no surface shows a "
+        "number from a v1/v2 block today, and nothing visible changes at deploy: the per-block rule adds a second, "
+        "independent condition, not a new state.",
+    ]
