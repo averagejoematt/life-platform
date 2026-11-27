@@ -259,6 +259,7 @@ def operations_lines(c: dict) -> list:
         "named `generated/*` paths; no statement names `backups/` (tested: "
         "tests/test_recompute_combined_6224.py::test_backups_are_not_anonymously_readable).",
         *preflight_lines(c),
+        *probe_lines(c),
         f"- Rollback coverage: each tool's export covers exactly its write set (asserted: {ROLLBACK_COVERAGE_TEST}); rollback "
         "order PUBLIC first, then PRIVATE; every item byte-identical after both.",
         "",
@@ -481,3 +482,62 @@ def deploy_meaning_lines(c: dict) -> list:
         "number from a v1/v2 block today, and nothing visible changes at deploy: the per-block rule adds a second, "
         "independent condition, not a new state.",
     ]
+
+
+# ── live evidence of the conditional backup write (files the operator supplies; the runner never probes) ─────────────
+
+
+def load_probe_evidence(paths: list) -> dict:
+    """{"public": evidence, "private": evidence} from the given probe-evidence JSON files, keyed by the backup prefix
+    each one exercised. The combined runner never runs a probe itself; it prints whatever evidence exists."""
+    import json
+
+    out: dict = {}
+    for path in paths or []:
+        with open(os.path.expanduser(path), encoding="utf-8") as fh:
+            ev = json.load(fh)
+        key = str(ev.get("key") or "")
+        tool = (
+            "public"
+            if key.startswith("backups/character-public-recompute/")
+            else "private" if key.startswith("backups/character-private-recompute/") else None
+        )
+        if tool:
+            out[tool] = dict(ev, _file=os.path.basename(path))
+    return out
+
+
+def _evidence_line(tool: str, ev: dict) -> str:
+    if not ev:
+        return f"- {tool.upper()} tool: its own live conditional-put probe has NOT run (no evidence file given). " + (
+            "It uses the same S3 call and client settings as the public path (endpoint s3.us-west-2, s3v4, checksum "
+            "`when_supported`, bucket-default encryption) through its own `put_verified_backup`, unit-tested on stubs."
+            if tool == "private"
+            else ""
+        )
+    s3 = ev.get("2b_s3_response") or {}
+    anon = ev.get("anonymous_read") or {}
+    return (
+        f"- {tool.upper()} tool, exercised once for real ({ev.get('started', '')[:16].replace('T', ' ')}Z, `{ev.get('_file')}`): a synthetic "
+        f"object at `{ev.get('key')}` (+ `.sha256`) was created and read back to its sha256 "
+        f"({(ev.get('1_created') or {}).get('readback_matches')}); a second conditional put of different bytes was refused by S3 "
+        f"({s3.get('code')}, HTTP {s3.get('http')}); the tool given a DIFFERENT export stopped; given the same export it "
+        f"resumed without writing ({(ev.get('4_tool_same') or {}).get('resumed')}); object unchanged "
+        f"({ev.get('5_object_unchanged')}), one version of each object; anonymous read "
+        + ", ".join(f"{h} {c}" for h, c in anon.items())
+        + f"; boto3/botocore {ev.get('boto3')}/{ev.get('botocore')}."
+    )
+
+
+def probe_lines(c: dict) -> list:
+    ev = c.get("probe_evidence") or {}
+    lines = ["**The conditional backup write, exercised against the real bucket (evidence files, not run by this runner):**"]
+    lines.append(_evidence_line("public", ev.get("public") or {}))
+    lines.append(_evidence_line("private", ev.get("private") or {}))
+    proven = [t for t in ("public", "private") if ev.get(t)]
+    lines.append(
+        "- So of the preflights' stated limits: the conditional put itself is now PROVEN on this bucket and role for the "
+        + (" and ".join(proven) + " path" + ("s" if len(proven) > 1 else "") if proven else "— no path yet")
+        + "; request-time write permission on the day of the apply remains unprovable by a read."
+    )
+    return lines

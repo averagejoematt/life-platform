@@ -425,8 +425,8 @@ def summary_md(c: dict, preliminary: bool) -> str:
         f"previous day. Definition: {sd.get('definition')}",
         "- Approval and apply must fall in ONE nightly cycle: both tools refuse once a newer stored sheet exists.",
         "- #6096 landing first would change the plan (re-run, re-approve).",
-        "- Unexercised without a production write (stated by the private preflight, verbatim in the backup section): the "
-        "conditional put itself and write permission at request time.",
+        "- The conditional put: see the backup section — proven per tool from the evidence files given; request-time "
+        "write permission on the day remains unprovable by a read.",
         "",
     ]
     return "\n".join(lines)
@@ -484,6 +484,12 @@ def main(argv: list) -> int:
     ap.add_argument("--out", required=True, help="directory OUTSIDE the repo")
     ap.add_argument("--preliminary", action="store_true")
     ap.add_argument("--skip-tests", action="store_true", help="skip the end-to-end fake-storage test and the route walk")
+    ap.add_argument(
+        "--probe-evidence",
+        action="append",
+        default=[],
+        help="a conditional-put probe evidence JSON (one per tool; repeatable) — printed in the backup section, never run here",
+    )
     ap.add_argument("--previous", help="a previous public dry run's manifest.json (e.g. #6283's) — the event deltas since it")
     args = ap.parse_args(argv)
     out = _outside_repo(args.out)
@@ -508,6 +514,7 @@ def main(argv: list) -> int:
     stored_items = S.read_public_items()  # read-only
     combined["unplanned_public"] = S.unplanned_public_items(stored_items, S.accounted_keys(out))
     combined["stored_versions"] = S.version_counts(stored_items)
+    combined["probe_evidence"] = S.load_probe_evidence(args.probe_evidence)
     with open(os.path.join(out, "combined.json"), "w", encoding="utf-8") as fh:
         json.dump(combined, fh, indent=1, sort_keys=True, default=str)
     with open(os.path.join(out, "COMBINED_SUMMARY.md"), "w", encoding="utf-8") as fh:

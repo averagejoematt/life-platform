@@ -595,3 +595,28 @@ def test_backups_are_not_anonymously_readable():
         if st.get("Effect") == "Allow" and st.get("Principal") in ("*", {"AWS": "*"}):
             res = st["Resource"] if isinstance(st["Resource"], list) else [st["Resource"]]
             assert not any("/backups/" in r or r.endswith(":::matthew-life-platform/*") for r in res), st.get("Sid")
+
+
+def test_the_probe_evidence_is_printed_per_tool_and_an_absent_one_says_not_run(tmp_path):
+    import recompute_character_combined_sections as S
+
+    ev = {
+        "key": "backups/character-public-recompute/probe-synthetic/export_probe.json",
+        "started": "2026-11-27T17:26:48+00:00",
+        "1_created": {"readback_matches": True},
+        "2b_s3_response": {"code": "PreconditionFailed", "http": 412},
+        "4_tool_same": {"resumed": True},
+        "5_object_unchanged": True,
+        "anonymous_read": {"site": 404, "bucket": 403},
+        "boto3": "x",
+        "botocore": "x",
+    }
+    f = tmp_path / "probe.json"
+    f.write_text(json.dumps(ev))
+    lines = S.probe_lines({"probe_evidence": S.load_probe_evidence([str(f)])})
+    text = "\n".join(lines)
+    assert "PUBLIC tool, exercised once for real" in text and "PreconditionFailed, HTTP 412" in text
+    assert "PRIVATE tool: its own live conditional-put probe has NOT run" in text
+    assert "PROVEN on this bucket and role for the public path" in text
+    none = "\n".join(S.probe_lines({"probe_evidence": {}}))
+    assert "no path yet" in none and "PUBLIC tool: its own live conditional-put probe has NOT run" in none

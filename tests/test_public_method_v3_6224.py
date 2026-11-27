@@ -178,3 +178,42 @@ def test_the_removed_debt_atrophy_and_decay_wording_is_gone_from_the_character_p
     css = open(os.path.join(ROOT, "site", "assets", "css", "evidence.css"), encoding="utf-8").read()
     for gone in (".ch-atrophy", ".ch-xpdebt", 'data-state="dormant"'):
         assert gone not in css, gone
+
+
+# premerge-gate: sweeps site/method/**, site/assets/js and www/ (src, content, public) for private rest wording
+PRIVATE_REST_WORDS = ("planned rest", "sick day", "travel day")
+
+
+def _private_rest_hits(text: str) -> list:
+    low = text.lower()
+    return [w for w in PRIVATE_REST_WORDS if w in low]
+
+
+def _public_method_files() -> list:
+    roots = [os.path.join(ROOT, "site", "method"), os.path.join(ROOT, "site", "assets", "js")]
+    roots += [os.path.join(ROOT, "www", d) for d in ("src", "content", "public")]
+    out = []
+    for root in roots:
+        for dirpath, dirnames, files in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in ("node_modules", "dist", ".astro")]
+            out += [
+                os.path.join(dirpath, f) for f in files if f.endswith((".html", ".js", ".mjs", ".astro", ".md", ".mdx", ".json", ".ts"))
+            ]
+    return out
+
+
+def test_no_public_method_page_or_script_names_a_private_rest_classification():
+    """Owner ruling 2026-11-27: "Planned rest remains private-only. Correct the public methodology wording without
+    changing the public scoring calculation or exposing private rest classifications." No public method page or public
+    script says "planned rest", "sick day" or "travel day" (case-insensitive); /method/game/ states the public rule."""
+    files = _public_method_files()
+    assert any(f.endswith(os.path.join("method", "game", "index.html")) for f in files) and len(files) > 30
+    hits = {os.path.relpath(f, ROOT): h for f in files if (h := _private_rest_hits(open(f, encoding="utf-8", errors="ignore").read()))}
+    assert hits == {}, hits
+    game = open(os.path.join(ROOT, "site", "method", "game", "index.html"), encoding="utf-8").read()
+    assert "with no adjustment for rest" in game
+
+
+def test_must_fail_control_the_old_planned_rest_sentence_is_caught():
+    old = "<li><strong>Planned rest is not inactivity.</strong> A day recorded as a sick day or a travel day leaves Movement's weekly windows</li>"
+    assert set(_private_rest_hits(old)) == set(PRIVATE_REST_WORDS)
