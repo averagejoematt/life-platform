@@ -65,6 +65,11 @@ MAX_EXAMPLE_REFS = 3
 # an error, so they can never be promotion candidates.
 NON_PROMOTABLE_CLASSES = ("hedged-safe", "defense-held")
 
+# #6294: surfaces whose corrections are not coach errors. A disagreement with a line of his private development
+# profile is his reading against the platform's rules, not a coach's false claim, so it never counts toward a
+# coach-output gate proposal (it keeps its own consequence inside the profile).
+NON_PROMOTABLE_SURFACES = frozenset({"development_profile"})
+
 # Statuses that count toward recurrence. "applied-to-gate" is deliberately
 # absent: those corrections' class already graduated to a gate.
 COUNTED_STATUSES = ("open", "applied-to-prompt")
@@ -120,7 +125,7 @@ def cluster_corrections(corrections: list) -> dict:
 
     Recurrence counts DISTINCT normalized item_refs (fallback: the correction's
     sk), so re-logging the same correction never inflates recurrence. Only
-    COUNTED_STATUSES rows participate; NON_PROMOTABLE_CLASSES are skipped.
+    COUNTED_STATUSES rows participate; NON_PROMOTABLE_CLASSES and NON_PROMOTABLE_SURFACES are skipped.
     Deterministic: no LLM, no randomness, no wall-clock (ADR-105).
     """
     clusters: dict = {}
@@ -131,6 +136,8 @@ def cluster_corrections(corrections: list) -> dict:
             continue
         cls = str(item.get("error_class") or "other")
         if cls in NON_PROMOTABLE_CLASSES:
+            continue
+        if (item.get("item_ref") or {}).get("surface") in NON_PROMOTABLE_SURFACES:
             continue
         key = _class_key(item)
         dedupe = normalize_item_ref(item.get("item_ref")) or ("sk", str(item.get("sk", "")))

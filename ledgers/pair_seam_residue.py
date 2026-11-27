@@ -379,6 +379,13 @@ PAIR_SEAM_DECISIONS: dict[str, tuple[str, str]] = {
         "#6294: the one new reader of this row (mcp/tools_development_profile.py) reads `date`/`mood`/`stress` defensively; "
         "see the read row — a shape change degrades it to not_enough_to_say, nothing is stored or published",
     ),
+    "habit_scores::mcp/tools_development_profile.py::read": (
+        "2026-11-27",
+        "#6294 (owner ruling on #6317): reads `date`, `core_done` and `core_known` only — the core set's own day counts "
+        "(`health.core_habits.habit_scores_fields`, documented in SCHEMA.md); each passes a numeric coercion and a day with no "
+        "known core habit is skipped, so a writer drift leaves fewer than 14 days and the indicator reads not_enough_to_say — "
+        "never a wrong fraction, never harder; no habit name is read",
+    ),
     "hevy::mcp/tools_development_profile.py::read": (
         "2026-11-27",
         "#6294: does NOT parse the hevy wire shape. Reads through `tools_strength._read_hevy_all_phases` (the ONE sanctioned "

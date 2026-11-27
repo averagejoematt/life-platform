@@ -4,8 +4,10 @@
 The subject is fictional and every record is synthetic (the repo is public). The data is built so that each kind of
 reading appears at least once:
 
-  physical capacity        measured: three lifts up and more zone 2 minutes per observed week -> improving
-  behavioural consistency  measured: training days steady, habit completion up, a sick week excluded -> improving
+  physical capacity        measured: three lifts up -> improving, SCOPED to strength; no VO2 max estimate, so aerobic
+                           fitness reads "not established"; the extra zone 2 minutes are shown as volume, not counted
+  behavioural consistency  measured: program adherence up (credited against intended sessions) and the core habit
+                           set up -> improving; training days shown as context only
   learning                 counted: more experiments and answered advice than the window before -> improving
   self-understanding       counted: two views on hypotheses, below the margin -> not_enough_to_say; one open
                            hypothesis listed as an open question, not evidence
@@ -35,6 +37,7 @@ os.environ.pop("AWS_PROFILE", None)
 sys.path[:0] = [os.path.join(_REPO, "lambdas"), _REPO]
 
 from health import development_profile as dp  # noqa: E402
+from health.development_profile_measured import adherence_windows  # noqa: E402
 
 TODAY = "2027-03-31"
 T = date.fromisoformat(TODAY)
@@ -90,7 +93,16 @@ def build() -> dict:
         "training_days": training,
         "lift_sessions": lifts,
         "weight": [{"date": d(a), "weight_lbs": 180.0} for a in (2, 9, 33, 47)],
-        "habit_days": [{"date": d(a), "completion_pct": 0.85 if a < 28 else 0.7} for a in days],
+        "habit_days": [{"date": d(a)} for a in days],
+        "core_habit_days": [{"date": d(a), "core_done": 9 if a < 28 else 7, "core_known": 10} for a in days],
+        "adherence_weeks": [
+            {"week_start": m, "intended": 5, "credited": 5 if k < 4 else 3, "program_version": "demo"}
+            for k, m in enumerate(
+                sorted(adherence_windows(TODAY)["recent"], reverse=True) + sorted(adherence_windows(TODAY)["prior"], reverse=True)
+            )
+        ],
+        "adherence_intent": "the demo program's plan: five sessions a program week",
+        "vo2_estimates": [],
         "experiments": [{"experiment_id": f"e{i}", "start_date": d(5 + 7 * i), "end_date": None, "status": "active"} for i in range(5)]
         + [{"experiment_id": "old", "start_date": d(70), "end_date": d(60), "status": "completed"}],
         "recommendations": [{"response": "accepted", "response_recorded_at": f"{d(9)}T08:00:00Z", "outcome": None}],
@@ -135,6 +147,7 @@ def main() -> int:
         print(f"[{dom['domain']}] {dom['name']}")
         print(f"  status: {dom['status']}   basis: {dom['basis']}")
         print(f"  why:    {dom['status_reason']}")
+        print(f"  scope:  rests on {dom['scope']['status_rests_on'] or 'nothing yet'}")
         for ev in dom["evidence"]:
             print(f"  - {ev.get('date')}  [{ev.get('evidence_kind')}] {ev.get('statement')}")
         for q in dom.get("open_questions") or []:
@@ -147,7 +160,8 @@ def main() -> int:
 
     by = {x["domain"]: x for x in profile["domains"]}
     checks = {
-        "physical capacity improving": by["physical_capacity"]["status"] == dp.IMPROVING,
+        "physical capacity improving, scoped to strength": by["physical_capacity"]["status"] == dp.IMPROVING
+        and any("aerobic" in x.lower() for x in by["physical_capacity"]["scope"]["not_established"]),
         "behavioural consistency improving": by["behavioural_consistency"]["status"] == dp.IMPROVING,
         "learning improving": by["learning_and_experimentation"]["status"] == dp.IMPROVING,
         "self-understanding not enough": by["self_understanding"]["status"] == dp.NOT_ENOUGH,

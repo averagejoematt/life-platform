@@ -259,7 +259,10 @@ WORDS = {
     "older_same_day": "Synthetic request alpha-two: is the deload this week?",
     "newest": "Synthetic request bravo: move my Sunday walk to the morning",
     "note": "Synthetic note charlie: he asked about protein timing.",
+    "profile_dispute": "Synthetic dispute india: the profile reads my consistency wrong, the plan changed that month",
+    "profile_closed": "Synthetic dispute juliet: closed and kept as history",
 }
+PROFILE_DISPUTE_DAY = "2026-11-15"
 
 
 def _days(n_back: int, end: str = TODAY) -> list[str]:
@@ -320,6 +323,20 @@ def synthetic_store() -> list[dict]:
             "cycle": SYN_CYCLE,
         }
     )
+    # #6294: his open dispute of a development-profile line (and a closed one, which is history, never context)
+    for sfx, status, text in (("d15p0001", "open", WORDS["profile_dispute"]), ("d15p0002", "closed", WORDS["profile_closed"])):
+        rows.append(
+            {
+                "pk": coach_corrections.PK,
+                "sk": f"CORRECTION#{PROFILE_DISPUTE_DAY}#{sfx}",
+                "status": status,
+                "error_class": "framing",
+                "correction_text": text,
+                "item_ref": {"surface": "development_profile", "signal": "development_profile:behavioural_consistency"},
+                "created_at": f"{PROFILE_DISPUTE_DAY}T17:00:00+00:00",
+                "cycle": SYN_CYCLE,
+            }
+        )
     pm = U + "platform_memory"
     base = {
         "pk": pm,
@@ -603,6 +620,18 @@ def case_cycle_day_confined(text: str) -> list[str]:
     return [f"a bare cycle-day count is handed over as a fact: {b!r}" for b in bad]
 
 
+def case_profile_dispute(text: str) -> list[str]:
+    out = []
+    lines = [ln for ln in text.splitlines() if WORDS["profile_dispute"] in ln]
+    if not lines:
+        out.append("his open dispute of a development-profile line is not in the context")
+    elif not any(_dated(ln, PROFILE_DISPUTE_DAY) for ln in lines):
+        out.append("the dispute is not dated")
+    if WORDS["profile_closed"] in text:
+        out.append("a CLOSED profile correction reached the context")
+    return out
+
+
 @dataclass
 class Case:
     n: int
@@ -669,6 +698,13 @@ CASES = [
             "brief": NA + "the cycle-day line is defined only in the Telegram domain pack",
         },
         "November miss",
+    ),
+    Case(
+        9,
+        "his open dispute of a development-profile line, attributed and dated",
+        case_profile_dispute,
+        {"telegram": LEAD, "packet": LEAD, "brief": NA + "the brief does not read the development_profile surface (#6294)"},
+        "#6294 owner ruling 2026-11-26",
     ),
 ]
 

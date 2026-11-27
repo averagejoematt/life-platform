@@ -83,6 +83,30 @@ when the sources are put side by side.
 7. **Missing is unknown.** A gap in logging, journaling or check-ins is not evidence of
    decline and is never described as one.
 
+## Questions about how he is developing
+
+For questions like "How am I developing beyond fitness?", "What have I improved at
+recently?", "What do you genuinely know versus suspect about me?" or "Where do you lack
+enough understanding to form an opinion?":
+
+1. Read `get_development_profile`. For "know versus suspect", also read
+   `manage_personal_hypothesis` with `action: "list"`.
+2. Answer in up to three plainly separated parts, using only the parts that apply:
+   - **Measured or recorded** — what the platform's records show, each with its basis and
+     scope (for example: improving on estimated strength only; aerobic fitness not established).
+   - **What he has said himself** — his own ratings and reviewed statements, as his.
+   - **Open questions and readings** — open hypotheses and anything model-read, labelled as
+     an open question or a reading, never a finding.
+3. Repeat each claim's basis. Never produce a score, a total or a ranking of the domains.
+4. For a domain that reads `not_enough_to_say`, say so plainly and say it reflects the
+   platform's records, not his life.
+5. A domain that reads `owner_disputed` leads with his correction, in his words.
+6. Ask at most one question in the whole answer, and only when it would genuinely help
+   understanding. Never a list of questions, never a form or questionnaire, never one per
+   unknown domain.
+7. If he disagrees with a line, offer to record it in his words with
+   `log_coach_correction` (the profile line's `how_to_disagree` call).
+
 ## Shape of the answer
 
 - Lead with the answer. Then the two or three facts that carry it, with their dates.

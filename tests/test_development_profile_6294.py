@@ -27,8 +27,6 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-import pytest
-
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "FAKE")
 os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
@@ -68,8 +66,19 @@ def _profile(inputs):
 # ── synthetic inputs ────────────────────────────────────────────────────────────────────────────
 
 
-def _measured(recent_z2_days=5, prior_z2_days=3, recent_lift=110.0, prior_lift=100.0):
-    """Every day observed; zone 2 sessions of 30 min on the first N days of each week; three lifts."""
+def _weeks(recent_done=4, prior_done=3, intended=5):
+    """Synthetic adherence weeks for the 8 complete Mon–Sun weeks before TODAY (a Friday)."""
+    from health.development_profile_measured import adherence_windows
+
+    w = adherence_windows(TODAY)
+    out = [{"week_start": m, "intended": intended, "credited": recent_done, "program_version": "synthetic"} for m in w["recent"]]
+    out += [{"week_start": m, "intended": intended, "credited": prior_done, "program_version": "synthetic"} for m in w["prior"]]
+    return out
+
+
+def _measured(recent_z2_days=5, prior_z2_days=3, recent_lift=110.0, prior_lift=100.0, *, vo2=None, weeks=None, core=(0.8, 0.6)):
+    """Every day observed; zone 2 sessions of 30 min on the first N days of each week; three lifts; adherence weeks;
+    core-habit counts (done of 10 known); `vo2` = (recent, prior) means from one device, or None for no estimate."""
     zone2, training = [], []
     for ago in list(RECENT) + list(PRIOR):
         per_week = recent_z2_days if ago < 28 else prior_z2_days
@@ -80,16 +89,25 @@ def _measured(recent_z2_days=5, prior_z2_days=3, recent_lift=110.0, prior_lift=1
     for name in ("Fictional Press", "Fictional Row", "Fictional Squat"):
         lifts.append({"date": _d(40), "identity": name.upper(), "name": name, "best_e1rm_lb": prior_lift})
         lifts.append({"date": _d(5), "identity": name.upper(), "name": name, "best_e1rm_lb": recent_lift})
-    habits = [{"date": _d(a), "completion_pct": 0.8 if a < 28 else 0.6} for a in list(RECENT) + list(PRIOR)]
-    return {
+    core_days = [{"date": _d(a), "core_done": round(10 * (core[0] if a < 28 else core[1])), "core_known": 10} for a in range(56)]
+    inputs = {
         "observed_days": [_d(a) for a in range(56)],
         "excluded_days": {"sick": [], "travel": []},
         "zone2_sessions": zone2,
         "training_days": training,
         "lift_sessions": lifts,
         "weight": [{"date": _d(a), "weight_lbs": 200 - a * 0.0} for a in (1, 10, 30, 50)],
-        "habit_days": habits,
+        "habit_days": [{"date": _d(a)} for a in range(56)],
+        "adherence_weeks": _weeks() if weeks is None else weeks,
+        "adherence_intent": "synthetic program plan",
+        "core_habit_days": core_days,
+        "vo2_estimates": [],
     }
+    if vo2:
+        inputs["vo2_estimates"] = [
+            {"date": _d(a), "value": vo2[0] if a < 28 else vo2[1], "source": "Synthetic Watch"} for a in (2, 9, 16, 30, 37, 44)
+        ]
+    return inputs
 
 
 def _record(ago, kind="owner_statement", domains=("social_connection",), direction="better", reviewed=True, text="A synthetic note."):
@@ -155,6 +173,11 @@ def test_absence_never_produces_harder():
     stripped["training_days"] = [d for d in stripped["training_days"] if d not in recent_days]
     stripped["lift_sessions"] = [s for s in stripped["lift_sessions"] if s["date"] not in recent_days]
     stripped["habit_days"] = [h for h in stripped["habit_days"] if h["date"] not in recent_days]
+    stripped["core_habit_days"] = [h for h in stripped["core_habit_days"] if h["date"] not in recent_days]
+    from health.development_profile_measured import adherence_windows
+
+    recent_weeks = set(adherence_windows(TODAY)["recent"])
+    stripped["adherence_weeks"] = [w for w in stripped["adherence_weeks"] if w["week_start"] not in recent_weeks]
     stripped["journal_entries"] = [r for r in stripped["journal_entries"] if r["date"] not in recent_days]
     stripped["personal_records"] = [r for r in stripped["personal_records"] if r["event_date"] < _d(89)]
     p = _profile(stripped)
@@ -164,60 +187,147 @@ def test_absence_never_produces_harder():
 
 
 def test_a_failed_read_is_unread_never_a_zero():
-    inputs = _measured(recent_z2_days=0)  # observed days with no zone 2 at all: a real measured drop
-    assert _status(_profile(inputs), "physical_capacity")["status"] in (dp.MIXED, dp.HARDER)
-    inputs["read_failed"] = {"zone2_sessions": "ClientError", "lift_sessions": "ClientError"}
+    inputs = _measured(recent_lift=90.0)  # a real measured strength drop
+    assert _status(_profile(inputs), "physical_capacity")["status"] == dp.HARDER
+    inputs["read_failed"] = {"lift_sessions": "ClientError", "vo2_estimates": "ClientError"}
     d = _status(_profile(inputs), "physical_capacity")
     assert d["status"] == dp.NOT_ENOUGH
     assert any("read failed" in n for n in d["not_observed"])
 
 
-# ── measured rules ──────────────────────────────────────────────────────────────────────────────
+# ── physical capacity: strength and aerobic RESULT measures; zone 2 is volume ──────────────────
 
 
-def test_measured_improving_steady_and_harder_follow_the_stated_margins():
-    assert _status(_profile(_measured()), "physical_capacity")["status"] == dp.IMPROVING
-    assert _status(_profile(_measured(recent_z2_days=3, recent_lift=100.0)), "physical_capacity")["status"] == dp.STEADY
-    assert _status(_profile(_measured(recent_z2_days=1, recent_lift=90.0)), "physical_capacity")["status"] == dp.HARDER
-    assert _status(_profile(_measured(recent_z2_days=5, recent_lift=90.0)), "physical_capacity")["status"] == dp.MIXED
-    beh = _status(_profile(_measured()), "behavioural_consistency")
-    assert beh["status"] == dp.IMPROVING and beh["basis"] == dp.MEASURED
+def _ind(domain, key):
+    return next(e for e in domain["evidence"] if e.get("indicator") == key)
 
 
-def test_measured_evidence_shows_window_n_and_the_underlying_figures():
+def test_strength_up_reads_improving_scoped_to_strength_with_aerobic_not_established():
     d = _status(_profile(_measured()), "physical_capacity")
-    z2 = next(e for e in d["evidence"] if e.get("indicator") == "zone2_minutes_per_week")
-    assert z2["evidence_kind"] == "measured" and z2["n"] == {"recent": 28, "prior": 28}
-    assert z2["window"]["recent"] == {"start": _d(27), "end": TODAY}
-    assert z2["figure"]["recent"] == pytest.approx(150.0) and z2["figure"]["prior"] == pytest.approx(90.0)
-    weight = next(e for e in d["evidence"] if e["source"].startswith("withings"))
+    assert d["status"] == dp.IMPROVING
+    assert d["scope"]["status_rests_on"] == [
+        _ind(d, "strength_best_e1rm") and "Estimated strength: best e1RM per lift, lifts performed in both windows"
+    ]
+    assert any(x.startswith("Demonstrated aerobic fitness") and "not established" in x for x in d["scope"]["not_established"])
+    assert "only" in d["status_reason"] and "Not established: Demonstrated aerobic fitness" in d["status_reason"]
+    assert any(n.startswith("Demonstrated aerobic fitness") for n in d["not_observed"])
+    strength = _ind(d, "strength_best_e1rm")
+    assert "improved on 3 of 3 repeated lifts" in strength["statement"]
+    assert all(lift["n"] == {"recent": 1, "prior": 1} and lift["window"]["recent"]["end"] == TODAY for lift in strength["figure"]["lifts"])
+
+
+def test_more_zone2_minutes_with_no_fitness_result_leaves_aerobic_not_established():
+    d = _status(_profile(_measured(recent_z2_days=7, prior_z2_days=1, recent_lift=100.0)), "physical_capacity")
+    z2 = _ind(d, "zone2_minutes_per_week")
+    assert z2["direction"] == dp.BETTER and z2["counts_toward_status"] is False and "not a fitness result" in z2["statement"]
+    assert d["status"] == dp.STEADY, "volume up is not capacity up"
+    assert "Zone 2 minutes per observed week — training volume: minutes trained, not a fitness result" in d["scope"]["shown_not_counted"]
+    assert any("aerobic" in x.lower() for x in d["scope"]["not_established"])
+
+
+def test_a_reliable_vo2max_result_counts_and_two_devices_do_not():
+    d = _status(_profile(_measured(recent_lift=100.0, vo2=(42.0, 40.0))), "physical_capacity")
+    assert _ind(d, "aerobic_vo2max_estimate")["direction"] == dp.BETTER and d["status"] == dp.IMPROVING
+    two = _measured(recent_lift=100.0, vo2=(42.0, 40.0))
+    two["vo2_estimates"][0]["source"] = "Another Device"
+    d2 = _status(_profile(two), "physical_capacity")
+    assert _ind(d2, "aerobic_vo2max_estimate")["direction"] == dp.INSUFFICIENT and d2["status"] == dp.STEADY
+
+
+def _battery(walk_dir="better", latest_ago=10, state="measured"):
+    return {
+        "six_minute_walk": {
+            "state": state,
+            "label": "6-minute walk",
+            "unit": "m",
+            "direction": walk_dir,
+            "latest": {"date": _d(latest_ago), "value": 600},
+            "previous": {"date": _d(latest_ago + 42), "value": 570},
+        },
+        "treadmill_20min_fixed": {"state": "measured", "direction": "first", "latest": {"date": _d(10), "value": 120}, "previous": None},
+    }
+
+
+def test_a_fitness_battery_result_establishes_aerobic_fitness_and_a_first_or_stale_one_does_not():
+    inputs = _measured(recent_lift=100.0)
+    inputs["fitness_trend"] = _battery()
+    d = _status(_profile(inputs), "physical_capacity")
+    tests = _ind(d, "aerobic_fitness_tests")
+    assert tests["direction"] == dp.BETTER and d["status"] == dp.IMPROVING
+    assert (
+        next(r for r in tests["figure"]["tests"] if r["test"] == "treadmill_20min_fixed")["direction"] is None
+    ), "a first result compares nothing"
+    inputs["fitness_trend"] = _battery(latest_ago=120)
+    assert _ind(_status(_profile(inputs), "physical_capacity"), "aerobic_fitness_tests")["direction"] == dp.INSUFFICIENT
+
+
+def test_measured_harder_and_mixed_follow_the_stated_margins():
+    assert _status(_profile(_measured(recent_lift=90.0)), "physical_capacity")["status"] == dp.HARDER
+    assert _status(_profile(_measured(recent_lift=110.0, vo2=(38.0, 40.0))), "physical_capacity")["status"] == dp.MIXED
+    weight = next(e for e in _status(_profile(_measured()), "physical_capacity")["evidence"] if e["source"].startswith("withings"))
     assert weight["counts_toward_status"] is False, "weight is shown, never scored"
+
+
+# ── behavioural consistency: adherence to intent and the core set; frequency is context ────────
+
+
+def test_training_six_and_a_half_to_seven_days_alone_never_reads_improving():
+    inputs = _measured(recent_z2_days=7, prior_z2_days=6, weeks=[], core=(0.7, 0.7))
+    inputs["core_habit_days"] = []
+    d = _status(_profile(inputs), "behavioural_consistency")
+    td = _ind(d, "training_days_per_week")
+    assert td["direction"] == dp.BETTER and td["counts_toward_status"] is False and "ceiling" in td["ceiling_note"]
+    assert d["status"] == dp.NOT_ENOUGH, "frequency alone is never consistency"
+    assert any("intent records cover fewer than" in n for n in d["not_observed"])
+
+
+def test_adherence_counts_credited_against_intended_and_planned_rest_is_never_a_miss():
+    d = _status(_profile(_measured(weeks=_weeks(recent_done=5, prior_done=3), core=(0.7, 0.7))), "behavioural_consistency")
+    ad = _ind(d, "program_adherence")
+    assert ad["figure"]["recent"] == 1.0 and ad["figure"]["prior"] == 0.6 and ad["direction"] == dp.BETTER
+    assert "planned rest is never a miss" in ad["denominator"] and ad["intent_established_by"] == "synthetic program plan"
+    assert d["status"] == dp.IMPROVING
+    # five intended sessions done in a week: the two rest days are not misses (adherence 1.0, not 5/7)
+    assert all(w["intended"] == 5 for w in ad["window"]["recent"]["weeks"])
+
+
+def test_a_sick_or_travel_week_is_left_out_never_a_miss():
+    from health.development_profile_measured import adherence_windows
+
+    weeks = _weeks(recent_done=5, prior_done=5)
+    sick_monday = adherence_windows(TODAY)["recent"][0]
+    for w in weeks:
+        if w["week_start"] == sick_monday:
+            w["credited"] = 0
+    inputs = _measured(weeks=weeks, core=(0.7, 0.7))
+    inputs["excluded_days"] = {"sick": [sick_monday], "travel": []}
+    ad = _ind(_status(_profile(inputs), "behavioural_consistency"), "program_adherence")
+    assert ad["figure"]["recent"] == 1.0 and ad["n"]["recent"] == 3
+    assert any("sick or travel" in s["why"] for s in ad["window"]["recent"]["skipped"])
+
+
+def test_insufficient_intent_records_read_not_enough_to_say():
+    weeks = _weeks()[:2] + _weeks()[4:]  # two recent weeks with a record of intent
+    inputs = _measured(weeks=weeks)
+    inputs["core_habit_days"] = []
+    d = _status(_profile(inputs), "behavioural_consistency")
+    assert _ind(d, "program_adherence")["direction"] == dp.INSUFFICIENT and d["status"] == dp.NOT_ENOUGH
+
+
+def test_the_core_habit_set_counts_and_reads_counts_only():
+    d = _status(_profile(_measured(weeks=[], core=(0.9, 0.6))), "behavioural_consistency")
+    core = _ind(d, "core_habit_adherence")
+    assert core["direction"] == dp.BETTER and core["figure"]["recent"] == 0.9 and d["status"] == dp.IMPROVING
+    src = (ROOT / "lambdas" / "health" / "development_profile_measured.py").read_text(encoding="utf-8")
+    assert "missed_core" not in src and "missed_labels" not in src, "no habit name is read"
 
 
 def test_sick_and_travel_days_are_excluded_from_the_denominator():
     inputs = _measured(recent_z2_days=5, prior_z2_days=5, recent_lift=100.0)
-    base = _status(_profile(inputs), "physical_capacity")
     sick = [_d(a) for a in RECENT if a % 7 >= 5]  # the recent no-session days, all marked sick
     inputs["excluded_days"] = {"sick": sick, "travel": []}
-    d = _status(_profile(inputs), "physical_capacity")
-    z2 = next(e for e in d["evidence"] if e.get("indicator") == "zone2_minutes_per_week")
+    z2 = _ind(_status(_profile(inputs), "physical_capacity"), "zone2_minutes_per_week")
     assert z2["n"]["recent"] == 28 - len(sick) and z2["excluded"]["recent"]["sick"] == len(sick)
-    assert base["status"] == dp.STEADY
-    # the whole recent window on travel -> below the minimum -> not enough to say (never harder)
-    inputs["excluded_days"] = {"sick": [], "travel": [_d(a) for a in RECENT]}
-    beh = _status(_profile(inputs), "behavioural_consistency")
-    assert beh["status"] in (dp.NOT_ENOUGH, dp.IMPROVING, dp.STEADY)
-    td = next(i for i in beh["evidence"] if i.get("indicator") == "training_days_per_week")
-    assert td["direction"] == dp.INSUFFICIENT and td["n"]["recent"] == 0
-
-
-def test_below_the_minimum_n_is_not_enough_to_say():
-    inputs = _measured()
-    keep = {_d(a) for a in range(0, 10)} | {_d(a) for a in PRIOR}
-    inputs["observed_days"] = sorted(keep)
-    inputs["zone2_sessions"] = [s for s in inputs["zone2_sessions"] if s["date"] in keep]
-    inputs["lift_sessions"] = []
-    assert _status(_profile(inputs), "physical_capacity")["status"] == dp.NOT_ENOUGH
 
 
 # ── counted rules ───────────────────────────────────────────────────────────────────────────────
@@ -472,7 +582,9 @@ def test_last_owner_view_and_how_to_disagree():
     assert view == {
         "date": "2026-11-12",
         "view": "agree",
+        "about": "social_connection",
         "his_words": "Fair, that is right.",
+        "state": "open",
         "correction_sk": "CORRECTION#2026-11-12#bbbb2222",
     }
     assert _status(p, "coping_and_flexibility")["last_owner_view"] is None
@@ -480,6 +592,103 @@ def test_last_owner_view_and_how_to_disagree():
     assert call["tool"] == "log_coach_correction"
     assert set(call["arguments"]) <= set(LOG_COACH_CORRECTION_INPUT["properties"])
     assert call["arguments"]["surface"] not in coach_corrections.OWNER_FACING_SURFACES, "no coach prompt reads a profile correction"
+
+
+# ── his corrections are consequential (the existing ledger, no other store) ────────────────────
+
+
+def _corr(signal, day, text, *, status="open", error_class="framing"):
+    return {
+        "sk": f"CORRECTION#{day}#{abs(hash((signal, day, text))) % 16**8:08x}",
+        "created_at": f"{day}T18:00:00+00:00",
+        "item_ref": {"surface": dp.PROFILE_SURFACE, "signal": signal},
+        "correction_text": text,
+        "error_class": error_class,
+        "status": status,
+    }
+
+
+def test_an_open_domain_correction_stops_the_profile_asserting_its_status_and_closing_restores_it():
+    inputs = _measured()
+    rule = _status(_profile(inputs), "physical_capacity")
+    assert rule["status"] == dp.IMPROVING
+    inputs["profile_corrections"] = [
+        _corr(dp.signal_for("physical_capacity"), "2026-11-18", "Synthetic: my shoulder is the story, not the lifts.")
+    ]
+    d = _status(_profile(inputs), "physical_capacity")
+    assert d["status"] == dp.OWNER_DISPUTED and d["rule_status"] == dp.IMPROVING
+    assert list(d)[:3] == ["domain", "name", "owner_correction"], "his correction is shown first"
+    assert d["owner_correction"]["his_words"].startswith("Synthetic: my shoulder") and d["owner_correction"]["date"] == "2026-11-18"
+    assert d["evidence"], "the evidence stays visible"
+    assert "he disputes this line (2026-11-18)" in d["status_reason"]
+    inputs["profile_corrections"][0]["status"] = "closed"
+    closed = _status(_profile(inputs), "physical_capacity")
+    assert closed["status"] == dp.IMPROVING and "owner_correction" not in closed
+    assert closed["last_owner_view"]["state"] == "closed", "a closed correction stays visible as history"
+
+
+def test_an_open_indicator_correction_excludes_that_indicator_and_the_status_is_recomputed():
+    inputs = _measured(recent_lift=100.0, vo2=(42.0, 40.0))
+    assert _status(_profile(inputs), "physical_capacity")["status"] == dp.IMPROVING  # on the VO2 estimate
+    inputs["profile_corrections"] = [
+        _corr(dp.signal_for("physical_capacity", "aerobic_vo2max_estimate"), "2026-11-18", "Synthetic: the watch estimate is wrong.")
+    ]
+    d = _status(_profile(inputs), "physical_capacity")
+    assert d["status"] == dp.STEADY and d["rule_status"] == dp.STEADY
+    ae = _ind(d, "aerobic_vo2max_estimate")
+    assert ae["counts_toward_status"] is False and ae["excluded_by_his_correction"]["his_words"].startswith("Synthetic: the watch")
+    assert d["scope"]["excluded_by_his_correction"] == [ae and "Demonstrated aerobic fitness (VO2 max device estimate)"]
+    assert dp.signal_for("physical_capacity", "aerobic_vo2max_estimate") in d["how_to_disagree"]["per_indicator"].values()
+
+
+def test_an_agreement_changes_nothing():
+    inputs = _measured()
+    inputs["profile_corrections"] = [
+        _corr(dp.signal_for("physical_capacity"), "2026-11-18", "Synthetic: right.", error_class=dp.AGREE_ERROR_CLASS)
+    ]
+    d = _status(_profile(inputs), "physical_capacity")
+    assert d["status"] == dp.IMPROVING and d["last_owner_view"]["view"] == "agree"
+
+
+def test_profile_disputes_reach_only_the_assembly_and_never_a_gate_proposal():
+    from coach import coach_corrections, correction_promotion, personal_context
+
+    assert personal_context.PROFILE_SURFACE == dp.PROFILE_SURFACE and personal_context.PROFILE_SIGNAL_PREFIX == dp.SIGNAL_PREFIX
+    assert personal_context.PROFILE_AGREE_CLASS == dp.AGREE_ERROR_CLASS
+    assert dp.PROFILE_SURFACE not in coach_corrections.OWNER_FACING_SURFACES, "the brief and the legacy chat block do not read it"
+    callers = [
+        str(p.relative_to(ROOT))
+        for p in (ROOT / "lambdas").rglob("*.py")
+        if "profile_disputes_section(" in p.read_text(encoding="utf-8", errors="replace") and p.name != "personal_context.py"
+    ]
+    assert callers == ["lambdas/coach/coach_context_pilot.py"], callers
+    rows = [
+        {
+            "sk": f"CORRECTION#2026-11-1{i}#p{i}",
+            "status": "open",
+            "error_class": "framing",
+            "item_ref": {"surface": dp.PROFILE_SURFACE, "signal": f"development_profile:d{i}", "coach": f"c{i}"},
+        }
+        for i in range(5)
+    ]
+    assert correction_promotion.promotion_proposals(rows, min_recurrence=2, min_coaches=1) == []
+    coach_rows = [dict(r, item_ref=dict(r["item_ref"], surface="chat_coaching")) for r in rows]
+    assert correction_promotion.promotion_proposals(coach_rows, min_recurrence=2, min_coaches=1), "the exclusion can fail"
+
+
+# ── not enough to say is about the records, not his life ───────────────────────────────────────
+
+
+def test_not_enough_to_say_says_it_reflects_the_records_not_his_life():
+    sentence = (
+        "the platform holds too few structured records to form a view; this says nothing about what has actually happened in his life"
+    )
+    assert dp.NOT_ENOUGH_MEANS == sentence
+    p = _profile({})
+    assert sentence in p["reading_this"]
+    for d in p["domains"]:
+        assert sentence in d["status_reason"], d["domain"]
+    assert dp.STATEMENT_MIN == 3 and dp.RATING_MIN_DAYS == 8 and dp.COUNT_MARGIN_MIN == 3, "thresholds unchanged"
 
 
 # ── the life-domain tags: validated, queue-only ─────────────────────────────────────────────────
@@ -594,6 +803,12 @@ def test_the_tool_is_a_read_and_writes_nothing(monkeypatch):
 
     monkeypatch.setattr(tcorr, "tool_get_zone2_breakdown", lambda args: {"error": "No recorded sessions for range."})
     monkeypatch.setattr(tstr, "_read_hevy_all_phases", lambda *a, **k: ([], []))
+    import mcp.plan_hevy_windows as phw
+
+    monkeypatch.setattr(phw, "_block_workouts", lambda *a, **k: [])
+    import mcp.tools_fitness_tests as tft
+
+    monkeypatch.setattr(tft, "read_view", lambda today=None, hevy_rows=None: {"trend": {}, "reads": {"record": "absent"}})
     import mcp.tools_journal as tj
 
     monkeypatch.setattr(tj, "_query_journal", lambda *a, **k: [])
@@ -619,7 +834,12 @@ def test_no_public_coach_or_prompt_module_can_reach_the_profile():
     graph = _import_graph()
     roots = [m for m in graph if m.startswith(NO_READ_PACKAGES)]
     assert len(roots) > 50, "the roots were not found — vacuous guard"
-    profile_modules = {"health.development_profile", "mcp.tools_development_profile"}
+    profile_modules = {
+        "health.development_profile",
+        "health.development_profile_base",
+        "health.development_profile_measured",
+        "mcp.tools_development_profile",
+    }
     reached = _closure(graph, roots)
     assert not reached & profile_modules, sorted(reached & profile_modules)
     importers = sorted(m for m, deps in graph.items() if deps & profile_modules and m not in profile_modules)
