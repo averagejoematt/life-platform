@@ -33,6 +33,7 @@ PINNED_OFF = {
     6: {"telegram/off": "pass", "packet/off": "pass", "brief": "pass"},  # #6149 already wired corrections everywhere
     7: {"telegram/off": "fail", "packet/off": "fail", "brief": "pass"},
     8: {"telegram/off": "fail", "packet/off": "n/a", "brief": "n/a"},
+    9: {"telegram/off": "fail", "packet/off": "fail", "brief": "n/a"},  # #6294: the assembly alone reads his profile disputes
 }
 
 NEEDLES = (h.SCAN_LEAN, h.WORDS["decision"], h.WORDS["correction"], h.WORDS["record"], h.WORDS["note"], "IMPLIED BY HIS WEIGHT CHANGE")
@@ -52,7 +53,7 @@ def test_every_applicable_case_passes_with_the_assembly_on():
             applicable += 1
             if r["verdict"] != "pass":
                 failures.append((case.n, case.name, col, r["why"]))
-    assert applicable == 15, applicable
+    assert applicable == 17, applicable  # #6294: case 9 on both interfaces
     assert not failures, failures
 
 

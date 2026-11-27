@@ -4,7 +4,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-11-27 (v8.6.0 — 97 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
+**Last updated:** 2026-11-27 (v8.6.0 — 98 MCP tools, 20 data sources, 108 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -2496,6 +2496,8 @@ Aliases (normalized on MCP write/read): `failure_pattern` → `failure_patterns`
   - `event_date` + `event_date_precision` ∈ `day` (`YYYY-MM-DD`), `month` (`YYYY-MM`), `season` (`YYYY-spring|summer|autumn|winter`, `fall`→`autumn`), `year` (`YYYY`), `unknown` (no date). A precision given with a date must match its shape; omitted, it is inferred.
   - `source_ref` — opaque string (e.g. a Notion page id), ≤200 chars, never fetched.
   - `owner_reviewed_at` (ISO instant of the approval) + `reviewed_via` (`manage_pending_writes:<pending_id>`) — **stamped by the approve path; a caller-supplied value is refused.**
+  - `life_domains` (optional, #6294) — a list from the closed vocabulary `physical_capacity`, `behavioural_consistency`, `learning_and_experimentation`, `self_understanding`, `emotional_wellbeing`, `social_connection`, `meaning_and_fulfilment`, `confidence_and_agency`, `coping_and_flexibility` (= `platform_memory.LIFE_DOMAINS` = the keys of `health.development_profile.DOMAINS`). Which part of his life the record speaks to; a SEPARATE field from `domains` (coach ids). Allowed only when `evidence_kind` is `owner_statement`, `self_report`, `confirmed_event`, `recollection` or `confirmed_insight` — an interpretation, a competing hypothesis, a rejected interpretation or an observed pattern cannot be tagged. Set only through the approval queue like every other field; a row without it contributes to no self-report domain.
+  - `life_direction` (optional, needs `life_domains`) ∈ `better`, `same`, `harder`, `unclear` — HIS reading of which way the record points. Read only by the owner-only `get_development_profile` (#6294), which needs at least 3 day-dated statements in each of two 90-day windows before it reads a direction; never rendered as the record's text, never in a coach prompt.
 - **Tier.** `private` unless the queued item itself says `privacy_tier="coach_context"` (the category's `opt_in_tiers` — the only per-record loosening in the registry); `public_ok` is refused.
 - **Injection.** Never when private. Never `ai_interpretation`, `competing_hypothesis` or `rejected_interpretation` (a rejected interpretation is kept so it is not re-proposed), and `observed_pattern` is not injected either until ruled otherwise. A row with no `owner_reviewed_at` is not injected. Injected lines carry their evidence kind and event date: `[<date> · personal_record · recollection, event 2019-summer] …`. A record with an `event_date` is exempt from the relevance window.
 - `read_platform_memory` returns every provenance field.

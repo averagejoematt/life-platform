@@ -58,7 +58,14 @@ except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at 
 WRITE_TOOL = "write_platform_memory"
 QUEUE_TOOL = "manage_pending_writes"
 #: #6287 provenance arguments — accepted (and validated) only for a provenance_required category.
-PROVENANCE_ARGS = ("evidence_kind", "event_date", "event_date_precision", "source_ref")
+PROVENANCE_ARGS = (
+    "evidence_kind",
+    "event_date",
+    "event_date_precision",
+    "source_ref",
+    "life_domains",
+    "life_direction",
+)  # #6294: +life tags
 
 
 # The write tool's input schema (lifted out of mcp/registry.py, which is at its size
@@ -122,6 +129,33 @@ WRITE_PLATFORM_MEMORY_INPUT = {
         "source_ref": {
             "type": "string",
             "description": "personal_record only: opaque reference to where it came from (e.g. a Notion page id); never fetched.",
+        },
+        # #6294: life-domain tags — personal_record only; read by the owner-only get_development_profile
+        "life_domains": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": [
+                    "physical_capacity",
+                    "behavioural_consistency",
+                    "learning_and_experimentation",
+                    "self_understanding",
+                    "emotional_wellbeing",
+                    "social_connection",
+                    "meaning_and_fulfilment",
+                    "confidence_and_agency",
+                    "coping_and_flexibility",
+                ],  # == platform_memory.LIFE_DOMAINS (tests/test_development_profile_6294.py)
+            },
+            "description": (
+                "personal_record only, optional: the life domain(s) this record speaks to. Only for his own words or what he "
+                "confirmed (owner_statement, self_report, confirmed_event, recollection, confirmed_insight)."
+            ),
+        },
+        "life_direction": {
+            "type": "string",
+            "enum": ["better", "same", "harder", "unclear"],  # == platform_memory.LIFE_DIRECTIONS
+            "description": "personal_record only, optional (needs life_domains): HIS reading of which way it points.",
         },
     },
     "required": ["category", "content"],
