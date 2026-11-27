@@ -47,11 +47,10 @@ ROLLBACK_COVERAGE_TEST = (
 )
 
 
-def preflights(out: str, plan_path: str) -> dict:
+def preflights(out: str, plan_path: str, public_plan_id: str) -> dict:
     """The read-only backup preconditions of both tools. PRIVATE: the private tool's own ``--preflight`` (ListObjectsV2
-    on its backup prefix, GetBucketVersioning — no write). PUBLIC: the public tool writes its pre-image export as a LOCAL
-    file in its ``--out`` directory; the check is that the directory exists, is writable (an access check, not a write)
-    and lies outside the repo."""
+    on its backup prefix, GetBucketVersioning — no write). PUBLIC: the public tool's own ``preflight``
+    (``backfill_public_variant_backup``) on this run's public plan id — the same two reads, no write."""
     import json
 
     cp = subprocess.run(
@@ -72,17 +71,15 @@ def preflights(out: str, plan_path: str) -> dict:
         private = json.loads(cp.stdout)
     except ValueError:
         private = {"ok": False, "error": (cp.stderr or cp.stdout)[-800:]}
-    pub_dir = os.path.realpath(os.path.join(out, "public"))
-    root = os.path.realpath(ROOT)
-    public = {
-        "location": f"local file {pub_dir}/export_<phase>_<ts>.json (not S3)",
-        "directory_exists": os.path.isdir(pub_dir),
-        "writable": os.access(pub_dir, os.W_OK),
-        "outside_repo": not (pub_dir == root or pub_dir.startswith(root + os.sep)),
-        "copy_to": "after each phase, copy the export (and SUMMARY/manifest) beside the private backup or another durable "
-        "private store — not automated; the rollback reads the local file",
-    }
-    public["ok"] = public["directory_exists"] and public["writable"] and public["outside_repo"]
+    import backfill_public_variant_backup as BK
+    import boto3
+
+    try:  # the public tool's own preflight (read-only: ListObjectsV2 + GetBucketVersioning), on this run's public plan id
+        region = os.environ.get("AWS_DEFAULT_REGION", "us-west-2")
+        store = BK.S3Backups(boto3.client("s3", region_name=region), os.environ.get("S3_BUCKET", "matthew-life-platform"))
+        public = BK.preflight(store, public_plan_id)
+    except Exception as exc:  # noqa: BLE001 — reported, and the run fails on it
+        public = {"ok": False, "error": str(exc)[-400:], "unverifiable_without_a_write": BK.UNVERIFIABLE}
     return {"private": private, "public": public}
 
 
@@ -93,9 +90,9 @@ def preflight_lines(c: dict) -> list:
         f"- PRIVATE preflight (`recompute_character_private.py --preflight`, read-only): ok={pv.get('ok')}; "
         f"{pv.get('verified_read_only') or pv.get('error')}.",
         "  - What a read cannot prove (verbatim): " + "; ".join(pv.get("unverifiable_without_a_write") or ["(not reported)"]),
-        f"- PUBLIC preflight: ok={pb.get('ok')}; the pre-image is a {pb.get('location')}; directory exists "
-        f"{pb.get('directory_exists')}, writable {pb.get('writable')}, outside the repo {pb.get('outside_repo')}. "
-        f"Copy: {pb.get('copy_to')}.",
+        f"- PUBLIC preflight (`backfill_public_variant.py --preflight`'s function, read-only): ok={pb.get('ok')}; "
+        f"{pb.get('verified_read_only') or pb.get('error')}.",
+        "  - What a read cannot prove (verbatim): " + "; ".join(pb.get("unverifiable_without_a_write") or ["(not reported)"]),
     ]
 
 
@@ -149,13 +146,15 @@ def final_state_lines(c: dict) -> list:
             "the ladder. The independent site-API second opinion cannot be taken on the PRIVATE composite: the rule is "
             "inline in `web.site_api_character.character()` (no callable function) and that route serves only the public "
             "variant (`character_privacy.public_sheets` fails closed on a private record) — computing it would need a "
-            "site-API change (extracting the rule), not done and not approximated."
+            "site-API change (extracting the rule), not done. The private composite is therefore verified through the "
+            "supported reader (the tool's own calculation from the planned items, which the tool also self-checks against its "
+            "last ladder step); no independent re-implementation of the rule was made."
         )
     return [
         priv,
         f"- PUBLIC: composite verified on {pc.get('verified')} of {pc.get('dates')} dates — each planned v3 block's composite "
         f"as this recompute reports it equals what `/api/character` serves for that block. Rule: {pc.get('rule')}. Exact "
-        "equality after the route's own rounding (one decimal).",
+        "equality after the route's own rounding (one decimal). No independent re-implementation of the rule was made.",
     ]
 
 
@@ -231,10 +230,17 @@ def operations_lines(c: dict) -> list:
         f"of {bl.get('public_dates')} dates carry one (the rest serve nothing today).",
         "",
         "**Backups (pre-images, written and re-read before the first write).**",
-        "- PRIVATE: a local `export.json` (+ `.sha256`) and `s3://…/backups/character-private-recompute/<plan_id>/<phase>-<ts>/export.json` "
-        "(conditional put, never overwrites); each entry is the FULL stored item of every row the phase writes, with its digest.",
-        "- PUBLIC: `export_<phase>_<ts>.json` in the public --out; each entry is the item's previous `public` attribute (or its "
-        "absence) and its method-1 fingerprint, for every item the phase writes, plus the ledger item's pre-image.",
+        f"- PRIVATE: `s3://<bucket>/backups/character-private-recompute/{p['plan_id']}/<phase>-<ts>/export.json` (conditional put, "
+        "never overwrites) + a local `export.json` (+ `.sha256`); each entry is the FULL stored item of every row the phase "
+        "writes, with its digest.",
+        f"- PUBLIC: `s3://<bucket>/backups/character-public-recompute/{pub['public_plan_id']}/export_<phase>.json` (+ "
+        "`.sha256`), conditional put (IfNoneMatch='*'), read back and hashed BEFORE the first write — a failure aborts with "
+        "zero writes; a refused put continues only when the existing backup's content equals this export (a resumed apply). "
+        "The local copy is kept in the public --out. Each entry is the item's previous `public` attribute (or its absence) "
+        "and its method-1 fingerprint, for every item the phase writes, plus the ledger item's pre-image.",
+        "- Neither backup is anonymously readable: `deploy/bucket_policy.json` grants public GetObject only on `site/*` and "
+        "named `generated/*` paths; no statement names `backups/` (tested: "
+        "tests/test_recompute_combined_6224.py::test_backups_are_not_anonymously_readable).",
         *preflight_lines(c),
         f"- Rollback coverage: each tool's export covers exactly its write set (asserted: {ROLLBACK_COVERAGE_TEST}); rollback "
         "order PUBLIC first, then PRIVATE; every item byte-identical after both.",

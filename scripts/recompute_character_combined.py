@@ -391,13 +391,13 @@ def summary_md(c: dict, preliminary: bool) -> str:
         *S.operations_lines(c),
         "",
         "## Backup and rollback evidence",
-        "- PRIVATE pre-image: a local export (+ `.sha256`) and `s3://…/backups/character-private-recompute/<plan_id>/<phase>-<ts>/export.json`, "
-        "both re-read and hashed before the first write.",
-        "- PUBLIC pre-image: `export_<phase>_<ts>.json` in the public --out, written before the first write.",
+        "- Both tools back up to S3 under `backups/` and re-read and hash it before their first write (details above).",
         "- Apply order: private `--apply --plan-in <plan> --phase sheets`, then `--phase receipts`; then public `--apply --plan-in "
         "<plan> --approved-public-plan-id <id> --phase pre-merge`, then `--phase post-merge`. Both `--verify` at 0.",
-        "- Rollback order: PUBLIC first (`backfill_public_variant.py --rollback <export> --apply`), then PRIVATE "
-        "(`recompute_character_private.py --rollback <export> --apply`).",
+        "- Rollback order, from the S3 copies (each verifies its recorded sha256 first): PUBLIC first, phase by phase — "
+        f"`backfill_public_variant.py --out <dir> --rollback s3://<bucket>/backups/character-public-recompute/{pub['public_plan_id']}/export_post-merge.json --apply`, "
+        "then `…/export_pre-merge.json`; then PRIVATE — `recompute_character_private.py --out <dir> --rollback <its export> --apply` "
+        "(its local export; the S3 copy is the same bytes).",
         f"- End-to-end fake-storage test ({E2E_TEST}: private apply → public apply → both verify 0 → rollback public → rollback "
         f"private → every item byte-identical): {'PASSED' if c['e2e']['passed'] else 'FAILED'} — {c['e2e']['result']}.",
         "",
@@ -488,7 +488,7 @@ def main(argv: list) -> int:
     generated = json.load(open(os.path.join(out, "public", "manifest.json"), encoding="utf-8"))["generated_at"]
     silent = None if args.skip_tests else S.run_silent_tests()
     combined = build(out, args.preliminary, generated, e2e, walk, args.previous, silent)
-    combined["preflight"] = S.preflights(out, plan_path)
+    combined["preflight"] = S.preflights(out, plan_path, combined["public"]["public_plan_id"])
     with open(os.path.join(out, "combined.json"), "w", encoding="utf-8") as fh:
         json.dump(combined, fh, indent=1, sort_keys=True, default=str)
     with open(os.path.join(out, "COMBINED_SUMMARY.md"), "w", encoding="utf-8") as fh:

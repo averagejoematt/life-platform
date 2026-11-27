@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 sys.path.insert(0, os.path.join(ROOT, "tests"))
 
 import backfill_public_variant as B  # noqa: E402
+import backfill_public_variant_backup as BK  # noqa: E402
 import backfill_public_variant_cli as CLI  # noqa: E402
 import backfill_public_variant_planin as PI  # noqa: E402
 import recompute_character_private as T  # noqa: E402
@@ -68,6 +69,32 @@ class PublicAdapter:
 
     def delete_item(self, Key=None, **_kw):  # noqa: N803
         self.store.items.pop((Key["pk"], Key["sk"]), None)
+
+
+class StubS3:
+    """``BK.S3Backups``' surface with S3's conditional-put semantics (IfNoneMatch='*': an existing key is refused)."""
+
+    def __init__(self, fail_put: bool = False):
+        self.objects: dict = {}
+        self.fail_put = fail_put
+        self.calls: list = []
+
+    def put_new(self, key, body):
+        self.calls.append(("put", key))
+        if self.fail_put:
+            raise RuntimeError("AccessDenied (synthetic)")
+        if key in self.objects:
+            raise BK.BackupExists(key)
+        self.objects[key] = bytes(body)
+
+    def get(self, key):
+        return self.objects[key]
+
+    def list(self, prefix):
+        return sorted(k for k in self.objects if k.startswith(prefix))
+
+    def versioning(self):
+        return "Enabled"
 
 
 @pytest.fixture(scope="module")
@@ -141,14 +168,17 @@ def test_end_to_end_apply_verify_and_rollback_restore_every_item_byte_identicall
     export = B.build_export(lambda k: table.get_item(Key=k).get("Item"), pub, TS)
     assert {(e["pk"], e["sk"]) for e in export["entries"]} == {(w["pk"], w["sk"]) for w in pub}
     B.record_ledger_preimage(table, export)
-    assert B.apply_plan(table, pub, export)["written"] == len(pub)
-    B.put_public_ledger(table, {"ledger_version": "v2", "rows": []})
+    s3 = StubS3()  # the public pre-image is backed up to S3 (conditional put, verified) BEFORE the first write
+    applied = BK.apply_phase(table, s3, export, pub, pid, "pre-merge", str(tmp_path), {"ledger_version": "v2", "rows": []})
+    assert applied["written"] == len(pub) and applied["backup"]["key"] == BK.backup_key(pid, "pre-merge")
 
     again, pid2 = public_plan(store, plan_path)
     assert again == [] and pid2 != pid  # public verify: 0 writes (the plan id covers the writes, so it moves to the empty plan)
     assert A.verify(store, str(tmp_path / "verify"), trees=P.TREES)["planned_writes"] == 0  # private verify: 0
 
-    assert B.rollback(table, export, apply=True)["refused"] == []  # PUBLIC first
+    from_s3 = BK.load_export(f"s3://bucket/{applied['backup']['key']}", s3)  # PUBLIC first, from the S3 copy (sha256 verified)
+    assert {(e["pk"], e["sk"]) for e in from_s3["entries"]} == {(w["pk"], w["sk"]) for w in pub}  # coverage == write set
+    assert B.rollback(table, from_s3, apply=True)["refused"] == []
     done = A.rollback(store, priv["export"], apply=True)  # then PRIVATE
     assert done["refused"] == [] and done["verified"]["mismatches"] == []
     assert _canon(store) == start
@@ -385,3 +415,128 @@ def test_the_private_apply_refuses_without_the_exact_approved_plan_id(private, t
     out = str(tmp_path / "apply")
     assert T.main(["--out", out, "--apply", "--plan-in", plan_path]) == 4
     assert T.main(["--out", out, "--apply", "--plan-in", plan_path, "--approved-plan-id", "0" * 16]) == 4
+
+
+# ── the public pre-image backup (owner: "backup before writes", "verified rollback") ──────────────────────────────────
+
+
+class _Recording(PublicAdapter):
+    def __init__(self, store, log):
+        super().__init__(store)
+        self.log = log
+
+    def update_item(self, **kw):
+        self.log.append(("ddb", kw["Key"]["sk"]))
+        return super().update_item(**kw)
+
+    def put_item(self, **kw):
+        self.log.append(("ddb", kw["Item"]["sk"]))
+        return super().put_item(**kw)
+
+
+class _LoggedS3(StubS3):
+    def __init__(self, log, **kw):
+        super().__init__(**kw)
+        self.log = log
+
+    def put_new(self, key, body):
+        self.log.append(("s3", key))
+        return super().put_new(key, body)
+
+
+def _applied_private(private, tmp_path):
+    base, plan_path = private
+    store = _fresh(base)
+    plan = A.load_plan(plan_path)
+    os.makedirs(str(tmp_path / "priv"), exist_ok=True)
+    A.apply_plan(store, plan, str(tmp_path / "priv"), "all", TS, approved_plan_id=plan["plan_id"])
+    pub, pid = public_plan(store, plan_path)
+    return store, pub, pid
+
+
+def test_the_backup_is_written_and_verified_before_the_first_write(private, tmp_path):
+    store, pub, pid = _applied_private(private, tmp_path)
+    log: list = []
+    table, s3 = _Recording(store, log), _LoggedS3(log)
+    export = B.build_export(lambda k: table.get_item(Key=k).get("Item"), pub, TS)
+    BK.apply_phase(table, s3, export, pub, pid, "pre-merge", str(tmp_path), None)
+    first_ddb = next(i for i, e in enumerate(log) if e[0] == "ddb")
+    assert [e for e in log[:first_ddb]] == [("s3", BK.backup_key(pid, "pre-merge")), ("s3", BK.backup_key(pid, "pre-merge") + ".sha256")]
+    assert BK.backup_key(pid, "pre-merge").startswith("backups/character-public-recompute/")
+    assert os.path.exists(str(tmp_path / f"export_pre-merge_{pid}.json.sha256"))  # the local copy is kept too
+
+
+def test_a_failing_backup_put_aborts_with_zero_writes(private, tmp_path):
+    store, pub, pid = _applied_private(private, tmp_path)
+    before = _canon(store)
+    table = PublicAdapter(store)
+    export = B.build_export(lambda k: table.get_item(Key=k).get("Item"), pub, TS)
+    with pytest.raises(BK.BackupError, match="no write made"):
+        BK.apply_phase(table, StubS3(fail_put=True), export, pub, pid, "pre-merge", str(tmp_path), {"rows": []})
+    assert _canon(store) == before
+
+
+def test_an_existing_matching_backup_resumes_and_a_different_one_stops(private, tmp_path):
+    store, pub, pid = _applied_private(private, tmp_path)
+    table = PublicAdapter(store)
+    s3 = StubS3()
+    export = B.build_export(lambda k: table.get_item(Key=k).get("Item"), pub, TS)
+    BK.backup_export(s3, export, pid, "pre-merge", str(tmp_path / "a.json"))  # an earlier run's backup, same pre-images
+    later = B.build_export(lambda k: table.get_item(Key=k).get("Item"), pub, "2026-11-27T02:00:00+00:00")
+    assert BK.apply_phase(table, s3, later, pub, pid, "pre-merge", str(tmp_path), None)["backup"]["resumed"] is True
+    # a different pre-image under the same key stops the apply, with zero writes
+    store2, pub2, pid2 = _applied_private(private, tmp_path / "b")
+    t2 = PublicAdapter(store2)
+    other = B.build_export(lambda k: t2.get_item(Key=k).get("Item"), pub2, TS)
+    other["entries"][0]["previous_public"] = {"synthetic": "a different pre-image"}
+    s3b = StubS3()
+    BK.backup_export(s3b, other, pid2, "pre-merge", str(tmp_path / "c.json"))
+    before = _canon(store2)
+    honest = B.build_export(lambda k: t2.get_item(Key=k).get("Item"), pub2, TS)
+    os.makedirs(str(tmp_path / "d"))
+    with pytest.raises(BK.BackupError, match="DIFFERENT backup"):
+        BK.apply_phase(t2, s3b, honest, pub2, pid2, "pre-merge", str(tmp_path / "d"), None)
+    assert _canon(store2) == before
+
+
+def test_rollback_refuses_an_export_whose_sha256_does_not_match(tmp_path):
+    s3 = StubS3()
+    s3.objects["backups/character-public-recompute/x/export_pre-merge.json"] = b"{}"
+    s3.objects["backups/character-public-recompute/x/export_pre-merge.json.sha256"] = b"0" * 64
+    with pytest.raises(BK.BackupError, match="does not match"):
+        BK.load_export("s3://bucket/backups/character-public-recompute/x/export_pre-merge.json", s3)
+    local = tmp_path / "e.json"
+    local.write_text("{}")
+    with pytest.raises(BK.BackupError, match="no recorded sha256"):
+        BK.load_export(str(local), None)
+
+
+def test_the_public_preflight_is_read_only_and_names_its_limit():
+    s3 = StubS3()
+    out = BK.preflight(s3, "abcd")
+    assert out["ok"] and out["verified_read_only"]["no_backup_under_prefix_yet"] and s3.calls == []
+    assert "IfNoneMatch" in out["unverifiable_without_a_write"][0]
+    s3.objects["backups/character-public-recompute/abcd/export_pre-merge.json"] = b"{}"
+    assert not BK.preflight(s3, "abcd")["ok"]  # control: an existing backup under the plan id
+
+
+def test_the_conditional_put_maps_a_412_to_backup_exists():
+    class _Err(Exception):
+        response = {"Error": {"Code": "PreconditionFailed"}}
+
+    class _Client:
+        def put_object(self, **kw):
+            assert kw["IfNoneMatch"] == "*"
+            raise _Err()
+
+    with pytest.raises(BK.BackupExists):
+        BK.S3Backups(_Client(), "b").put_new("backups/character-public-recompute/k", b"{}")
+
+
+def test_backups_are_not_anonymously_readable():
+    """deploy/bucket_policy.json: public GetObject covers site/* and named generated/* paths only; none names backups/."""
+    policy = json.load(open(os.path.join(ROOT, "deploy", "bucket_policy.json"), encoding="utf-8"))
+    for st in policy["Statement"]:
+        if st.get("Effect") == "Allow" and st.get("Principal") in ("*", {"AWS": "*"}):
+            res = st["Resource"] if isinstance(st["Resource"], list) else [st["Resource"]]
+            assert not any("/backups/" in r or r.endswith(":::matthew-life-platform/*") for r in res), st.get("Sid")

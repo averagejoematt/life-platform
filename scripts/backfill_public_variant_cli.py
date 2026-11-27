@@ -711,12 +711,15 @@ def write_csv(path: str, rows: list) -> None:
             w.writerow({k: json.dumps(v, default=str) if isinstance(v, (list, dict)) else v for k, v in r.items()})
 
 
-def main(argv: list) -> int:
+def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", help="directory for the manifest / export (OUTSIDE the repo: it carries real values)")
     ap.add_argument("--to", default=(datetime.now(timezone.utc).date()).isoformat())
     ap.add_argument("--apply", action="store_true", help="WRITE: export the pre-image, then SET `public` (owner act)")
-    ap.add_argument("--rollback", help="an export file: restore its pre-image (dry run unless --apply)")
+    ap.add_argument(
+        "--rollback", help="an export (local file or s3://…/export_<phase>.json): restore its pre-image (dry run unless --apply)"
+    )
+    ap.add_argument("--preflight", action="store_true", help="read-only: the public backup's preconditions for this plan id")
     ap.add_argument("--skip-routes", action="store_true", help="skip the route-handler before/after evaluation")
     ap.add_argument(
         "--no-order-fix",
@@ -735,6 +738,26 @@ def main(argv: list) -> int:
         "PLANNED character rows instead of the stored ones, and the public apply requires exactly those rows live",
     )
     ap.add_argument("--approved-public-plan-id", help="with --plan-in --apply: the public_plan_id the owner approved (must reproduce)")
+    return ap
+
+
+def _rollback(args: Any, table: Any, backups: Any) -> int:
+    import backfill_public_variant_backup as BK
+
+    try:
+        export = BK.load_export(args.rollback, backups)  # its recorded sha256 verified first
+    except BK.BackupError as exc:
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return 5
+    result = B.rollback(table, export, apply=args.apply)
+    print(json.dumps({k: (len(v) if isinstance(v, list) else v) for k, v in result.items()}, indent=1))
+    if args.out:
+        _write(os.path.join(args.out, "rollback_result.json"), result)
+    return 0 if not result["refused"] else 2
+
+
+def main(argv: list) -> int:
+    ap = _parser()
     args = ap.parse_args(argv)
     if args.apply and not args.rollback and args.phase == "all":
         ap.error("--apply needs --phase pre-merge or post-merge: a receipt written before the merge is served early by the old code")
@@ -745,14 +768,11 @@ def main(argv: list) -> int:
     table = boto3.resource("dynamodb", region_name=region).Table(os.environ["TABLE_NAME"])
     run_ts = datetime.now(timezone.utc).isoformat()
 
+    import backfill_public_variant_backup as BK
+
+    backups = BK.S3Backups(boto3.client("s3", region_name=region), os.environ["S3_BUCKET"])
     if args.rollback:
-        with open(args.rollback, encoding="utf-8") as fh:
-            export = json.load(fh)
-        result = B.rollback(table, export, apply=args.apply)
-        print(json.dumps({k: (len(v) if isinstance(v, list) else v) for k, v in result.items()}, indent=1))
-        if args.out:
-            _write(os.path.join(args.out, "rollback_result.json"), result)
-        return 0 if not result["refused"] else 2
+        return _rollback(args, table, backups)
 
     if not args.out:
         ap.error("--out is required (a directory outside the repo)")
@@ -852,6 +872,11 @@ def main(argv: list) -> int:
     write_csv(os.path.join(args.out, "manifest_day_grade.csv"), g_rows)
     _write(os.path.join(args.out, "plan.json"), plan)
     print(json.dumps(manifest["summary"], indent=1, default=str))
+    if args.preflight:
+        pf = BK.preflight(backups, manifest["plan"]["public_plan_id"])
+        _write(os.path.join(args.out, "preflight.json"), pf)
+        print(json.dumps(pf, indent=1))
+        return 0 if pf["ok"] else 1
     if not args.apply:
         print(f"DRY RUN — nothing written. {len(plan)} planned writes, {len(phase_plan)} in phase {args.phase}; manifest in {args.out}")
         return 0
@@ -861,15 +886,16 @@ def main(argv: list) -> int:
         return 3
     export = B.build_export(lambda key: table.get_item(Key=key).get("Item"), phase_plan, run_ts)
     export["phase"] = args.phase
-    export_path = os.path.join(args.out, f"export_{args.phase}_{run_ts.replace(':', '')}.json")
     if B.PHASE_WRITES_LEDGER[args.phase]:
         B.record_ledger_preimage(table, export)
-    _write(export_path, export)  # the pre-image exists on disk BEFORE the first write
-    result = B.apply_plan(table, phase_plan, export)
-    if B.PHASE_WRITES_LEDGER[args.phase]:
-        B.put_public_ledger(table, ledger_item)
+    ledger = ledger_item if B.PHASE_WRITES_LEDGER[args.phase] else None
+    try:  # #6224: the pre-image is backed up locally AND to S3 (conditional put, verified) BEFORE the first write
+        result = BK.apply_phase(table, backups, export, phase_plan, manifest["plan"]["public_plan_id"], args.phase, args.out, ledger)
+    except BK.BackupError as exc:
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return 5
     _write(os.path.join(args.out, "apply_result.json"), result)
-    print(json.dumps({"written": result["written"], "skipped": len(result["skipped"]), "export": export_path}, indent=1))
+    print(json.dumps({"written": result["written"], "skipped": len(result["skipped"]), "backup": result["backup"]}, indent=1))
     return 0 if not result["skipped"] else 2
 
 
