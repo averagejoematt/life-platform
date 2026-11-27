@@ -409,15 +409,26 @@ class TestLoadRawScoreHistories:
         assert [r["date"] for r in records] == ["2026-08-04"]
         assert histories["sleep"] == [52.0]
 
-    def test_every_pillar_is_keyed_and_unscored_days_default_to_40(self, monkeypatch):
+    def test_every_pillar_is_keyed_and_unscored_days_are_left_out(self, monkeypatch):
+        """#6293 amendment: a day with no raw score for a pillar is left out of its history — never a stand-in 40."""
         _install(monkeypatch, _PkTable([self._sheet("2026-08-03", sleep=61), self._sheet("2026-08-04", movement=70)]))
 
         histories, _ = csl.load_raw_score_histories(DATE)
 
         assert set(histories) == set(csl.PILLAR_ORDER)
-        assert histories["sleep"] == [61.0, 40.0]  # day 2 carried no sleep raw_score
-        assert histories["movement"] == [40.0, 70.0]
-        assert histories["mind"] == [40.0, 40.0]
+        assert histories["sleep"] == [61.0]  # day 2 carried no sleep raw_score
+        assert histories["movement"] == [70.0]
+        assert histories["mind"] == []
+
+    def test_held_pillar_days_are_left_out_of_the_history(self, monkeypatch):
+        """#6293 amendment: a stored not-instrumented or coverage-held pillar-day never reaches the EMA window."""
+        held = self._sheet("2026-08-03", sleep=50)
+        held["pillar_sleep"]["not_instrumented"] = True
+        thin = self._sheet("2026-08-04", sleep=44)
+        thin["pillar_sleep"]["coverage_hold"] = True
+        _install(monkeypatch, _PkTable([held, thin, self._sheet("2026-08-02", sleep=70)]))
+        histories, _ = csl.load_raw_score_histories(DATE)
+        assert histories["sleep"] == [70.0]
 
     def test_no_history_yields_empty_lists_not_missing_keys(self, monkeypatch):
         _install(monkeypatch, _PkTable([]))
@@ -733,8 +744,30 @@ class TestAssembleData:
         assert by_pk[PREFIX + "hevy"] == [f"DATE#{DATE}#WORKOUT#h1"]
 
     def test_partial_day_reports_a_partial_percentage(self, monkeypatch, frozen_clock):
+        """#6293 rest_day_completeness: no source shows a session, so the absent Strava row is not expected (2 of 4)."""
         _install(monkeypatch, _PkTable([_row("whoop", "DATE#" + DATE, date=DATE), _row("apple_health", "DATE#" + DATE, date=DATE)]))
+        assert csl.assemble_data(DATE)["data_completeness_pct"] == 50.0
+
+    def test_a_missing_strava_sync_on_a_training_day_still_counts_missing(self, monkeypatch, frozen_clock):
+        """#6293: when another source shows a session that day, the absent Strava row is a missing sync (2 of 5)."""
+        _install(monkeypatch, _PkTable([_row("whoop", "DATE#" + DATE, date=DATE), _row("apple_health", "DATE#" + DATE, date=DATE)]))
+        monkeypatch.setattr(csl, "activity_elsewhere", lambda data, day: True)
         assert csl.assemble_data(DATE)["data_completeness_pct"] == 40.0
+
+    def test_activity_elsewhere_reads_the_session_count_without_strava(self, monkeypatch):
+        from training import session_count
+
+        seen = {}
+
+        def _count(**kw):
+            seen.update(kw)
+            return {"sessions": 1}
+
+        monkeypatch.setattr(session_count, "count", _count)
+        assert csl.activity_elsewhere({"hevy_7d": ["h"], "whoop_7d": ["w"], "apple_7d": ["a"], "strava_7d": ["s"]}, DATE) is True
+        assert "strava" not in seen and seen["start_date"] == seen["end_date"] == DATE
+        monkeypatch.setattr(session_count, "count", lambda **kw: {"sessions": 0})
+        assert csl.activity_elsewhere({}, DATE) is False
 
     def test_empty_platform_yields_honest_nulls(self, monkeypatch, frozen_clock):
         _install(monkeypatch, _PkTable([]))
@@ -1189,7 +1222,7 @@ class TestHandlerFullCompute:
         assert history[-1]["week_start"] == "2026-08-03"  # Monday of the week
         assert history[-1]["week_label"].startswith("Wk ")
         # #6224: Mind is not scored in public — it has no weekly value (omitted, never a 0)
-        assert set(history[-1]["pillars"]) == set(csl.PILLAR_ORDER) - {"mind"}
+        assert set(history[-1]["pillars"]) == set(csl.PILLAR_ORDER) - {"mind", "relationships"}  # #6293: not instrumented
         assert history[0]["pillars"]["sleep"] == 45.0
 
     def test_site_writer_failure_never_fails_the_compute(self, monkeypatch, wired):

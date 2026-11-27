@@ -26,6 +26,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from experiment.phase_filter import singleton_visible  # the ONE visibility predicate (tombstone, phase) — #6224
+
 STRESS_SCALE_MAX = 4  # the evening check-in's 0-4 scale (coach/evening_checkin.py), 4 = the most stressed
 
 # component -> the owner-only source it reads (privacy.field_tiers SOURCE_TIERS)
@@ -109,7 +111,13 @@ HELD_PILLAR: dict[str, Any] = {
 # public method does not score the pillar at all: no score, level, tier, XP, drivers or level events, and no place in the
 # composite, the headline level or the XP total. Public routes serve the shape below — no number in it — and name the
 # reason. Only an owner ruling reopens it.
-UNSCORED_PUBLIC_PILLARS: dict[str, str] = {"mind": "Not scored in public: its inputs are private."}
+# #6293 amendment (owner ruling 2026-11-26, "Amend the calculation so uninstrumented Relationships is excluded entirely
+# from consistency, variance and related aggregate calculations. Do not substitute a neutral value of 50 for missing
+# evidence."): Relationships is not instrumented in either method, so it is not scored in public either — with its own
+# reason, distinct from Mind's.
+MIND_NOT_SCORED_NOTE = "Not scored in public: its inputs are private."
+RELATIONSHIPS_NOT_INSTRUMENTED_NOTE = "Not instrumented: no defensible, approved relationship assessment exists yet."
+UNSCORED_PUBLIC_PILLARS: dict[str, str] = {"mind": MIND_NOT_SCORED_NOTE, "relationships": RELATIONSHIPS_NOT_INSTRUMENTED_NOTE}
 
 
 def pillar_scored_in_public(name: Any) -> bool:
@@ -184,6 +192,16 @@ CHAIN_PILLARS = ("consistency",)  # every value of these is a chain result (cros
 
 def scores_pending() -> bool:
     return bool(PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE)
+
+
+def older_method(view: Any) -> bool:
+    """#6224 (2026-11-27): a public block computed under an OLDER public method than ``PUBLIC_METHOD_VERSION``. Its
+    chain-carried values (overall level, tier, XP, XP debt, composite, mood, effects, level events, pillar levels) were
+    computed with inputs the current method withholds, so they are ALWAYS served "being recalculated" — independently of
+    the global switch: a public score is served only when the block is current-method AND the switch is off. A sheet
+    missed by the recompute, or a rollback of the public apply after the switch is off, therefore never serves the old
+    numbers. An older-method block credits no level, badge, milestone or event either (``event_level_series``)."""
+    return isinstance(view, dict) and view.get("public_method_version") != PUBLIC_METHOD_VERSION
 
 
 def pending_pillar(name: str) -> dict[str, Any]:
@@ -279,14 +297,19 @@ def public_pillar(name: str, pillar: Any) -> Any:
 # (fail closed: never a fallback to method 1). The arithmetic is ``health.character_public``.
 PUBLIC_KEY = "public"
 PUBLIC_METHOD_V1 = "character-public-v1"
-PUBLIC_METHOD_VERSION = "character-public-v2"  # #6224 (2026-11-26): Mind not scored in public; no restraint/delivery input
+PUBLIC_METHOD_V2 = "character-public-v2"  # #6224 (2026-11-26): Mind not scored in public; no restraint/delivery input
+# #6224/#6293 (2026-11-27): the amended public chain — Relationships not scored (not instrumented), no neutral fill for a
+# day with no usable measurement, no XP debt. Variants written since the v2 deploy carry the v2 label WITH Relationships
+# at a neutral value and held days filled, so the amended chain needs its own version to be told apart.
+PUBLIC_METHOD_VERSION = "character-public-v3"
 # Every version a reader may serve; an unknown one is not served. A v1 variant stays servable until the recompute
 # replaces it — ``public_sheet`` serves its Mind as not scored, but its composite, level and XP still carry Mind's
 # contribution until then (``scripts/backfill_public_variant.py``).
-PUBLIC_METHOD_VERSIONS = (PUBLIC_METHOD_V1, PUBLIC_METHOD_VERSION)
+PUBLIC_METHOD_VERSIONS = (PUBLIC_METHOD_V1, PUBLIC_METHOD_V2, PUBLIC_METHOD_VERSION)  # v1, v2: servable, older
 PUBLIC_METHOD_EFFECTIVE_FROM = "2026-09-06"  # the first date the method applies to: the experiment's genesis
 PUBLIC_METHOD_DEFINED_ON = "2026-11-05"  # the owner's ruling
 PUBLIC_METHOD_V2_DEFINED_ON = "2026-11-26"  # #6224: the owner's rulings that Mind is not scored in public
+PUBLIC_METHOD_V3_DEFINED_ON = "2026-11-27"  # #6224/#6293: the amended method (owner rulings 2026-11-26/27)
 METHOD_1 = "method-1"
 PUBLIC_METHOD_HISTORY = (
     {
@@ -306,13 +329,24 @@ PUBLIC_METHOD_HISTORY = (
         "were recomputed from the stored inputs; what the site showed on those dates at the time was computed under method 1.",
     },
     {
-        "version": PUBLIC_METHOD_VERSION,
+        "version": PUBLIC_METHOD_V2,
         "from": PUBLIC_METHOD_EFFECTIVE_FROM,
         "defined_on": PUBLIC_METHOD_V2_DEFINED_ON,
+        "published_until": PUBLIC_METHOD_V3_DEFINED_ON,
         "note": "Mind is not scored in public: its inputs are private. It has no public score, level, tier or XP, and the "
         "composite, the overall level and the XP total are worked out from the other areas without it, not with Mind at a "
         "neutral score. The food-delivery adjustment to Nutrition is not applied, and restraint habits count nowhere. Dates "
         "before it was adopted were recalculated the same way.",
+    },
+    {
+        "version": PUBLIC_METHOD_VERSION,
+        "from": PUBLIC_METHOD_EFFECTIVE_FROM,
+        "defined_on": PUBLIC_METHOD_V3_DEFINED_ON,
+        "note": "Everything in v2, and: Relationships is not scored in public, because it is not instrumented — it is left "
+        "out of the level, the composite, consistency and every other combined figure. A day with no usable public "
+        "measurement for an area is left out of that area's history, never filled with a neutral value. XP debt no longer "
+        "exists. Scores written after v2 was adopted carried Relationships at a neutral value and filled those days, so "
+        "this version marks the corrected scores apart. Dates before it was adopted were recalculated the same way.",
     },
 )
 # The label a public history surface prints beside a value. It depends on the method and the record's origin only
@@ -327,6 +361,14 @@ PUBLIC_METHOD_LABELS_BY_VERSION = {
         "left out. The score shown on this date at the time came from an earlier method and is not republished.",
     },
     PUBLIC_METHOD_VERSION: {
+        "live": "Computed that morning under the public method (v3), from the records available then. Private inputs are "
+        "left out, and Mind and Relationships are not scored in public: the level and composite are worked out without them.",
+        "recomputed": "Recalculated later under the public method (v3), from the records available when it was "
+        "recalculated, not from what was available on this date. Private inputs are left out, and Mind and Relationships "
+        "are not scored in public: the level and composite are worked out without them. The score shown on this date at the "
+        "time came from an earlier method and is not republished.",
+    },
+    PUBLIC_METHOD_V2: {
         "live": "Computed that morning under the public method (v2), from the records available then. Private inputs are "
         "left out, and Mind is not scored in public: the level and composite are worked out without it.",
         "recomputed": "Recalculated later under the public method (v2), from the records available when it was "
@@ -349,13 +391,21 @@ PUBLIC_CORRECTION_NOTICE_V1 = (
     "improvement."
 )
 # #6224: the v2 recalculation's notice — the same words on every date.
+# #6224: the owner's text, exactly (2026-11-26) — four paragraphs; no per-date before/after is published anywhere.
 PUBLIC_CORRECTION_NOTICE = (
-    "These scores were recalculated. Mind is no longer scored in public, because its inputs are private, so it shows no "
-    "score or level. The overall level, the composite and the XP total are now worked out from the other areas alone, "
-    "and on most dates the level and the XP total read lower than before. That is the method changing, not a change in "
-    "what he did."
+    "We've updated how the public character's scores are calculated.\n\n"
+    "Earlier versions included information that should not have contributed to the public character. We've removed "
+    "those inputs and recalculated the historical scores using the approved public data.\n\n"
+    "As a result, some previously displayed levels, XP totals and achievement dates may differ. The underlying "
+    "activities and measurements have not changed.\n\n"
+    "Mind is no longer scored publicly. Previous character scores are superseded by the corrected values."
 )
-PUBLIC_CORRECTION_NOTICES = {PUBLIC_METHOD_V1: PUBLIC_CORRECTION_NOTICE_V1, PUBLIC_METHOD_VERSION: PUBLIC_CORRECTION_NOTICE}
+# The owner-approved notice applies to v3 (the one final recompute); v2 was never applied as a recomputation.
+PUBLIC_CORRECTION_NOTICES = {
+    PUBLIC_METHOD_V1: PUBLIC_CORRECTION_NOTICE_V1,
+    PUBLIC_METHOD_V2: PUBLIC_CORRECTION_NOTICE,
+    PUBLIC_METHOD_VERSION: PUBLIC_CORRECTION_NOTICE,
+}
 
 # The record keys a public view carries from the stored record's envelope (identity, phase, the input manifest — which
 # public routes re-judge over public sources themselves). Every score comes from the public variant.
@@ -363,7 +413,12 @@ _ENVELOPE_KEYS = ("pk", "sk", "date", "phase", "cycle", "input_manifest", "input
 
 
 def public_variant(record: Any) -> Optional[dict[str, Any]]:
-    """The stored public variant of a ``character_sheet`` record, or None when there is none a reader may serve."""
+    """The stored public variant of a ``character_sheet`` record, or None when there is none a reader may serve.
+
+    #6224: a tombstoned (or other-phase) record serves nothing, whatever its stored ``public`` block holds — a get_item
+    by date bypasses the query's phase filter, and the filter does not read the tombstone (``singleton_visible``)."""
+    if isinstance(record, dict) and not singleton_visible(record):
+        return None
     pv = record.get(PUBLIC_KEY) if isinstance(record, dict) else None
     if not isinstance(pv, dict) or pv.get("public_method_version") not in PUBLIC_METHOD_VERSIONS:
         return None
@@ -432,16 +487,52 @@ def _level(value: Any) -> int:
         return 1
 
 
-def public_event_sheets(records: Any) -> list[dict[str, Any]]:
-    """The public views that may carry an EVENT (owner ruling 2026-11-06: a recalculation is not an achievement). A
-    recomputed record never does, and neither does a live record until its level passes the highest recalculated level —
-    otherwise the first live day would read as a level-up from the old published number. Oldest first, as given.
-    #6224: none while the scores are pending a recompute."""
+# #6224 (owner ruling 2026-11-26 23:50Z): a reconstructed historical event — one the corrected public chain produces on
+# a date where nothing was served before, or a re-dated one — carries INTERNAL provenance: these keys, in the stored
+# public projection and the private audit, read by internal readers only. ``public_sheet`` never serves them, and never
+# serves a reconstructed event among a view's ``level_events`` — so no outbound or time-ordered reader (the chronicle,
+# the dossier, the buddy page, character_stats.json, an email) can present it as new activity. The historical record
+# still shows it on its date: the timelines derive level-ups from the level series on ``public_event_sheets`` days.
+PROVENANCE_KEYS = ("event_provenance", "reconstructed_at", "reconstructed_method", "redated_from")
+# #6293 planned_rest: the private Movement detail that records a planned pause (a sick or travel day — owner-only). The
+# public method restores the day without it (``character_public.without_private_modifiers``); none of these keys may
+# reach a public body or the stored ``public`` projection (the route walk's leak tokens and the combined run check it).
+PLANNED_REST_KEYS = ("_planned_rest", "pre_rest_raw", "pre_rest_raw_unblended", "pre_rest_details")
+RECONSTRUCTED = "reconstructed"
+
+
+def is_reconstructed(event: Any) -> bool:
+    return isinstance(event, dict) and event.get("event_provenance") == RECONSTRUCTED
+
+
+def without_provenance(event: Any) -> Any:
+    return {k: v for k, v in event.items() if k not in PROVENANCE_KEYS} if isinstance(event, dict) else event
+
+
+def is_corrected_chain(view: Any) -> bool:
+    """#6224 (owner decision 2026-11-26): True for a variant of the CURRENT public method — the corrected public chain.
+    Its stored events are that chain's own day-over-day transitions, so they are served on their dates whatever the
+    record's origin (a recomputed date serves the corrected chain's events — not nothing, and not method 1's)."""
+    return isinstance(view, dict) and view.get("public_method_version") == PUBLIC_METHOD_VERSION
+
+
+def public_event_sheets(records: Any, internal: bool = False) -> list[dict[str, Any]]:
+    """The public views that may carry an EVENT, oldest first, as given. #6224: none while the scores are pending a
+    recompute.
+
+    A corrected-chain variant (``is_corrected_chain``) always may: its events are the corrected chain's own transitions
+    on their own dates (owner decision 2026-11-26: "Preserve unrelated valid activity and achievement events ... Do not
+    erase legitimate history merely because a day's character sheet was recomputed"). The 2026-11-06 ruling's intent —
+    a recalculation is not an achievement — still holds there: the move from a previously published value to the
+    corrected one is never an event (``character_public.compute_public_variant`` drops a headline event across a method
+    change, and a recomputed chain starts from no previous published state). For an OLDER-method variant the 11-06 rule
+    stands unchanged: a recomputed one carries none, and a live one only once its level passes the highest recalculated
+    level."""
     if scores_pending():
         return []
-    views = public_sheets(records, pending=False)
-    floor = max((_level(v.get("character_level")) for v in views if _origin(v) != "live"), default=0)
-    return [v for v in views if _origin(v) == "live" and _level(v.get("character_level")) > floor]
+    views = public_sheets(records, pending=False, internal=internal)
+    floor = max((_level(v.get("character_level")) for v in views if _origin(v) != "live" and not is_corrected_chain(v)), default=0)
+    return [v for v in views if is_corrected_chain(v) or (_origin(v) == "live" and _level(v.get("character_level")) > floor)]
 
 
 def event_level_series(records: Any) -> list[tuple[str, int]]:
@@ -449,17 +540,22 @@ def event_level_series(records: Any) -> list[tuple[str, int]]:
     recalculated date is the historical fact (the stored method-1 level, frozen — it cannot move again), and a live
     public level counts once it passes the highest recalculated level. A level reached only by recalculation is never
     credited, so the correction fires no badge and no milestone. #6224: none while the scores are pending a recompute
-    (a level badge or milestone is then neither earned nor un-earned)."""
+    (a level badge or milestone is then neither earned nor un-earned); a corrected-chain variant credits its own public
+    level on its own date (owner decision 2026-11-26: level-dependent unlocks follow the corrected historical scores)."""
     out: list[tuple[str, int]] = []
     if scores_pending():
         return out
     event_days = {str(v.get("date")) for v in public_event_sheets(records)}
     for rec in records or []:
-        if not isinstance(rec, dict):
+        if not isinstance(rec, dict) or not singleton_visible(rec):  # #6224: a tombstoned sheet credits no level
             continue
         d = str(rec.get("date") or str(rec.get("sk", "")).replace("DATE#", ""))[:10]
         pv = public_variant(rec)
-        if pv is None or _origin(pv) != "live":
+        if pv is not None and older_method(pv):
+            continue  # #6224: an older-method block credits no level (no badge, no milestone)
+        if pv is not None and is_corrected_chain(pv):  # #6224: the corrected public chain's level on every date (badges, milestones)
+            out.append((d, _level(pv.get("character_level"))))
+        elif pv is None or _origin(pv) != "live":
             out.append((d, _level(rec.get("character_level"))))
         elif d in event_days:
             out.append((d, _level(pv.get("character_level"))))
@@ -472,7 +568,7 @@ def event_level(records: Any) -> int:
     return series[-1][1] if series else 1
 
 
-def public_sheet(record: Any, pending: Optional[bool] = None) -> Any:
+def public_sheet(record: Any, pending: Optional[bool] = None, internal: bool = False) -> Any:
     """A stored ``character_sheet`` record as every public route must read it: its PUBLIC variant (owner ruling
     2026-11-05, ``public_view``) with each unpublishable pillar replaced by the held shape. None when the record
     carries no public variant — fail closed, never the method-1 record. Pure; the stored record is never changed. A
@@ -490,10 +586,16 @@ def public_sheet(record: Any, pending: Optional[bool] = None) -> Any:
     scrub_unscored(out)
     if not restraint_published():
         scrub_restraint(out)
-    if _origin(out) != "live":  # owner ruling 2026-11-06: a recalculation is not an event — no reader can celebrate it
+    if _origin(out) != "live" and not is_corrected_chain(out):  # 11-06: a recalculation (older method) is not an event
         out["recalculated_level_events"] = out.get("level_events") or []
         out["level_events"] = []
-    if scores_pending() if pending is None else pending:  # #6224 containment: the chain values are being recalculated
+    if not internal:  # #6224: no provenance on a public body, and no reconstructed event served as an event
+        for key in ("level_events", "recalculated_level_events"):
+            if isinstance(out.get(key), list):
+                out[key] = [without_provenance(e) for e in out[key] if not is_reconstructed(e)]
+    # #6224: the chain values are being recalculated — globally (the containment switch) OR for this block (an older
+    # public method: two independent conditions, ``older_method``)
+    if (scores_pending() if pending is None else pending) or older_method(out):
         suppress_pending(out)
     return out
 
@@ -515,7 +617,9 @@ def scrub_unscored(view: dict[str, Any]) -> dict[str, Any]:
     names = [n for n in _PILLAR_WORDS if not pillar_scored_in_public(n)]
     if not names:
         return view
-    v1 = view.get("public_method_version") == PUBLIC_METHOD_V1
+    # an OLDER-method variant (v1: Mind scored; v2: Relationships at a neutral value) evaluated ``all_pillars`` over a
+    # pillar the current method does not score, so its firing is not served either
+    older = view.get("public_method_version") != PUBLIC_METHOD_VERSION
     for name in names:
         view[f"pillar_{name}"] = not_scored_pillar(name)
     view["unscored_pillars"] = list(names)
@@ -523,7 +627,7 @@ def scrub_unscored(view: dict[str, Any]) -> dict[str, Any]:
         kept = []
         for e in view["active_effects"]:
             cond = e.get("condition") if isinstance(e, dict) else None
-            if any(_condition_reads(cond, n) for n in names) or (v1 and _condition_reads(cond, "all_pillars")):
+            if any(_condition_reads(cond, n) for n in names) or (older and _condition_reads(cond, "all_pillars")):
                 continue
             if isinstance(e, dict) and isinstance(e.get("targets"), dict):
                 e = dict(e, targets={k: t for k, t in e["targets"].items() if k not in names})
@@ -601,9 +705,9 @@ def scrub_restraint(view: dict[str, Any]) -> dict[str, Any]:
     return view
 
 
-def public_sheets(records: Any, pending: Optional[bool] = None) -> list[dict[str, Any]]:
+def public_sheets(records: Any, pending: Optional[bool] = None, internal: bool = False) -> list[dict[str, Any]]:
     """``public_sheet`` over a list, dropping every record with no public variant (order kept)."""
-    return [v for v in (public_sheet(r, pending) for r in records or []) if isinstance(v, dict)]
+    return [v for v in (public_sheet(r, pending, internal) for r in records or []) if isinstance(v, dict)]
 
 
 def component_is_publishable(name: str) -> bool:

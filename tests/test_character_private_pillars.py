@@ -99,13 +99,15 @@ def test_character_is_byte_identical_on_a_journal_day_and_a_quiet_day(monkeypatc
     assert _served(JOURNAL_DAY, monkeypatch, date) == _served(QUIET_DAY, monkeypatch, date)
     body = json.loads(_served(JOURNAL_DAY, monkeypatch, date))
     rel = next(p for p in body["pillars"] if p["name"] == "relationships")
-    assert rel["not_instrumented"] is True and rel["not_instrumented_note"] == character_privacy.PRIVATE_PILLAR_NOTE
+    # #6293 amendment: not instrumented in either method — served not scored, with its own reason
+    assert rel["not_instrumented"] is True and rel["not_instrumented_note"] == character_privacy.UNSCORED_PUBLIC_PILLARS["relationships"]
     assert body["character"]["composite_pillar_count"] == 5  # #6224: Mind is not scored in public either
 
 
 def test_mutation_control_a_published_relationships_pillar_would_move(monkeypatch):
     monkeypatch.setattr(C, "_attach_pillar_absence", lambda *a, **k: None)
     monkeypatch.setattr(activity_publication, "source_is_public", lambda s: True)
+    monkeypatch.delitem(character_privacy.UNSCORED_PUBLIC_PILLARS, "relationships")  # #6293: the control lifts both guards
     assert _served(JOURNAL_DAY, monkeypatch) != _served(QUIET_DAY, monkeypatch)
 
 
@@ -147,7 +149,10 @@ def _receipt(journal: bool):
     }
     # Owner ruling 2026-11-05: the route serves the public variant's receipt, stored inside the item; these tests keep
     # exercising its row/pillar filter (an unfiltered receipt of the same shape is the mutation control).
-    return dict(body, **{character_privacy.PUBLIC_KEY: copy.deepcopy(body)})
+    # #6224: only a current-method public receipt is served, so the fixture's variant carries the current version.
+    return dict(
+        body, **{character_privacy.PUBLIC_KEY: dict(copy.deepcopy(body), public_method_version=character_privacy.PUBLIC_METHOD_VERSION)}
+    )
 
 
 def test_the_receipt_omits_private_rows_and_the_private_pillar():

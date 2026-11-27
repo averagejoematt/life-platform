@@ -12,9 +12,8 @@ prove:
   1. the flat lookup indeed cannot see the rows (the pre-#890 dead path),
   2. assemble_data() now derives a dict-shaped journal view (merged, deduped
      themes) from the day's templated entries,
-  3. themes flow end-to-end into character_engine.compute_relationships_raw's
-     interaction_quality component — and the day counts as instrumented
-     coverage (`_not_instrumented` is False) once themes are present.
+  3. the view stays readable, and since #6293 (owner ruling 2026-11-26) it scores
+     no relationship: the Relationships pillar is not instrumented whatever it holds.
 
 All offline — the module-level boto3 table is monkeypatched.
 """
@@ -105,18 +104,15 @@ def test_assemble_data_derives_journal_from_templated_entries(monkeypatch):
     assert data["journal"] == {"themes": ["family connection", "work pressure", "personal growth"]}
 
 
-def test_themes_flow_to_interaction_quality_and_clear_not_instrumented(monkeypatch):
-    """End-to-end: the previously-dead themes path is live — interaction_quality
-    scores from the merged journal view, and the day counts as instrumented
-    coverage for the Relationships pillar (#881's _not_instrumented clears)."""
-    monkeypatch.setattr(csl, "table", _fake_table())
-    data = csl.assemble_data(DATE)
-
-    raw, details = character_engine.compute_relationships_raw(data, _relationships_config())
-
-    # "family connection" matches the social-keyword list -> one social theme -> 33.
-    assert details["interaction_quality"]["score"] == 33
-    assert details["_not_instrumented"] is False
+def test_journal_view_stays_readable_but_scores_no_relationship(monkeypatch):
+    """#6293 (owner ruling 2026-11-26): the merged journal view is still assembled and readable — but Relationships
+    scores none of it (themes, mood, social quality are a model's interpretation): the pillar stays not instrumented."""
+    for rows in (_journal_rows(), _journal_rows_with_mood(), _journal_rows_with_social_quality()):
+        monkeypatch.setattr(csl, "table", FakeDdbTable(rows=rows, query_hook=_keyed_query_hook))
+        data = csl.assemble_data(DATE)
+        assert "family connection" in data["journal"]["themes"]  # the view is still assembled and readable
+        raw, details = character_engine.compute_relationships_raw(data, _relationships_config())
+        assert raw == 50.0 and details["_not_instrumented"] is True
 
 
 def test_merge_journal_view_empty_day_stays_falsy():
@@ -186,22 +182,6 @@ def _journal_rows_with_mood():
     ]
 
 
-def test_social_mood_correlation_gets_non_null_input(monkeypatch):
-    """End-to-end #902: with enriched_mood populated (and a social signal
-    present) social_mood_correlation is no longer None.
-
-    Moods 5,3 -> mapped 10,5 -> mood_avg 7.5; the consumer computes
-    (7.5/10)*100 = 75.0."""
-    table = FakeDdbTable(rows=_journal_rows_with_mood(), query_hook=_keyed_query_hook)
-    monkeypatch.setattr(csl, "table", table)
-    data = csl.assemble_data(DATE)
-
-    assert data["journal"]["mood_avg"] == 7.5
-
-    raw, details = character_engine.compute_relationships_raw(data, _relationships_config())
-    assert details["social_mood_correlation"]["score"] == 75.0
-
-
 # ── #910: categorical enriched_social_quality → social_score bridge (end-to-end)
 
 
@@ -227,20 +207,3 @@ def _journal_rows_with_social_quality():
             "raw_text": "evening entry",
         },
     ]
-
-
-def test_social_quality_revives_both_social_components(monkeypatch):
-    """End-to-end #910: with ONLY the categorical enriched_social_quality stored
-    (no numeric field), social_interaction_frequency AND social_mood_correlation
-    are both non-null through the real assemble_data path.
-
-    Quality deep,meaningful -> mapped 10, 6.67 -> avg 8.33 -> *10 -> 83.3.
-    Moods 5,3 -> mapped 10,5 -> mood_avg 7.5 -> (7.5/10)*100 = 75.0."""
-    table = FakeDdbTable(rows=_journal_rows_with_social_quality(), query_hook=_keyed_query_hook)
-    monkeypatch.setattr(csl, "table", table)
-    data = csl.assemble_data(DATE)
-
-    raw, details = character_engine.compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] == 83.3
-    assert details["social_mood_correlation"]["score"] == 75.0
-    assert details["_not_instrumented"] is False
