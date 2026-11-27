@@ -60,6 +60,16 @@ WHAT THIS DOES NOT CATCH (stated, not glossed)
     who…"). Widening to catch it would fire on ordinary coaching questions.
   * Non-English input. The patterns are English-only.
   * Euphemism and understatement, which is how distress is most often actually expressed.
+    #6303 added four SELF_HARM families for both doors (inability to stay safe; better off
+    without me / a burden; wishing not to wake up, not to exist, to be dead; overdose intent),
+    each anchored on a self-referential object or an end-of-clause so training talk does not
+    fire. What still misses, pinned in tests/test_owner_channel_safety_6303.py: statements with
+    no self-harm object at all — "what's the point of any of this anymore" (deliberately NOT
+    matched alone: far more often ordinary frustration than crisis), "I can't do this anymore",
+    "I just want it all to stop", "I don't see a way forward", "everything feels pointless".
+    Known accepted false positives: "keep me safe from myself" said as a joke, and "be here" or
+    "live" followed by a time word ("I don't want to be here tonight, the bar is too loud"),
+    because the same words are how a crisis is said.
   * Anything in the *model's* output — this gates the INPUT only. Output-side grounding
     is ADR-104's job (`grounded_generation.py`).
 
@@ -137,10 +147,95 @@ _PATTERNS: dict[str, tuple[re.Pattern, ...]] = {
     SELF_HARM: (
         re.compile(r"\b(?:kill|killing|hurt|harm(?:ing)?)\s+myself\b", re.IGNORECASE),
         re.compile(r"\b(?:end|ending)\s+(?:it all|my life)\b", re.IGNORECASE),
-        re.compile(r"\b(?:want|wanting|going)\s+to\s+die\b", re.IGNORECASE),
+        # #6303: a narrow exertion/embarrassment veto ("going to die on these hills", "going to die of
+        # embarrassment"). Deliberately narrow: "going to die on Friday" must still hit.
+        re.compile(
+            r"\b(?:want|wanting|going)\s+to\s+die\b"
+            r"(?!\s+(?:on\s+(?:this|these|that|those)\s+(?:hill|hills|run|ride|set|sets|climb|climbs|stairs|bike|rower|treadmill|sprints?)\b"
+            r"|of\s+(?:embarrassment|laughter|boredom|shame|cringe)\b))",
+            re.IGNORECASE,
+        ),
         re.compile(r"\bsuicid(?:e|al)\b", re.IGNORECASE),
         re.compile(r"\bself[- ]harm(?:ing)?\b", re.IGNORECASE),
-        re.compile(r"\b(?:don'?t|do not|not)\s+(?:want|wanting)\s+to\s+(?:be here|live)\b", re.IGNORECASE),
+        # #6303: a PLACE or a DURATION after "be here"/"live" makes it a sentence about the gym or
+        # the city ("I don't want to be here at the gym today", "don't want to live in this city"),
+        # not about being alive. Time words (today, tonight, right now) and "this" are deliberately
+        # NOT vetoes: "I don't want to be here tonight" and "I don't want to live this way" must hit.
+        re.compile(
+            r"\b(?:don'?t|do not|not)\s+(?:want|wanting)\s+to\s+(?:be here|live)\b"
+            r"(?!\s+(?:at|in|on|for|with|near|during|until|till|long|by|off|out)\b)",
+            re.IGNORECASE,
+        ),
+        # ── #6303: four families the first version missed, for BOTH doors ──────────────
+        # Each needs the self-referential object ("myself", "without me", "I … dead") or an
+        # end-of-clause, which is what separates it from training talk ("keep my lifts safe",
+        # "better off without the extra set", "I wish I didn't have to wake up at 5am").
+        # (1) inability to stay safe. An inability marker is required ("how do I keep myself safe
+        # on icy runs" is a training question), and a place/activity after "safe" vetoes it.
+        re.compile(
+            r"\b(?:can'?t|cannot|can\s+not|unable\s+to|won'?t\s+be\s+able\s+to|don'?t\s+think\s+i\s+can|not\s+sure\s+i\s+can|"
+            r"don'?t\s+know\s+if\s+i\s+can|struggling\s+to|(?:scared|afraid|worried)\s+i\s+(?:can'?t|won'?t))\s+"
+            r"(?:keep\s+myself|stay|be|keep)\s+safe\b"
+            r"(?!\s+(?:on|in|at|during|while|when|with|around|near|lifting|running|driving|riding|cycling|outside)\b)",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\b(?:not|don'?t|do\s+not)\s+(?:feel(?:ing)?\s+)?safe\s+(?:with|around)\s+myself\b", re.IGNORECASE),
+        re.compile(r"\b(?:stay|keep)\s+(?:me\s+)?safe\s+from\s+myself\b", re.IGNORECASE),
+        re.compile(
+            r"\bdon'?t\s+trust\s+myself\s+(?:not\s+to\s+(?:hurt|harm|act\s+on\s+it|do\s+something(?:\s+(?:tonight|bad|drastic|dangerous))?\s*(?:[.!?,;]|$))"
+            r"|to\s+(?:stay|be|keep)\s+safe)",
+            re.IGNORECASE,
+        ),
+        # (2) others better off without me / being a burden
+        re.compile(
+            r"\bbetter\s+off\s+(?:without\s+me|if\s+i\s+(?:were|was|wasn'?t|weren'?t)\s+(?:gone|dead|not\s+here|here|around|alive))\b",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\bi'?m\s+(?:just\s+|only\s+)?(?:a\s+)?burden\s+(?:to|on|for)\s+(?:everyone|everybody|my\s+\w+|them|people|the\s+people)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\b(?:no\s*one|nobody)\s+would\s+(?:miss|notice)\s+(?:me|if\s+i\s+(?:was|were)\s+gone)\b", re.IGNORECASE),
+        # (3) wishing not to wake up / not to exist / to be dead. "wake up" must END the clause
+        # (optionally "tomorrow/again/anymore"), so "wake up at 5am" or "wake up sore" never fires.
+        re.compile(
+            r"\b(?:wish|hope)\s+i\s+(?:wouldn'?t|would\s+not|won'?t|will\s+not|never|don'?t|do\s+not)\s+wake\s+up"
+            r"(?:\s+(?:tomorrow|again|anymore|any\s+more|ever(?:\s+again)?))?\s*(?:[.!?,;]|$)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:don'?t|do\s+not)\s+want\s+to\s+wake\s+up\s+(?:anymore|any\s+more|ever\s+again)\b(?!\s+(?:at|before|early|for|to|so)\b)",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\bwish\s+i\s+(?:was|were)\s+dead\b", re.IGNORECASE),
+        re.compile(
+            r"\bwish\s+i\s+(?:wasn'?t|weren'?t|was\s+not|were\s+not)\s+(?:alive|here\s+anymore|around\s+anymore|born)\b", re.IGNORECASE
+        ),
+        re.compile(r"\bwish\s+i(?:'d|\s+had)\s+never\s+been\s+born\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:don'?t|do\s+not)\s+want\s+to\s+(?:exist|be\s+alive)(?:\s+(?:anymore|any\s+more))?\s*(?:[.!?,;]|$)", re.IGNORECASE
+        ),
+        re.compile(r"\b(?:want|wish\s+i\s+could)\s+(?:to\s+)?(?:just\s+)?disappear\s+(?:forever|for\s+good|permanently)\b", re.IGNORECASE),
+        # (4) overdose INTENT. An intent verb is required, and a dosing-routine context in the
+        # same clause ("… in the morning with breakfast", "… is that ok") vetoes it, so "I take all
+        # my pills at once with breakfast" and "took all my supplements at once" never fire.
+        re.compile(
+            r"\b(?:thinking\s+(?:of|about)|want(?:ing)?\s+to|going\s+to|gonna|plan(?:ning)?\s+to|about\s+to|tempted\s+to)\s+"
+            r"(?:"
+            r"(?:tak(?:e|ing)|swallow(?:ing)?|down(?:ing)?)\s+(?:all|every(?:\s+one|\s+single)?)(?:\s+of)?\s+(?:my\s+|the\s+|these\s+|those\s+)?"
+            r"(?:pills|meds|medication|medications|tablets|sleeping\s+pills|painkillers|pain\s+killers|pill)\b"
+            r"|swallow(?:ing)?\s+(?:the|a)\s+(?:whole\s+)?bottle\b"
+            r"|(?:tak(?:e|ing)|down(?:ing)?)\s+(?:the|a)\s+(?:whole\s+)?bottle\s+of\s+(?:my\s+)?(?:pills|meds|tablets|sleeping\s+pills|painkillers)\b"
+            r")"
+            r"(?![^.?!]{0,50}\b(?:breakfast|lunch|dinner|morning|evening|with\s+food|with\s+(?:a\s+)?meals?|absorption|every\s+day|daily|"
+            r"is\s+(?:that|it)\s+(?:ok|okay|fine|bad|better|safe)|supplements?|vitamins?)\b)",
+            re.IGNORECASE,
+        ),
+        re.compile(
+            r"\b(?:want(?:ing)?|going|thinking\s+(?:of|about)|plan(?:ning)?|tempted)\s+(?:to\s+)?overdos(?:e|ing)\b"
+            r"(?!\s+on\s+(?!(?:my\s+|the\s+)?(?:pills|meds|medication|tablets|painkillers|sleeping\s+pills|insulin)\b))",
+            re.IGNORECASE,
+        ),
     ),
     ACUTE_SYMPTOM: (
         re.compile(rf"{_FIRST_PERSON}\b[^.?!]{{0,40}}\bchest (?:pain|pressure|tightness)\b", re.IGNORECASE),
