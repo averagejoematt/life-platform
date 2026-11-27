@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 import recompute_character_private as T  # noqa: E402
+import recompute_character_private_apply as A  # noqa: E402
 from common.numeric import floats_to_decimal  # noqa: E402
 from health import character_engine as ce  # noqa: E402
 
@@ -194,7 +195,7 @@ def saved_plan(plan: dict, tmp_path) -> dict:
     """The plan as --apply reads it: written, then loaded and integrity-checked."""
     (tmp_path / "out").mkdir(exist_ok=True)
     paths = T.write_outputs(plan, str(tmp_path / "out"))
-    return T.load_plan(paths["plan"])
+    return A.load_plan(paths["plan"])
 
 
 @pytest.fixture(scope="module")
@@ -295,7 +296,7 @@ def test_apply_writes_only_character_rows_and_backs_up_first(seeded, tmp_path):
     real_put, real_backup = store.put, store.put_backup
     store.put = lambda item, cond: (order.append("put"), real_put(item, cond))[1]
     store.put_backup = lambda key, body: (order.append("backup"), real_backup(key, body))[1]
-    result = T.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
+    result = A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
     assert order[0] == "backup" and order.count("backup") == 1
     assert {pk for pk, _sk in store.writes} <= set(T.WRITTEN_PARTITIONS)
     assert all(k.startswith(T.BACKUP_PREFIX + "/") for k in store.s3_writes)
@@ -312,7 +313,7 @@ def test_backup_is_verified_before_the_first_write(seeded, tmp_path):
     plan = saved_plan(plan, tmp_path)
     store.get_backup = lambda key: b"{}"  # the S3 copy does not read back
     with pytest.raises(T.PlanGuardError):
-        T.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
+        A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
     assert store.writes == []
 
 
@@ -321,7 +322,7 @@ def test_a_row_changed_since_the_plan_is_aborted_and_reported(seeded, tmp_path):
     plan = saved_plan(plan, tmp_path)
     key = (T.SHEET_PK, f"DATE#{_d(2)}")
     store.items[key]["run_id"] = "a-nightly-rewrite"
-    result = T.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
+    result = A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
     assert [(a["pk"], a["sk"]) for a in result["aborted"]] == [key]
     assert key not in store.writes and store.items[key]["run_id"] == "a-nightly-rewrite"
     assert (
@@ -346,7 +347,7 @@ def test_the_conditional_write_refuses_a_change_between_read_and_write(seeded, t
         return item
 
     store.get = racing_get
-    result = T.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00")
+    result = A.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00")
     assert any((a["pk"], a["sk"]) == target and "conditional" in a["reason"] for a in result["aborted"])
     assert target not in store.writes
 
@@ -354,28 +355,28 @@ def test_the_conditional_write_refuses_a_change_between_read_and_write(seeded, t
 def test_reapplying_the_same_plan_writes_nothing(seeded, tmp_path):
     store, plan = seeded
     plan = saved_plan(plan, tmp_path)
-    T.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
+    A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
     n = len(store.writes)
-    again = T.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T02:00:00+00:00")
+    again = A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T02:00:00+00:00")
     assert len(store.writes) == n and again["written"] == [] and again["aborted"] == []
 
 
 def test_resume_by_limit_then_rest(seeded, tmp_path):
     store, plan = seeded
     plan = saved_plan(plan, tmp_path)
-    first = T.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00", limit=3)
+    first = A.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00", limit=3)
     assert len(first["written"]) == 3
-    rest = T.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T02:00:00+00:00")
+    rest = A.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T02:00:00+00:00")
     assert len(rest["written"]) == plan["counts"]["character_sheet"]["rows_to_write"] - 3 and rest["aborted"] == []
 
 
 def test_verify_is_zero_write_after_apply(seeded, tmp_path):
     store, plan = seeded
-    pending = T.verify(store, str(tmp_path / "out"), trees=TREES)
+    pending = A.verify(store, str(tmp_path / "out"), trees=TREES)
     assert pending["planned_writes"] > 0
-    T.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
+    A.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
     writes = list(store.writes)
-    done = T.verify(store, str(tmp_path / "out"), trees=TREES)
+    done = A.verify(store, str(tmp_path / "out"), trees=TREES)
     assert done["planned_writes"] == 0, done["pending"]
     assert store.writes == writes  # verify wrote nothing
 
@@ -383,9 +384,9 @@ def test_verify_is_zero_write_after_apply(seeded, tmp_path):
 def test_verify_cli_exits_non_zero_with_pending_writes(seeded, tmp_path, monkeypatch):
     store, _plan = seeded
     monkeypatch.setattr(T, "live_store", lambda writable: store)
-    monkeypatch.setattr(T, "verify", lambda st, out, start, end: {"rows": 1, "planned_writes": 2, "pending": ["x", "y"]})
+    monkeypatch.setattr(A, "verify", lambda st, out, start, end: {"rows": 1, "planned_writes": 2, "pending": ["x", "y"]})
     assert T.main(["--out", str(tmp_path / "cli"), "--verify"]) == 1
-    monkeypatch.setattr(T, "verify", lambda st, out, start, end: {"rows": 1, "planned_writes": 0, "pending": []})
+    monkeypatch.setattr(A, "verify", lambda st, out, start, end: {"rows": 1, "planned_writes": 0, "pending": []})
     assert T.main(["--out", str(tmp_path / "cli"), "--verify"]) == 0
 
 
@@ -393,21 +394,21 @@ def test_verify_cli_exits_non_zero_with_pending_writes(seeded, tmp_path, monkeyp
 def test_rollback_restores_every_preimage_byte_for_byte(seeded, tmp_path, limit):
     store, plan = seeded
     pre = copy.deepcopy(store.items)
-    result = T.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00", limit=limit)
+    result = A.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00", limit=limit)
     assert store.items != pre
-    dry = T.rollback(store, result["export"], apply=False)
+    dry = A.rollback(store, result["export"], apply=False)
     assert dry["refused"] == [] and store.items != pre
-    done = T.rollback(store, result["export"], apply=True)
+    done = A.rollback(store, result["export"], apply=True)
     assert done["refused"] == [] and done["verified"]["mismatches"] == []
     assert {k: T.canonical(T.to_typed(v)) for k, v in store.items.items()} == {k: T.canonical(T.to_typed(v)) for k, v in pre.items()}
 
 
 def test_rollback_refuses_a_row_changed_after_the_apply(seeded, tmp_path):
     store, plan = seeded
-    result = T.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00")
+    result = A.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00")
     key = (T.SHEET_PK, f"DATE#{_d(5)}")
     store.items[key]["public"] = {"origin": "the public apply ran after"}
-    done = T.rollback(store, result["export"], apply=True)
+    done = A.rollback(store, result["export"], apply=True)
     assert [(r["pk"], r["sk"]) for r in done["refused"]] == [key]
     assert store.items[key]["public"] == {"origin": "the public apply ran after"}
     assert f"{key[0]} {key[1]}" in done["verified"]["mismatches"]
@@ -415,11 +416,11 @@ def test_rollback_refuses_a_row_changed_after_the_apply(seeded, tmp_path):
 
 def test_rollback_refuses_an_edited_export(seeded, tmp_path):
     store, plan = seeded
-    result = T.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00")
+    result = A.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00")
     with open(result["export"], "a", encoding="utf-8") as fh:
         fh.write(" ")
     with pytest.raises(T.PlanGuardError):
-        T.rollback(store, result["export"], apply=True)
+        A.rollback(store, result["export"], apply=True)
 
 
 def test_consumed_challenge_xp_is_carried_forward(seeded):
@@ -436,7 +437,15 @@ def test_consumed_challenge_xp_is_carried_forward(seeded):
 
 
 def test_no_event_or_notification_write_exists():
-    src = open(os.path.join(ROOT, "scripts", "recompute_character_private.py"), encoding="utf-8").read()
+    src = "".join(
+        open(os.path.join(ROOT, "scripts", f), encoding="utf-8").read()
+        for f in (
+            "recompute_character_private.py",
+            "recompute_character_private_apply.py",
+            "recompute_character_private_report.py",
+            "recompute_character_private_replay.py",
+        )
+    )
     for forbidden in ("read_announced_events", "record_event", "send_email", "ses", "sns", "publish_site_stats", "write_character_stats"):
         assert f"{forbidden}(" not in src and f".{forbidden}" not in src, forbidden
     assert "activity_publication" not in src  # the tool reads no publication set (#6283 may move it)
@@ -446,7 +455,7 @@ def test_events_are_reported_never_written(seeded, tmp_path):
     store, plan = seeded
     assert plan["events"]["writes_events"] is False
     assert set(plan["events"]["events"]["totals"]) <= {"character", "sleep", "movement", "nutrition", "metabolic", "mind", "consistency"}
-    T.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
+    A.apply_plan(store, saved_plan(plan, tmp_path), str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00")
     assert {pk for pk, _ in store.writes} <= set(T.WRITTEN_PARTITIONS)
 
 
@@ -492,7 +501,7 @@ def test_the_plan_file_is_integrity_checked(seeded, tmp_path):
     with open(paths["plan"], "w", encoding="utf-8") as fh:
         json.dump(data, fh)
     with pytest.raises(T.PlanGuardError):
-        T.load_plan(paths["plan"])
+        A.load_plan(paths["plan"])
 
 
 def test_condition_spec_renders_as_dynamodb_expression():
@@ -533,7 +542,7 @@ def test_planned_sheets_reader_gives_the_public_side_the_stored_shape(seeded, tm
     _store, plan = seeded
     (tmp_path / "out").mkdir(exist_ok=True)
     path = T.write_outputs(plan, str(tmp_path / "out"))["plan"]
-    sheets = T.planned_sheets(path)
+    sheets = A.planned_sheets(path)
     assert sorted(sheets) == [_d(i) for i in range(N_DAYS)]
     one = sheets[_d(1)]
     assert isinstance(one["character_level"], float) and one["engine_version"] == "1.10.0"

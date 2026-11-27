@@ -76,7 +76,6 @@ model_values). A receipt row inherits its sheet's causes (it replays the sheet's
 from __future__ import annotations
 
 import argparse
-import csv
 import hashlib
 import json
 import os
@@ -709,168 +708,6 @@ def reconcile(rows: list, attribution: dict, ladder_records: list, plan_items: d
     }
 
 
-# ── reports: served baseline, events, challenge XP, stress days ─────────────────────────────────────────────────────
-
-
-def served_baselines(rows: list) -> dict:
-    """Per date: what the public routes serve from the STORED row (its ``public`` block), and the proof that the
-    planned private row serves the same (the private apply changes nothing a reader sees)."""
-    sys.path.insert(0, os.path.join(ROOT, "scripts"))
-    from backfill_public_variant_cli import served_today
-
-    out = {}
-    for r in rows:
-        if r["pk"] != SHEET_PK or r["planned_item"] is None:
-            continue
-        before = served_today(as_float(r_stored(r)))
-        after = served_today(as_float(r["planned_item"]))
-        out[r["date"]] = {
-            "served": (
-                None
-                if before is None
-                else {"character_level": before.get("character_level"), "digest": digest(json.loads(json.dumps(before, default=str)))}
-            ),
-            "unchanged_by_private_apply": canonical(json.loads(json.dumps(before, default=str)))
-            == canonical(json.loads(json.dumps(after, default=str))),
-        }
-    return out
-
-
-def r_stored(r: dict) -> dict:
-    """The row's stored pre-image (typed); kept in memory only — ``public_rows`` strips it (and ``_owned``) from the file."""
-    return r["_stored"]
-
-
-def public_rows(rows: list) -> list:
-    return [{k: v for k, v in r.items() if not k.startswith("_")} for r in rows]
-
-
-def _flat_events(by_date: dict) -> list:
-    out = []
-    for d in sorted(by_date):
-        for ev in (by_date[d] or {}).get("level_events") or []:
-            if not isinstance(ev, dict):
-                continue
-            who = str(ev.get("pillar") or "character").lower()
-            tier = "tier" in str(ev.get("type"))
-            new = ev.get("new_tier") if tier else _lv(ev.get("new_level"))
-            old = ev.get("old_tier") if tier else _lv(ev.get("old_level"))
-            out.append({"date": d, "who": who, "type": ev.get("type"), "old": old, "new": new, "key": [who, ev.get("type"), str(new)]})
-    return out
-
-
-def _lv(v: Any) -> Any:
-    try:
-        f = float(v)
-    except (TypeError, ValueError):
-        return v
-    return int(f) if f == int(f) else round(f, 4)
-
-
-def event_report(stored_f: dict, planned_f: dict, ladder_f: list) -> dict:
-    """KEPT / MOVED / REMOVED / ADDED for every private level event, the level badges' and level milestones' first
-    crossing dates (the #6283 rules' rungs), and the events each ladder step emits. Reported only, never written."""
-    sys.path.insert(0, os.path.join(ROOT, "scripts"))
-    import backfill_public_variant_events as EV
-    from health import achievement_rules, milestone_ledger
-
-    values = {d: {"character": _lv((r or {}).get("character_level"))} for d, r in planned_f.items()}
-    for d, r in planned_f.items():
-        for k, p in (r or {}).items():
-            if k.startswith("pillar_") and isinstance(p, dict) and p.get("level") is not None:
-                values[d][k[7:]] = _lv(p["level"])
-    comp = EV.compare(_flat_events(stored_f), _flat_events(planned_f), values)
-    badges = {r.id: r.threshold for r in achievement_rules.BADGE_RULES if r.signal == "current_level"}
-    ladder_rungs = sorted(r.threshold for r in milestone_ledger.MILESTONE_RULES if r.signal == "character_level")
-
-    def first(series: dict, n: Any) -> Optional[str]:
-        return next(
-            (
-                d
-                for d in sorted(series)
-                if _lv((series[d] or {}).get("character_level")) is not None and float((series[d] or {}).get("character_level")) >= float(n)
-            ),
-            None,
-        )
-
-    crossings = {}
-    for label, n in [*((f"badge:{k}", v) for k, v in badges.items()), *((f"milestone:level_{n}", n) for n in ladder_rungs)]:
-        pair = [first(stored_f, n), first(planned_f, n)]
-        status = "KEPT" if pair[0] == pair[1] else "MOVED" if pair[0] and pair[1] else "REMOVED" if pair[0] else "ADDED"
-        crossings[label] = {"before": pair[0], "after": pair[1], "status": status}
-    per_step = {}
-    for cause, recs in ladder_f:
-        evs = _flat_events(recs)
-        per_step[cause] = {
-            "level_up": sum(1 for e in evs if str(e["type"]).endswith("level_up")),
-            "level_down": sum(1 for e in evs if str(e["type"]).endswith("level_down")),
-        }
-    return {"events": comp, "rung_crossings": crossings, "events_by_step": per_step, "writes_events": False}
-
-
-def challenge_report(snap: dict, rows: list) -> dict:
-    """Consumed challenge XP: the stored sheets' ``challenge_bonus_xp`` against the consumed challenges, and the proof
-    that every planned sheet carries it unchanged (never recomputed away — the compute skips consumed challenges)."""
-    domain_to_pillar = lambda_constant("CHALLENGE_DOMAIN_TO_PILLAR")
-    expected: dict = {}
-    for ch in snap.get("challenges") or []:
-        if not ch.get("xp_consumed_at") or ch.get("status") not in ("completed", "failed"):
-            continue
-        xp = int(float(ch.get("character_xp_awarded", 0) or 0))
-        if xp <= 0:
-            continue
-        d = str(ch.get("completed_at", ""))[:10]
-        pillar = domain_to_pillar.get(ch.get("domain", "general"), "consistency")
-        expected.setdefault(d, {})
-        expected[d][pillar] = expected[d].get(pillar, 0) + xp
-    out = {
-        "dates_with_consumed_xp": 0,
-        "stored_matches_consumed": 0,
-        "stored_differs": [],
-        "planned_carries_stored": True,
-        "missing_rows": [],
-    }
-    by_date = {r["date"]: r for r in rows if r["pk"] == SHEET_PK}
-    for d in sorted(set(expected) | {d for d, r in by_date.items() if as_float(r_stored(r)).get("challenge_bonus_xp")}):
-        if not (snap["start"] <= d <= snap["end"]):
-            continue
-        out["dates_with_consumed_xp"] += 1
-        r = by_date.get(d)
-        if r is None:
-            out["missing_rows"].append(d)
-            continue
-        s = {k: int(v) for k, v in (as_float(r_stored(r)).get("challenge_bonus_xp") or {}).items()}
-        p = {k: int(v) for k, v in (as_float(r["planned_item"] or {}).get("challenge_bonus_xp") or {}).items()}
-        if s == expected.get(d, {}):
-            out["stored_matches_consumed"] += 1
-        else:
-            out["stored_differs"].append(d)
-        if p != s:
-            out["planned_carries_stored"] = False
-    return out
-
-
-def lambda_constant(name: str) -> Any:
-    """A literal constant of the compute Lambda, read from its source (importing it would build boto3 resources)."""
-    import ast
-
-    path = os.path.join(ROOT, "lambdas", "compute", "character_sheet_lambda.py")
-    for node in ast.parse(open(path, encoding="utf-8").read()).body:
-        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
-            return ast.literal_eval(node.value)
-    raise RuntimeError(f"{name} not found in the compute Lambda")
-
-
-def stress_days(snap: dict) -> list:
-    """Dates whose stored Mind carried a stress contribution (a stress score not held out) — the #5129 stale set."""
-    out = []
-    for d, s in sorted(snap["sheets"].items()):
-        comp = (((s.get("pillar_mind") or {}).get("components") or {}).get("stress_management")) or {}
-        if comp.get("score") is not None and not comp.get("held_out"):
-            out.append(d)
-    return out
-
-
 # ── the dry run ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -883,6 +720,8 @@ def dry_run(
     trees: Optional[dict] = None,
     planned_at: Optional[str] = None,
 ) -> dict:
+    import recompute_character_private_report as R  # the reports (module-size split, #1665)
+
     planned_at = planned_at or datetime.now(timezone.utc).isoformat()
     snap = load_snapshot(store, start, end)
     os.makedirs(refuse_in_repo(out_dir), exist_ok=True)
@@ -907,7 +746,7 @@ def dry_run(
     stored_f = {d: as_float(to_typed(i)) for d, i in snap["sheets"].items()}
     planned_f = {r["date"]: as_float(r["planned_item"]) for r in rows if r["pk"] == SHEET_PK and r["planned_item"]}
     ladder_f = [(c, {d: as_float(v) for d, v in recs.items()}) for c, recs in ladder_records]
-    sdays = stress_days(snap)
+    sdays = R.stress_days(snap)
     stress_changed = sorted(d for d, a in attribution.items() if "stress_days" in a["by_step"])
     prev_recs = dict(ladder_records)[ladder[0][1]] if ladder[0][1] == "replay_residual" else {}
     stress_recs = dict(ladder_records).get("stress_days", {})
@@ -934,358 +773,31 @@ def dry_run(
         "rows": rows,
         "attribution": attribution,
         "accounting": accounting,
-        "counts": counts(rows, snap),
+        "counts": R.counts(rows, snap),
         "stress_days": {
             "stored_with_stress": sdays,
             "mind_raw_changed_by_stress_step": stress_direct,
             "same_set": sdays == stress_direct,
             "changed_only_through_the_chain": sorted(set(stress_changed) - set(stress_direct)),
         },
-        "preserved_non_engine_attributes": preserved_attributes(rows),
+        "preserved_non_engine_attributes": R.preserved_attributes(rows),
         "receipts_self_replay_verified": sum(
             1 for r in rows if r["pk"] == RECEIPT_PK and r["planned_item"] and (r["planned_item"].get("replay_verified") is True)
         ),
-        "served_baseline": served_baselines(rows),
-        "events": event_report(stored_f, planned_f, ladder_f),
-        "challenge_xp": challenge_report(snap, rows),
+        "served_baseline": R.served_baselines(rows),
+        "events": R.event_report(stored_f, planned_f, ladder_f),
+        "challenge_xp": R.challenge_report(snap, rows),
         "notes": {n: results[n].get("notes") for n, _c, _s in ladder[-1:]},
         "invisible_sheets_in_window": snap["invisible_sheets"],
     }
     return plan
 
 
-def preserved_attributes(rows: list) -> dict:
-    """{partition: {attribute: rows}} — the stored attributes the plan keeps exactly as stored (not engine-owned)."""
-    out: dict = {}
-    for r in rows:
-        if r["planned_item"] is None:
-            continue
-        for k in sorted(set(r["_stored"]) - set(r["_owned"]) - {"pk", "sk"}):
-            out.setdefault(r["partition"], {}).setdefault(k, 0)
-            out[r["partition"]][k] += 1
-    return out
-
-
-def counts(rows: list, snap: dict) -> dict:
-    out: dict = {}
-    for pk in WRITTEN_PARTITIONS:
-        rs = [r for r in rows if r["pk"] == pk]
-        name = pk.split("#SOURCE#")[-1]
-        out[name] = {
-            "rows_read": len(rs),
-            "rows_to_write": sum(1 for r in rs if r["action"] == "write"),
-            "rows_unchanged": sum(1 for r in rs if r["action"] == "unchanged"),
-            "rows_not_planned": sum(1 for r in rs if r["action"] == "not_planned"),
-            "attributes_changed": sum(len(r["changed_attributes"]) for r in rs if r["action"] == "write"),
-            "attributes_removed": sum(len(r["removed_attributes"]) for r in rs if r["action"] == "write"),
-        }
-    out["dates_affected"] = len({r["date"] for r in rows if r["action"] == "write"})
-    return out
-
-
-# ── outputs ─────────────────────────────────────────────────────────────────────────────────────────────────────────
-
-
 def write_outputs(plan: dict, out_dir: str, plan_out: Optional[str] = None, preliminary: bool = False) -> dict:
-    plan_path = refuse_in_repo(plan_out or os.path.join(out_dir, "plan.json"))
-    with open(plan_path, "w", encoding="utf-8") as fh:
-        json.dump(dict(plan, rows=public_rows(plan["rows"])), fh, indent=1, sort_keys=True)
-    csv_path = os.path.join(out_dir, "per_date.csv")
-    write_csv(csv_path, per_date_rows(plan))
-    md_path = os.path.join(out_dir, "SUMMARY.md")
-    with open(md_path, "w", encoding="utf-8") as fh:
-        fh.write(summary_md(plan, preliminary=preliminary))
-    return {"plan": plan_path, "csv": csv_path, "summary": md_path}
+    """plan.json (``--plan-out``), per_date.csv and SUMMARY.md — ``recompute_character_private_report.write_outputs``."""
+    import recompute_character_private_report as R
 
-
-def per_date_rows(plan: dict) -> list:
-    out = []
-    by = {}
-    for r in plan["rows"]:
-        by.setdefault(r["date"], {})[r["partition"]] = r
-    for d in sorted(by):
-        s, rc = by[d].get("character_sheet"), by[d].get("character_receipt")
-        row: dict = {"date": d}
-        if s:
-            st, pl = as_float(r_stored(s)), as_float(s["planned_item"] or {})
-            row.update(
-                {
-                    "sheet_action": s["action"],
-                    "sheet_attributes_changed": len(s["changed_attributes"]),
-                    "sheet_leaves_changed": s.get("leaf_changes"),
-                    "sheet_causes": "|".join(s["causes"]),
-                    "character_level": f"{st.get('character_level')}->{pl.get('character_level')}",
-                    "character_xp": f"{st.get('character_xp')}->{pl.get('character_xp')}",
-                    "character_xp_debt": f"{st.get('character_xp_debt')}->{pl.get('character_xp_debt')}",
-                }
-            )
-            for p in ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"):
-                a, b = st.get(f"pillar_{p}") or {}, pl.get(f"pillar_{p}") or {}
-                row[f"{p}_level"] = f"{a.get('level')}->{b.get('level')}"
-                row[f"{p}_raw"] = f"{a.get('raw_score')}->{b.get('raw_score')}"
-            for c in plan["ladder"]:
-                row[f"step_{c['cause']}"] = "|".join(plan["attribution"].get(d, {}).get("by_step", {}).get(c["cause"], []))
-        if rc:
-            row.update({"receipt_action": rc["action"], "receipt_attributes_changed": len(rc["changed_attributes"])})
-        out.append(row)
-    return out
-
-
-def write_csv(path: str, rows: list) -> None:
-    keys = []
-    for r in rows:
-        keys += [k for k in r if k not in keys]
-    with open(path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=keys)
-        w.writeheader()
-        for r in rows:
-            w.writerow(r)
-
-
-PRELIMINARY_BANNER = (
-    "**PRELIMINARY — not the dry run for approval.** The final dry run is the COMBINED one: the public projection's dry "
-    "run (#6283) over this file's planned private rows, presented together. Nothing was written: every DynamoDB and S3 "
-    "call went through a proxy that refuses each write verb."
-)
-OWNER_GATE = (
-    "1. the public dry run over this plan (its --plan-in) · 2. the owner approves the exact combined plan ids · 3. the "
-    "method PR (#6299) merges and deploys · 4. a re-run of this dry run on the deployed tree reproduces the approved plan "
-    "id (--apply refuses otherwise) · 5. --apply --plan-in plan.json --phase sheets, then --phase receipts · 6. the public "
-    "apply · 7. both --verify runs report 0 planned writes"
-)
-
-
-def summary_md(plan: dict, preliminary: bool = False) -> str:
-    c, a, ev = plan["counts"], plan["accounting"], plan["events"]
-    lines = [
-        f"# Private character recompute — dry run ({plan['plan_id']})",
-        "",
-        *([PRELIMINARY_BANNER, ""] if preliminary else []),
-        f"Generated {plan['generated_at']} · engine {plan['method']['engine_version']} · config {plan['method']['config_version']} · "
-        f"tree {plan['method']['tree']['head'][:12]}{' (dirty)' if plan['method']['tree']['dirty'] else ''} · window "
-        f"{plan['window']['start']}..{plan['window']['end']} ({plan['window']['sheet_dates']} stored sheets)",
-        "",
-        "## Rows",
-    ]
-    for name in ("character_sheet", "character_receipt"):
-        x = c[name]
-        lines.append(
-            f"- {name}: read {x['rows_read']} · to write {x['rows_to_write']} · unchanged {x['rows_unchanged']} · not planned "
-            f"{x['rows_not_planned']} · attributes changed {x['attributes_changed']} · removed {x['attributes_removed']}"
-        )
-    lines += [f"- dates affected: {c['dates_affected']}", "", "## Ladder (cumulative; dates / attributes / leaves changed by each step)"]
-    for step in plan["ladder"]:
-        t = a["ladder_totals"][step["cause"]]
-        lines.append(
-            f"- {step['cause']}: {t['dates']} / {t['attributes']} / {t['leaves']} (changed then restored later: {a['changed_then_restored'][step['cause']]})"
-        )
-    sd = plan["stress_days"]
-    lines += [
-        "",
-        f"## Stress days: stored with a counted stress score {len(sd['stored_with_stress'])}; Mind raw changed by the stress "
-        f"step {len(sd['mind_raw_changed_by_stress_step'])} (same set: {sd['same_set']}); later dates moved only through the "
-        f"chain {len(sd['changed_only_through_the_chain'])}",
-        f"## Receipts whose planned self-replay verifies: {plan['receipts_self_replay_verified']} of {c['character_receipt']['rows_read']}",
-        "",
-        "## Events (reported only; the #6283 reconciliation writes them)",
-    ]
-    for who, t in sorted(ev["events"]["totals"].items()):
-        lines.append(f"- {who}: KEPT {t['KEPT']} · MOVED {t['MOVED']} · REMOVED {t['REMOVED']} · ADDED {t['ADDED']}")
-    lines.append(
-        "- events by step: " + "; ".join(f"{k} up {v['level_up']} down {v['level_down']}" for k, v in ev["events_by_step"].items())
-    )
-    ch = plan["challenge_xp"]
-    served = plan["served_baseline"]
-    lines += [
-        "",
-        f"## Consumed challenge XP: {ch['dates_with_consumed_xp']} dates; stored matches consumed on {ch['stored_matches_consumed']}; "
-        f"planned carries stored: {ch['planned_carries_stored']}",
-        f"## Served baseline unchanged by the private apply on {sum(1 for v in served.values() if v['unchanged_by_private_apply'])} of {len(served)} dates",
-        "",
-        "## Controls",
-        f"- tree_switch_residual (must be 0): {a['ladder_totals'].get('tree_switch_residual', {}).get('attributes', 'n/a')} attributes",
-        "- replay_residual: what the stored method's own replay does not reproduce — never a method change; read its "
-        "attributes in plan.json `attribution` before approving",
-        f"- method tree {'DIRTY: re-run from the committed, deployed tree' if plan['method']['tree']['dirty'] else 'clean'}",
-        "",
-        "## Before any write (owner gate)",
-        OWNER_GATE,
-        "",
-    ]
-    return "\n".join(lines)
-
-
-def planned_sheets(plan_path: str) -> dict:
-    """{date: planned sheet item, every number a float} from a plan file — the stored-sheets shape the public backfill
-    reads (``backfill_public_variant_cli.load_snapshot``'s ``sheets``). An unchanged row's planned item is the stored
-    item; a "not_planned" row is omitted. The file is integrity-checked first (``load_plan``)."""
-    plan = load_plan(plan_path)
-    return {r["date"]: as_float(r["planned_item"]) for r in plan["rows"] if r["pk"] == SHEET_PK and r["planned_item"] is not None}
-
-
-# ── apply, verify, rollback ─────────────────────────────────────────────────────────────────────────────────────────
-
-
-PHASES = {"sheets": (SHEET_PK,), "receipts": (RECEIPT_PK,), "all": (SHEET_PK, RECEIPT_PK)}
-
-
-def load_plan(path: str) -> dict:
-    with open(path, encoding="utf-8") as fh:
-        plan = json.load(fh)
-    if plan.get("schema") != PLAN_SCHEMA:
-        raise PlanGuardError("not a private recompute plan")
-    pid = hashlib.sha256(
-        canonical([[r["pk"], r["sk"], r["stored_digest"], r.get("planned_compare_digest")] for r in plan["rows"]]).encode()
-    ).hexdigest()[:16]
-    if pid != plan["plan_id"]:
-        raise PlanGuardError("the plan file's rows do not hash to its plan_id (edited or truncated)")
-    for r in plan["rows"]:
-        if r["action"] == "write" and digest(r["planned_item"]) != r["planned_digest"]:
-            raise PlanGuardError(f"planned item digest mismatch: {r['pk']} {r['sk']}")
-    assert_character_keys(plan["rows"], plan["window"]["start"], plan["window"]["end"])
-    return plan
-
-
-def rows_for(plan: dict, phase: str, from_date: Optional[str] = None, limit: Optional[int] = None) -> list:
-    keep = PHASES[phase]
-    rows = [r for r in plan["rows"] if r["action"] == "write" and r["pk"] in keep and (not from_date or r["date"] >= from_date)]
-    rows.sort(key=lambda r: (WRITTEN_PARTITIONS.index(r["pk"]), r["date"]))
-    return rows[:limit] if limit else rows
-
-
-def write_condition(pre: dict) -> list:
-    """The write is conditional on the pre-image: the row exists, its nightly stamps are the exported ones, and it
-    carries no recompute provenance other than the exported one."""
-    cond: list = [("exists", "pk")]
-    for k in ("computed_at", "run_id"):
-        cond.append(("eq", k, from_typed(pre[k])) if k in pre else ("not_exists", k))
-    if PROVENANCE in pre:
-        cond.append(("eq", [PROVENANCE, "plan_id"], pre[PROVENANCE]["plan_id"]))
-    else:
-        cond.append(("not_exists", PROVENANCE))
-    return cond
-
-
-def export_and_verify(store: Any, plan: dict, rows: list, out_dir: str, phase: str, now: str) -> tuple:
-    """The pre-image of every row about to be written, to a local file AND S3 ``backups/``, each re-read and hashed.
-    Returns (export, path). Raises (no write happens) on any mismatch."""
-    entries, aborted = [], []
-    for r in rows:
-        cur = store.get(r["pk"], r["sk"])
-        cur_t = to_typed(cur) if cur is not None else None
-        if cur_t is not None and digest(cur_t, exclude=(PROVENANCE,)) == r["planned_compare_digest"]:
-            continue  # already applied (resume): not exported again, not written again
-        if cur_t is None or digest(cur_t) != r["stored_digest"]:
-            aborted.append({"pk": r["pk"], "sk": r["sk"], "reason": "the row changed since the plan"})
-            continue
-        entries.append(
-            {"pk": r["pk"], "sk": r["sk"], "preimage": cur_t, "preimage_digest": r["stored_digest"], "planned_digest": r["planned_digest"]}
-        )
-    export = {"schema": EXPORT_SCHEMA, "plan_id": plan["plan_id"], "phase": phase, "taken_at": now, "entries": entries}
-    body = json.dumps(export, sort_keys=True, indent=1).encode()
-    sha = hashlib.sha256(body).hexdigest()
-    path = os.path.join(out_dir, f"export_{plan['plan_id']}_{phase}_{now.replace(':', '')}.json")
-    with open(path, "wb") as fh:
-        fh.write(body)
-    with open(path + ".sha256", "w", encoding="utf-8") as fh:
-        fh.write(sha + "\n")
-    with open(path, "rb") as fh:
-        if hashlib.sha256(fh.read()).hexdigest() != sha:
-            raise PlanGuardError("the local export does not read back to its hash — no write made")
-    reread = json.loads(open(path, encoding="utf-8").read())
-    if any(digest(e["preimage"]) != e["preimage_digest"] for e in reread["entries"]):
-        raise PlanGuardError("an exported pre-image does not hash to its recorded digest — no write made")
-    key = f"{BACKUP_PREFIX}/{plan['plan_id']}/{phase}-{now.replace(':', '')}/export.json"
-    store.put_backup(key, body)
-    if hashlib.sha256(store.get_backup(key)).hexdigest() != sha:
-        raise PlanGuardError("the S3 backup does not read back to the export's hash — no write made")
-    export["_local_path"], export["_s3_key"], export["_sha256"], export["_aborted_before_export"] = path, key, sha, aborted
-    return export, path
-
-
-def apply_plan(
-    store: Any, plan: dict, out_dir: str, phase: str, now: str, from_date: Optional[str] = None, limit: Optional[int] = None
-) -> dict:
-    rows = rows_for(plan, phase, from_date, limit)
-    export, path = export_and_verify(store, plan, rows, out_dir, phase, now)
-    by_key = {(e["pk"], e["sk"]): e for e in export["entries"]}
-    written, aborted = [], list(export["_aborted_before_export"])
-    for r in rows:
-        e = by_key.get((r["pk"], r["sk"]))
-        if e is None:
-            continue
-        cur = store.get(r["pk"], r["sk"])
-        if cur is None or digest(to_typed(cur)) != e["preimage_digest"]:
-            aborted.append({"pk": r["pk"], "sk": r["sk"], "reason": "the row changed after the export"})
-            continue
-        try:
-            store.put(from_typed(r["planned_item"]), write_condition(e["preimage"]))
-        except ConditionFailed:
-            aborted.append({"pk": r["pk"], "sk": r["sk"], "reason": "conditional write refused (pre-image changed)"})
-            continue
-        after = store.get(r["pk"], r["sk"])
-        ok = after is not None and digest(to_typed(after)) == r["planned_digest"]
-        written.append({"pk": r["pk"], "sk": r["sk"], "verified": ok})
-    result = {
-        "plan_id": plan["plan_id"],
-        "phase": phase,
-        "export": path,
-        "s3_key": export["_s3_key"],
-        "written": written,
-        "aborted": aborted,
-    }
-    with open(os.path.join(out_dir, f"apply_{plan['plan_id']}_{phase}_{now.replace(':', '')}.json"), "w", encoding="utf-8") as fh:
-        json.dump(result, fh, indent=1, sort_keys=True)
-    return result
-
-
-def rollback(store: Any, export_path: str, *, apply: bool) -> dict:
-    """Restore every exported pre-image where the row still holds what the apply wrote, then verify byte for byte."""
-    body = open(export_path, "rb").read()
-    side = export_path + ".sha256"
-    if os.path.exists(side) and open(side, encoding="utf-8").read().strip() != hashlib.sha256(body).hexdigest():
-        raise PlanGuardError("the export does not match its recorded sha256")
-    export = json.loads(body)
-    if export.get("schema") != EXPORT_SCHEMA:
-        raise PlanGuardError("not a private recompute export")
-    ops, refused = [], []
-    for e in export["entries"]:
-        cur = store.get(e["pk"], e["sk"])
-        cur_t = to_typed(cur) if cur is not None else None
-        if cur_t is not None and digest(cur_t) == e["preimage_digest"]:
-            ops.append({"pk": e["pk"], "sk": e["sk"], "op": "already_preimage"})
-            continue
-        if cur_t is None or digest(cur_t) != e["planned_digest"]:
-            refused.append({"pk": e["pk"], "sk": e["sk"], "reason": "the row is neither the pre-image nor what the apply wrote"})
-            continue
-        ops.append({"pk": e["pk"], "sk": e["sk"], "op": "restore"})
-        if apply:
-            try:
-                store.put(from_typed(e["preimage"]), [("exists", "pk"), ("eq", [PROVENANCE, "plan_id"], export["plan_id"])])
-            except ConditionFailed:
-                refused.append({"pk": e["pk"], "sk": e["sk"], "reason": "conditional restore refused"})
-    verified = None
-    if apply:
-        mism = []
-        for e in export["entries"]:
-            cur = store.get(e["pk"], e["sk"])
-            if cur is None or canonical(to_typed(cur)) != canonical(e["preimage"]):
-                mism.append(f"{e['pk']} {e['sk']}")
-        verified = {"entries": len(export["entries"]), "byte_equal": len(export["entries"]) - len(mism), "mismatches": mism}
-    return {"applied": apply, "operations": ops, "refused": refused, "verified": verified}
-
-
-def verify(store: Any, out_dir: str, start: str = EXPERIMENT_START_DATE, end: Optional[str] = None, trees: Optional[dict] = None) -> dict:
-    """Zero-write post-verification: a fresh plan (the amended method only) over the stored rows must write nothing."""
-    snap = load_snapshot(store, start, end)
-    os.makedirs(refuse_in_repo(out_dir), exist_ok=True)
-    work = tempfile.mkdtemp(prefix="verify-", dir=out_dir)
-    trees = trees or {"new": ROOT}
-    res = run_ladder(child_inputs(snap), work, trees, (("plan", "missing_data", PLAN_SPEC),))["plan"]
-    engine_keys = {d: set(res["sheet_attrs"].get(d) or {}) for d in snap["sheets"]}
-    rows = build_rows(snap, res, engine_keys)
-    pending = [f"{r['partition']} {r['sk']}" for r in rows if r["action"] == "write"]
-    return {"rows": len(rows), "planned_writes": len(pending), "pending": pending}
+    return R.write_outputs(plan, out_dir, plan_out, preliminary=preliminary)
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1300,6 +812,8 @@ def live_store(writable: bool) -> LiveStore:
 
 
 def main(argv: list) -> int:
+    import recompute_character_private_apply as A  # the write half (module-size split, #1665)
+
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--out", required=True, help="output directory OUTSIDE the repo (outputs carry real values)")
     ap.add_argument("--plan-out", help="the plan file (default OUT/plan.json); read by the public dry run (--plan-in there)")
@@ -1308,7 +822,7 @@ def main(argv: list) -> int:
     ap.add_argument("--verify", action="store_true", help="zero-write post-verification: exit 1 unless 0 planned writes")
     ap.add_argument("--apply", action="store_true", help="WRITE (owner act): with --plan-in, or with --rollback")
     ap.add_argument("--plan-in", help="the approved plan file --apply writes")
-    ap.add_argument("--phase", choices=sorted(PHASES), default="all")
+    ap.add_argument("--phase", choices=sorted(A.PHASES), default="all")
     ap.add_argument("--from-date", help="resume cursor: plan rows on or after this date")
     ap.add_argument("--limit", type=int, help="write at most N rows this run (resumable)")
     ap.add_argument("--rollback", help="an export file: restore its pre-images (dry run unless --apply)")
@@ -1319,20 +833,20 @@ def main(argv: list) -> int:
     now = datetime.now(timezone.utc).isoformat()
 
     if args.rollback:
-        result = rollback(live_store(writable=args.apply), args.rollback, apply=args.apply)
+        result = A.rollback(live_store(writable=args.apply), args.rollback, apply=args.apply)
         with open(os.path.join(out_dir, f"rollback_{now.replace(':', '')}.json"), "w", encoding="utf-8") as fh:
             json.dump(result, fh, indent=1)
         ok = not result["refused"] and (not args.apply or not result["verified"]["mismatches"])
         print(json.dumps({k: (len(v) if isinstance(v, list) else v) for k, v in result.items()}, indent=1, default=str))
         return 0 if ok else 2
     if args.verify:
-        result = verify(live_store(writable=False), out_dir, args.start, args.end)
+        result = A.verify(live_store(writable=False), out_dir, args.start, args.end)
         print(json.dumps({"rows": result["rows"], "planned_writes": result["planned_writes"]}))
         return 0 if result["planned_writes"] == 0 else 1
     if args.apply:
         if not args.plan_in:
             ap.error("--apply needs --plan-in (the approved plan)")
-        plan = load_plan(args.plan_in)
+        plan = A.load_plan(args.plan_in)
         fresh = dry_run(
             live_store(writable=False), out_dir, plan["window"]["start"], plan["window"]["end"], planned_at=plan["generated_at"]
         )
@@ -1345,7 +859,7 @@ def main(argv: list) -> int:
         if later:
             print(f"REFUSED: stored sheets exist after the plan's window ({later[:3]}…) — re-plan to include them", file=sys.stderr)
             return 3
-        result = apply_plan(live_store(writable=True), plan, out_dir, args.phase, now, args.from_date, args.limit)
+        result = A.apply_plan(live_store(writable=True), plan, out_dir, args.phase, now, args.from_date, args.limit)
         print(json.dumps({"written": len(result["written"]), "aborted": len(result["aborted"]), "export": result["export"]}, indent=1))
         return 0 if not result["aborted"] and all(w["verified"] for w in result["written"]) else 2
     plan = dry_run(live_store(writable=False), out_dir, args.start, args.end, planned_at=now)
