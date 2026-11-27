@@ -172,11 +172,18 @@ from mcp.tools_lifestyle import (
     tool_update_insight_outcome,
 )
 from mcp.tools_may_tracker import GET_MAY_TRACKER_DESCRIPTION, GET_MAY_TRACKER_INPUT, tool_get_may_tracker  # #5073
-from mcp.tools_memory import tool_delete_platform_memory, tool_list_memory_categories, tool_read_platform_memory, tool_write_platform_memory
+from mcp.tools_memory import (
+    WRITE_PLATFORM_MEMORY_INPUT,
+    tool_delete_platform_memory,
+    tool_list_memory_categories,
+    tool_read_platform_memory,
+    tool_write_platform_memory,
+)
 from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, lifted out of this table
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
 from mcp.tools_owner_words import LOG_OWNER_NOTE_DESCRIPTION, LOG_OWNER_NOTE_INPUT, tool_log_owner_note  # #4584
 from mcp.tools_pending_writes import MANAGE_PENDING_WRITES_DESCRIPTION, MANAGE_PENDING_WRITES_INPUT, tool_manage_pending_writes  # #4078
+from mcp.tools_personal_hypotheses import MANAGE_HYPOTHESIS_DESCRIPTION, MANAGE_HYPOTHESIS_INPUT, tool_manage_personal_hypothesis  # #6292
 from mcp.tools_plan import tool_plan_next_session
 
 # #3668: the three hot-path named tools (cycle / habits / cost) over the same waiter
@@ -1245,39 +1252,7 @@ TOOLS = {
         "schema": {
             "name": "write_platform_memory",
             "description": WRITE_PLATFORM_MEMORY_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "description": (
-                            "Sanctioned memory category (e.g. 'life_context', 'constraints_preferences', "
-                            "'failure_patterns', 'what_worked', 'coaching_calibration'). Aliases accepted: "
-                            "'episodic_wins' → what_worked, 'failure_pattern' → failure_patterns."
-                        ),
-                    },
-                    "content": {"type": "object", "description": 'Key-value dict; put the readable core in "summary" — what coaches read.'},
-                    "date": {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
-                    "replace_key": {"type": "string", "description": "Exact sk of the one row to rewrite; default adds a new row (#4171)"},
-                    "privacy_tier": {
-                        "type": "string",
-                        "enum": ["public_ok", "coach_context", "private"],
-                        "description": (
-                            "Optional per-record privacy override — may only TIGHTEN the category default. "
-                            "'private' never reaches any generation prompt."
-                        ),
-                    },
-                    "domains": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": (
-                            "Optional bare coach ids this memory is relevant to (sleep, training, nutrition, mind, "
-                            "physical, glucose, labs, explorer). Default: the category's rule (usually all coaches)."
-                        ),
-                    },
-                },
-                "required": ["category", "content"],
-            },
+            "inputSchema": WRITE_PLATFORM_MEMORY_INPUT,
         },
     },
     "read_platform_memory": {
@@ -1498,6 +1473,14 @@ TOOLS = {
     "manage_research_finding": {  # #6208: the research findings store — owner-only, every write his explicit act
         "fn": tool_manage_research_finding,
         "schema": {"name": "manage_research_finding", "description": MANAGE_FINDING_DESCRIPTION, "inputSchema": MANAGE_FINDING_INPUT},
+    },
+    "manage_personal_hypothesis": {  # #6292: his working hypotheses — reads direct, every write queue-only
+        "fn": tool_manage_personal_hypothesis,
+        "schema": {
+            "name": "manage_personal_hypothesis",
+            "description": MANAGE_HYPOTHESIS_DESCRIPTION,
+            "inputSchema": MANAGE_HYPOTHESIS_INPUT,
+        },
     },
     "get_advice_link_queue": {  # read-only: the coaches' recent asks beside what Matthew recorded; writes nothing
         "fn": tool_get_advice_link_queue,

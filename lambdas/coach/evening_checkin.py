@@ -219,8 +219,8 @@ def _stamp_eval(table, day: str, reason: str, now_utc: datetime) -> None:
         logger.warning("[evening-checkin] eval stamp failed: %s", type(e).__name__)
 
 
-#: #6176: the EVAL# verdict stamped when the outbound trial gives the 20:00 slot to the evening-nudge email.
-OUTBOUND_TRIAL_REASON = "outbound_trial_email_owns_evening"
+#: #6290: the EVAL# verdict stamped when the owner's ruling holds the scheduled Telegram prompt (evaluated, not sent).
+OUTBOUND_TRIAL_REASON = "held_by_owner_ruling_not_sent"
 
 
 def decide(table, day: str, now_pt: datetime, seat: Callable[[str], tuple]) -> tuple[str, Optional[tuple]]:
@@ -229,11 +229,13 @@ def decide(table, day: str, now_pt: datetime, seat: Callable[[str], tuple]) -> t
 
     from coach.coach_outbound import in_quiet_hours
 
-    # #6176 item 5 (outbound trial): the 20:00 check-in has ONE channel, the evening-nudge email (1 Telegram reply in
-    # 28 evenings). The verdict is still stamped as EVAL#<day> by run_prompt, so the dead-man sees a run, not a gap.
-    # A /checkin he sends himself is unaffected: only the scheduled prompt is held.
-    if outbound_trial.is_on(outbound_trial.EVENING_ONE_CHANNEL):
-        outbound_trial.suppressed(outbound_trial.EVENING_ONE_CHANNEL, "telegram-coach-worker#TelegramEveningCheckin", log=logger.info)
+    # #6290 (owner ruling 2026-11-26): the scheduled Telegram prompt is held, as its own switch (independent of #6176 item
+    # 5, the evening-nudge EMAIL's rule). run_prompt still stamps EVAL#<day> with the held verdict, so the dead-man sees
+    # a deliberate hold, never a gap and never a send. A /checkin he sends himself is unaffected.
+    if outbound_trial.is_on(outbound_trial.TELEGRAM_EVENING_PROMPT_HELD):
+        outbound_trial.suppressed(
+            outbound_trial.TELEGRAM_EVENING_PROMPT_HELD, "telegram-coach-worker#TelegramEveningCheckin", log=logger.info
+        )
         return OUTBOUND_TRIAL_REASON, None
     if in_quiet_hours(now_pt):
         return "quiet_hours", None

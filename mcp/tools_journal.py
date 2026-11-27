@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
+from common.inferred_fields import SOURCE_MODEL_INFERRED, SOURCE_SELF_REPORT, resolve_rating  # #6286
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.config import USER_PREFIX, table
@@ -81,7 +82,7 @@ def _get_mood_trend(args):
 
     from health.flourishing import entry_channel  # #1572 channel provenance
 
-    # Build daily scores (prefer enriched, fall back to structured)
+    # Build daily scores (#6286: his own rating first, the model's score only as a marked fallback)
     daily = {}  # date -> {mood, energy, stress, themes, sentiment, channels}
     for item in items:
         date = item.get("date")
@@ -100,20 +101,24 @@ def _get_mood_trend(args):
         if ch not in chans:
             chans.append(ch)
 
-        # Mood: enriched > morning_mood > day_rating
-        mood = item.get("enriched_mood") or item.get("morning_mood") or item.get("day_rating")
-        if mood and ("mood" not in daily[date] or template == "Evening"):
-            daily[date]["mood"] = float(mood) if mood else None
-
-        # Energy: enriched > morning_energy > energy_eod
-        energy = item.get("enriched_energy") or item.get("morning_energy") or item.get("energy_eod")
-        if energy and ("energy" not in daily[date] or template == "Evening"):
-            daily[date]["energy"] = float(energy) if energy else None
-
-        # Stress: enriched > stress_level
-        stress = item.get("enriched_stress") or item.get("stress_level")
-        if stress and ("stress" not in daily[date] or template == "Evening"):
-            daily[date]["stress"] = float(stress) if stress else None
+        # #6286 (owner ruling 2026-11-26): his own rating outranks a model's reading of it.
+        # Per entry: morning_mood > day_rating, morning_energy > energy_eod, stress_level —
+        # the enrichment model's 1-5 score only when he gave no rating, and then the day says
+        # so in `<metric>_source`. Across a day's entries a self-report always replaces a model
+        # value; between two of the same provenance the Evening entry wins, as before.
+        for metric in ("mood", "energy", "stress"):
+            val, src = resolve_rating(item, metric)
+            if val is None:
+                continue
+            prev_src = daily[date].get(f"{metric}_source")
+            take = (
+                metric not in daily[date]
+                or (src == SOURCE_SELF_REPORT and prev_src == SOURCE_MODEL_INFERRED)
+                or (template == "Evening" and not (src == SOURCE_MODEL_INFERRED and prev_src == SOURCE_SELF_REPORT))
+            )
+            if take:
+                daily[date][metric] = val
+                daily[date][f"{metric}_source"] = src
 
         # Themes and sentiment from enrichment
         themes = item.get("enriched_themes", [])
@@ -149,6 +154,9 @@ def _get_mood_trend(args):
                 "max": max(vals),
                 "latest": vals[-1],
                 "days_tracked": len(vals),
+                # #6286: how many of those days are his own rating vs the model's reading.
+                "days_self_reported": sum(1 for d in trend if d.get(f"{metric_name}_source") == SOURCE_SELF_REPORT),
+                "days_model_inferred": sum(1 for d in trend if d.get(f"{metric_name}_source") == SOURCE_MODEL_INFERRED),
             }
             # Trend direction (first half vs second half)
             if len(vals) >= 4:
@@ -181,6 +189,10 @@ def _get_mood_trend(args):
     result = {
         "trend": trend,
         "summary": summary,
+        "rating_provenance": (
+            "Per day, `<metric>_source` is 'self_report' when he rated it himself and 'model_inferred' when "
+            "only the journal-enrichment model's reading of his writing exists. His own rating always wins."
+        ),
         "top_themes": [{"theme": t, "count": c} for t, c in top_themes],
         "days_with_entries": len(trend),
         "date_range": f"{start} to {end}",

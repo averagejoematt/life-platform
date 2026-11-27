@@ -5305,3 +5305,55 @@ STRUCTURAL_HAND_PROOFS["structural::test_editorial_release_6258.py"] = {
     ),
     "proved_on": "2026-11-25",
 }
+
+# #6286 — model-inferred psychological labels (defense / avoidance / cognitive-distortion families) never reach a
+# prompt: outside lambdas/common/inferred_fields.py and the two producers, no source under lambdas/ or mcp/ names one.
+STRUCTURAL_HAND_PROOFS["structural::test_inferred_psych_fields_guard_6286.py"] = {
+    "gate_name": "test_inferred_psych_fields_guard_6286.py",
+    "command": "python3 -m pytest tests/test_inferred_psych_fields_guard_6286.py -q -p no:warnings   # baseline 2 passed",
+    "mutation": (
+        "Two plants, ONE AT A TIME, each reverted: M1 lambdas/emails/daily_brief_signals.py gains "
+        '`_planted = entry.get("enriched_defense_patterns")` inside extract_journal_signals; M2 a new module '
+        'mcp/zz_plant_6286.py returning `e.get("avoidance_flags")` (the bare re-keyed name).'
+    ),
+    "observed": (
+        "2026-11-26, #6286 lane. BASELINE 2 passed. M1 1 failed (test_no_consumer_reads_a_model_inferred_psych_label, "
+        "offender lambdas/emails/daily_brief_signals.py:71 'enriched_defense_patterns'). M2 1 failed (same test, offender "
+        "mcp/zz_plant_6286.py:2 'avoidance_flags'). REVERTED 2 passed."
+    ),
+    "scope": (
+        "Every .py under lambdas/ and mcp/, string constants compared EXACTLY against INFERRED_PSYCH_LABEL_FIELDS and their "
+        'bare keys. NOT SEEN: a name built at runtime ("enriched_" + family), and a generic whole-row dump that never names '
+        "the field (mcp.tools_data's dumpers relabel through inferred_fields.relabel_row; other whole-row paths are not swept)."
+    ),
+    "proved_on": "2026-11-26",
+}
+
+# #6292 — revisable, evidence-linked hypotheses about the person (owner rulings 2026-11-26, epic #6284): every write
+# queue-only through the #6287 approval scope, his rejection final until he reopens, never re-proposed, an
+# interpretation never a diagnosis, at most 7 open, retirement proposed (never performed), no coach/web reader, the
+# prompt seam off and uncalled.
+STRUCTURAL_HAND_PROOFS["structural::test_personal_hypotheses_6292.py"] = {
+    "gate_name": "test_personal_hypotheses_6292.py",
+    "command": "python3 -m pytest tests/test_personal_hypotheses_6292.py -q -p no:randomly -p no:warnings   # baseline 41 passed",
+    "mutation": (
+        "Twelve plants, ONE AT A TIME, each restored from a copy: M1 the tool's approval check satisfied without a scope; "
+        "M2 build_event's owner-closure refusal made False; M3 refuse_reproposal returns at once; M4 the diagnostic "
+        "tripwire's search made None; M5 the open cap made False; M6 retirement_proposed made False; M7 fold accepts a "
+        "head without its approval stamp; M8 `from research import hypotheses` appended to lambdas/web/site_api_status.py; "
+        "M9 a call to the off prompt seam added to the tool's list; M10 a rejection accepts owner_adopted_text; M11 the "
+        "enqueue precheck hook in mcp/tools_pending_writes.py returns None; M12 supported/contradicted need no evidence."
+    ),
+    "observed": (
+        "2026-11-26, #6292 lane. BASELINE 41 passed. M1 3 failed; M2 4 failed; M3 3 failed; M4 4 failed; M5 1 failed; "
+        "M6 1 failed; M7 1 failed; M8 2 failed; M9 1 failed; M10 1 failed; M11 25 failed; M12 1 failed. REVERTED 41 passed."
+    ),
+    "scope": (
+        "The real tool and the real manage_pending_writes enqueue/approve/discard over an in-memory table; the fold; the "
+        "static import graph (module-level and lazy) of lambdas/web, content, emails, coach, ai, intelligence and compute; "
+        "every lambdas/, mcp/ and scripts/ module for a call to the off seam; lambdas/web for a module naming the kind. "
+        "NOT SEEN: a dynamic import by string; a reader that queries the partition by a pk and sk prefix it builds "
+        "without naming the kind; wording that diagnoses without a listed term (the tripwire reads words, not meaning)."
+    ),
+    "proved_on": "2026-11-26",
+}

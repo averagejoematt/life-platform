@@ -310,7 +310,16 @@ class TestJournalMining:
         assert entry["date"] == "2026-08-01"
         assert entry["template"] == "Morning"
         assert entry["enriched_themes"] == ["avoidance"]
-        assert entry["enriched_avoidance_flags"] == ["late_night_snacking"]
+        # #6286: the model-inferred avoidance label is withheld from challenge mining.
+        assert "enriched_avoidance_flags" not in entry
+
+    def test_mood_resolves_self_report_first_and_marks_a_model_fallback(self, table):
+        """#6286: his own rating wins over the model's; a model-only score is marked."""
+        seed(table, "notion", "DATE#2026-08-01#journal#morning", template="Morning", morning_mood=2, enriched_mood=4, enriched_stress=3)
+        entry = chg.gather_context()["journal_14d"][0]
+        assert (entry["mood"], entry["mood_source"]) == (2.0, "self_report")
+        assert (entry["stress"], entry["stress_source"]) == (3.0, "model_inferred")
+        assert "energy" not in entry
 
     def test_an_unenriched_entry_carries_no_empty_enrichment_keys(self, table):
         """ADR-104: an entry the enricher has not reached yet is silent about

@@ -362,6 +362,9 @@ SOURCE_TIERS: dict[str, int] = {
     # so owner-only with no public projection and no aggregate carve-out. Declared before the first row exists
     # (ADR-154's ordering). Reader and writer: the owner's MCP tool `manage_research_finding` only; no coach prompt,
     # page or email reads it — `tests/test_research_findings_6208.py` holds the publication boundary.
+    # #6292: the same partition also holds his working hypotheses about himself (PERSONAL_HYPOTHESIS#, a second record
+    # kind, `research/hypotheses.py`) — interpretations he reviews, confirms, corrects or rejects. Same tier, no new
+    # source: reader and writer `manage_personal_hypothesis` only (writes queue-only); `tests/test_personal_hypotheses_6292.py`.
     "research_findings": TIER_OWNER_ONLY,
     # ── internal: never published, but inside owner-facing tooling and AI context ──
     # ADR-155 amendment (2026-10-12, owner ruling): the owner clinical record

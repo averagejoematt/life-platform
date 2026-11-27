@@ -363,6 +363,8 @@ SOURCE_CLASS: dict[str, str] = {
     # #6208: the research findings store (FINDING#<id> + its FINDING#<id>#EV# events, `research/findings.py`).
     # CROSS_PHASE: external evidence and what he decided about it do not belong to a cycle — a finding read in one
     # cycle still answers its question in the next. Never tagged, never wiped, never phase-filtered.
+    # #6292: its second record kind, PERSONAL_HYPOTHESIS#<id> (+ #EV# events, `research/hypotheses.py`), is CROSS_PHASE
+    # for the same reason and more so: a hypothesis about the person, and his rejection of one, is not about a cycle.
     "research_findings": CROSS_PHASE,
     "coach_corrections": CROSS_PHASE,  # #1689 (epic #1687 "The Coach Correction Loop"): Matthew's
     # class-tagged corrections to weekly AI-review-pack items (`lambdas/coach_corrections.py`,
@@ -574,6 +576,9 @@ MEMORY_DURABLE_CATEGORIES = frozenset(
         # fact about Matthew's body, not the current experiment run — same reasoning
         # as constraints_preferences, a reset must not silently clear one.
         "training",
+        # #6287: a reviewed personal record (a recollection, a confirmed event) is a fact
+        # about Matthew's life the owner approved — a reset must not clear it.
+        "personal_record",
     }
 )
 MEMORY_SCOPED_CATEGORIES = frozenset(

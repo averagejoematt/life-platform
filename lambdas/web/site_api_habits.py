@@ -3,6 +3,7 @@
 capture helpers and the P1.1 taxonomy. Handlers read facade state via `_g` (see freshness)."""
 
 import math
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
@@ -214,12 +215,44 @@ def public_tier0_summary(table, as_of: str, start: str, *, streak_names=None):
                 {  # ADR-058: hide pilot habitify records
                     "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}habitify") & Key("sk").between(f"DATE#{start}", f"DATE#{as_of}"),
                     "ScanIndexForward": False,
+                    **_tier0_projection(registry),
                 }
             ),
         ).get("Items", [])
     )
     restraints = {str(n) for n in (streak_names or ())} | {str(k) for k in streak_map}
     return AP.public_tier0_figures(rows, registry, restraints, as_of, start)
+
+
+#: Past this the projection falls back to whole ``habit_statuses`` maps (DynamoDB caps an expression at 4 KB).
+_MAX_PROJECTION_CHARS = 3500
+
+
+def _tier0_projection(registry) -> dict:
+    """#6271: the ``ProjectionExpression`` for the window read in ``public_tier0_summary`` — each row's key and date,
+    and the whole stored status of each habit the owner's registry puts in tier 0, nothing else.
+
+    Only those habits can count: ``AP.public_tier0_counts`` skips every status whose registry entry is not a tier-0
+    mapping, and the restraint union is only ever asked about the habits it counts. Each kept status is the stored
+    value unchanged, so the predicate sees exactly what it saw in the whole row and the figures are the same
+    (``tests/test_public_tier0_read_6271.py`` replays both). A projection is applied AFTER the read: it cuts the bytes
+    sent and parsed, not the read capacity consumed or the 1 MB page boundary."""
+    reg = registry if isinstance(registry, Mapping) else {}
+    tier0 = sorted(str(n) for n, meta in reg.items() if isinstance(meta, Mapping) and habit_tier(dict(meta)) == 0)
+    names = {"#t0sk": "sk", "#t0date": "date"}
+    paths = ["#t0sk", "#t0date"]
+    if tier0:
+        names["#t0hs"] = "habit_statuses"
+        for i, name in enumerate(tier0):
+            names[f"#t0h{i}"] = name
+            paths.append(f"#t0hs.#t0h{i}")
+    expr = ", ".join(paths)
+    if len(expr) > _MAX_PROJECTION_CHARS:  # whole status maps: the same figures, more bytes
+        return {
+            "ProjectionExpression": "#t0sk, #t0date, #t0hs",
+            "ExpressionAttributeNames": {"#t0sk": "sk", "#t0date": "date", "#t0hs": "habit_statuses"},
+        }
+    return {"ProjectionExpression": expr, "ExpressionAttributeNames": names}
 
 
 def public_tier0_or_none(table, as_of: str, start: str):

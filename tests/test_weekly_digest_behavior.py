@@ -1258,13 +1258,15 @@ class TestExJournal:
         assert out["entries"] == 2
         assert out["days_journaled"] == 2
 
-    def test_the_raw_notion_field_is_used_only_when_the_enrichment_is_missing(self):
+    def test_his_own_rating_outranks_the_model_score(self):
+        """#6286: self-report first; the model's score only when he gave no rating."""
         entries = {
             "2026-08-02": [jentry(enriched_mood=5, morning_mood=1)],
             "2026-08-03": [jentry(morning_mood=3)],
+            "2026-08-04": [jentry(enriched_mood=2)],
         }
-        # enriched wins on day 1 → (5 + 3)/2 = 4.0
-        assert wd.ex_journal(entries)["mood_avg"] == 4.0
+        # his 1 wins on day 1 → (1 + 3 + 2)/3 = 2.0
+        assert wd.ex_journal(entries)["mood_avg"] == 2.0
 
     def test_best_and_worst_mood_days_come_from_the_per_day_means(self):
         entries = {
@@ -1285,11 +1287,14 @@ class TestExJournal:
         assert out["top_themes"][1] == ("sleep", 2)
         assert len(out["top_themes"]) == 6
 
-    def test_avoidance_flags_are_deduplicated_and_capped(self):
+    def test_model_inferred_psych_labels_are_withheld(self):
+        """#6286: avoidance / cognitive labels are neither rendered nor handed to the digest's AI."""
         entries = {
-            "2026-08-02": [jentry(enriched_avoidance_flags=["scrolling", "scrolling", "snacking"])],
+            "2026-08-02": [jentry(enriched_avoidance_flags=["scrolling"], enriched_cognitive_patterns=["catastrophising"])],
         }
-        assert wd.ex_journal(entries)["avoidance_flags"] == ["scrolling", "snacking"]
+        out = wd.ex_journal(entries)
+        assert "avoidance_flags" not in out and "cognitive_patterns" not in out
+        assert "scrolling" not in repr(out) and "catastrophising" not in repr(out)
 
     def test_notable_quotes_carry_their_date_and_are_capped_at_three(self):
         entries = {f"2026-08-0{2 + i}": [jentry(enriched_notable_quote=f"q{i}")] for i in range(4)}
@@ -1301,11 +1306,10 @@ class TestExJournal:
         assert wd.ex_journal({"2026-08-02": [jentry(raw_text="just words")]})["mood_avg"] is None
 
     def test_raw_energy_and_stress_fields_back_fill_a_missing_enrichment(self):
-        entries = {"2026-08-02": [jentry(morning_energy=4, stress_level=2, enriched_cognitive_patterns=["catastrophising"])]}
+        entries = {"2026-08-02": [jentry(morning_energy=4, stress_level=2)]}
         out = wd.ex_journal(entries)
         assert out["energy_avg"] == 4.0
         assert out["stress_avg"] == 2.0
-        assert out["cognitive_patterns"] == ["catastrophising"]
 
     def test_the_end_of_day_energy_field_is_the_second_raw_fallback(self):
         assert wd.ex_journal({"2026-08-02": [jentry(energy_eod=5)]})["energy_avg"] == 5.0
@@ -2079,14 +2083,15 @@ class TestBuildHtmlSections:
             "entries": 5,
             "days_journaled": 4,
             "top_themes": [("work", 3), ("sleep", 2)],
-            "avoidance_flags": ["scrolling"],
+            "avoidance_flags": ["scrolling"],  # a stale key from a pre-#6286 extractor
             "notable_quotes": [{"date": "2026-08-04", "quote": "I chose the walk."}],
         }
         html = wd.build_html(digest_data(this={"journal": journal}, prior={"journal": {"mood_avg": 3.0}}), BOARD_TEXT, profile_row())
         assert "3.5/5" in html
         assert "5 across 4 days" in html
         assert "work (3)" in html
-        assert "scrolling" in html
+        # #6286: no "Avoidance" row — a model-inferred label is never printed as a finding.
+        assert "scrolling" not in html and "Avoidance" not in html
         assert "I chose the walk." in html
 
     def test_the_productivity_section_renders_the_task_counts(self):

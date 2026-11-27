@@ -684,6 +684,8 @@ ALLOWED_TO_NAME = frozenset(
         "lambdas/privacy/field_tiers.py",  # TIER_OWNER_ONLY
         "lambdas/experiment/phase_taxonomy.py",  # CROSS_PHASE
         "deploy/config_ownership_audit.py",  # the allowlist's ownership ruling names the verifier
+        "lambdas/research/hypotheses.py",  # #6292: the personal-hypothesis kind in the same partition (its own sk family)
+        "mcp/tools_personal_hypotheses.py",  # #6292: that kind's owner tool (reads direct, writes queue-only); builds no finding row
     }
 )
 RUNTIME_TREES = ("lambdas/", "mcp/", "deploy/", "cdk/")
@@ -764,7 +766,16 @@ def _closure(graph: dict[str, set[str]], roots: list[str]) -> set[str]:
 #: The public publishing pipeline and every coach-facing package: the site API, the content generators, the email
 #: lambdas, and the coach package (no coach prompt reads the store). None may reach it, module-level or lazily.
 NO_READ_PACKAGES = ("web.", "content.", "emails.", "coach.", "ai.", "intelligence.", "compute.")
-STORE_MODULES = frozenset({"research.findings", "research.finding_risk", "research.finding_sources", "mcp.tools_research_findings"})
+STORE_MODULES = frozenset(
+    {
+        "research.findings",
+        "research.finding_risk",
+        "research.finding_sources",
+        "mcp.tools_research_findings",
+        "research.hypotheses",  # #6292: the personal-hypothesis kind in the same partition
+        "mcp.tools_personal_hypotheses",
+    }
+)
 
 
 def test_no_public_or_coach_module_can_reach_the_store():

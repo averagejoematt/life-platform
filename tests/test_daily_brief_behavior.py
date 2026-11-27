@@ -709,11 +709,32 @@ class TestExtractJournalSignals:
         assert out["themes"] == ["a", "b", "c", "d"]  # dedup, first four
         assert out["emotions"] == ["x", "y"]
 
-    def test_the_primary_defense_leads_the_defense_list(self):
+    def test_model_inferred_psych_labels_are_withheld(self):
+        """#6286: defense / avoidance / cognitive labels never reach journal_signals (the coach prompt's feed)."""
         out = brief.extract_journal_signals(
-            [{"template": "evening", "enriched_defense_patterns": ["intellectualising"], "enriched_primary_defense": "avoidance"}]
+            [
+                {
+                    "template": "evening",
+                    "enriched_defense_patterns": ["intellectualising"],
+                    "enriched_primary_defense": "avoidance",
+                    "enriched_avoidance_flags": ["hard call"],
+                    "enriched_cognitive_patterns": ["catastrophising"],
+                }
+            ]
         )
-        assert out["defense_patterns"][0] == "avoidance"
+        assert not {"defense_patterns", "avoidance_flags", "cognitive_patterns", "primary_defense"} & set(out)
+        assert "intellectualising" not in repr(out) and "hard call" not in repr(out) and "catastrophising" not in repr(out)
+
+    def test_his_own_rating_outranks_the_model_score(self):
+        """#6286: self-report first; the model's score only for an entry he did not rate."""
+        out = brief.extract_journal_signals(
+            [
+                {"template": "morning", "morning_mood": 2, "enriched_mood": 5, "stress_level": 4, "enriched_stress": 1},
+                {"template": "evening", "enriched_mood": 4},
+            ]
+        )
+        assert out["mood_avg"] == 3.0  # (2 self-report + 4 model-only) / 2 — never the model's 5
+        assert out["stress_avg"] == 4.0
 
     def test_social_quality_is_the_most_recent_reading(self):
         out = brief.extract_journal_signals(
