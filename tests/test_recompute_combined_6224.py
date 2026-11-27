@@ -597,7 +597,7 @@ def test_backups_are_not_anonymously_readable():
             assert not any("/backups/" in r or r.endswith(":::matthew-life-platform/*") for r in res), st.get("Sid")
 
 
-def test_the_probe_evidence_is_printed_per_tool_and_an_absent_one_says_not_run(tmp_path):
+def test_the_backup_section_states_the_owners_four_points_in_order(tmp_path):
     import recompute_character_combined_sections as S
 
     ev = {
@@ -615,8 +615,11 @@ def test_the_probe_evidence_is_printed_per_tool_and_an_absent_one_says_not_run(t
     f.write_text(json.dumps(ev))
     lines = S.probe_lines({"probe_evidence": S.load_probe_evidence([str(f)])})
     text = "\n".join(lines)
-    assert "PUBLIC tool, exercised once for real" in text and "PreconditionFailed, HTTP 412" in text
-    assert "PRIVATE tool: its own live conditional-put probe has NOT run" in text
-    assert "PROVEN on this bucket and role for the public path" in text
-    none = "\n".join(S.probe_lines({"probe_evidence": {}}))
-    assert "no path yet" in none and "PUBLIC tool: its own live conditional-put probe has NOT run" in none
+    assert lines[1].startswith("1. The PUBLIC tool demonstrated the real S3 conditional write") and "HTTP 412" in lines[1]
+    assert "private path was not independently exercised against real S3 because permission was denied." in lines[2]
+    assert lines[3].startswith("3. The operative safeguard") and "zero data writes" in lines[3]
+    assert lines[4].startswith("4. The synthetic probe objects are retained")
+    assert "pending" not in text.lower() and "optional" not in text.lower() and "has not run" not in text.lower()
+    for name in S.SAFEGUARD_TESTS["public"] + S.SAFEGUARD_TESTS["private"]:  # every cited test exists
+        path, test = name.split("::")
+        assert f"def {test}(" in open(os.path.join(ROOT, path), encoding="utf-8").read(), name

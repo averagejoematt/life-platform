@@ -503,26 +503,39 @@ def load_probe_evidence(paths: list) -> dict:
             else "private" if key.startswith("backups/character-private-recompute/") else None
         )
         if tool:
-            out[tool] = dict(ev, _file=os.path.basename(path))
+            out[tool] = dict(ev, _file=os.path.basename(path), _path=path)
     return out
 
 
-def _evidence_line(tool: str, ev: dict) -> str:
+PRIVATE_NOT_EXERCISED = "the private path was not independently exercised against real S3 because permission was denied."
+PRIVATE_BACKUP_TESTS = "nine, as reported by its owner"
+# the rule both tools satisfy, and the stub tests that prove each side of it (read from the two test files)
+SAFEGUARD_TESTS = {
+    "public": (
+        "tests/test_recompute_combined_6224.py::test_the_backup_is_written_and_verified_before_the_first_write",
+        "tests/test_recompute_combined_6224.py::test_a_failing_backup_put_aborts_with_zero_writes",
+        "tests/test_recompute_combined_6224.py::test_an_existing_matching_backup_resumes_and_a_different_one_stops",
+    ),
+    "private": (
+        "tests/test_recompute_character_private_6311.py::test_backup_is_verified_before_the_first_write",
+        "tests/test_recompute_character_private_6311.py::test_a_resume_refuses_a_local_export_that_differs_from_the_s3_preimage",
+        "tests/test_recompute_character_private_6311.py::test_a_resume_after_an_outside_write_stops_and_directs_to_rollback",
+    ),
+}
+
+
+def _public_evidence_line(ev: dict) -> str:
     if not ev:
-        return f"- {tool.upper()} tool: its own live conditional-put probe has NOT run (no evidence file given). " + (
-            "It uses the same S3 call and client settings as the public path (endpoint s3.us-west-2, s3v4, checksum "
-            "`when_supported`, bucket-default encryption) through its own `put_verified_backup`, unit-tested on stubs."
-            if tool == "private"
-            else ""
-        )
+        return "1. The PUBLIC tool's real S3 conditional write: no evidence file was given to this run (`--probe-evidence`)."
     s3 = ev.get("2b_s3_response") or {}
     anon = ev.get("anonymous_read") or {}
     return (
-        f"- {tool.upper()} tool, exercised once for real ({ev.get('started', '')[:16].replace('T', ' ')}Z, `{ev.get('_file')}`): a synthetic "
-        f"object at `{ev.get('key')}` (+ `.sha256`) was created and read back to its sha256 "
-        f"({(ev.get('1_created') or {}).get('readback_matches')}); a second conditional put of different bytes was refused by S3 "
-        f"({s3.get('code')}, HTTP {s3.get('http')}); the tool given a DIFFERENT export stopped; given the same export it "
-        f"resumed without writing ({(ev.get('4_tool_same') or {}).get('resumed')}); object unchanged "
+        f"1. The PUBLIC tool demonstrated the real S3 conditional write and overwrite protection "
+        f"({ev.get('started', '')[:16].replace('T', ' ')}Z, through its own `backup_export` with the real `S3Backups` store; "
+        f"evidence `{ev.get('_path')}`): a synthetic object at `{ev.get('key')}` (+ `.sha256`) was created and read back to "
+        f"its sha256 ({(ev.get('1_created') or {}).get('readback_matches')}); a second conditional put of different bytes was "
+        f"refused by S3 ({s3.get('code')}, HTTP {s3.get('http')}); the tool given a DIFFERENT export stopped; given the same "
+        f"export it resumed without writing ({(ev.get('4_tool_same') or {}).get('resumed')}); the object is unchanged "
         f"({ev.get('5_object_unchanged')}), one version of each object; anonymous read "
         + ", ".join(f"{h} {c}" for h, c in anon.items())
         + f"; boto3/botocore {ev.get('boto3')}/{ev.get('botocore')}."
@@ -530,14 +543,22 @@ def _evidence_line(tool: str, ev: dict) -> str:
 
 
 def probe_lines(c: dict) -> list:
-    ev = c.get("probe_evidence") or {}
-    lines = ["**The conditional backup write, exercised against the real bucket (evidence files, not run by this runner):**"]
-    lines.append(_evidence_line("public", ev.get("public") or {}))
-    lines.append(_evidence_line("private", ev.get("private") or {}))
-    proven = [t for t in ("public", "private") if ev.get(t)]
-    lines.append(
-        "- So of the preflights' stated limits: the conditional put itself is now PROVEN on this bucket and role for the "
-        + (" and ".join(proven) + " path" + ("s" if len(proven) > 1 else "") if proven else "— no path yet")
-        + "; request-time write permission on the day of the apply remains unprovable by a read."
-    )
-    return lines
+    ev = (c.get("probe_evidence") or {}).get("public") or {}
+    return [
+        "**The backup write, for the real migration:**",
+        _public_evidence_line(ev),
+        f"2. The {PRIVATE_NOT_EXERCISED[0].upper() + PRIVATE_NOT_EXERCISED[1:]} The private implementation uses the same "
+        "underlying S3 operation and client settings (endpoint s3.us-west-2, s3v4, checksum `when_supported`, "
+        "bucket-default encryption) through its own function `put_verified_backup`, and has "
+        f"{PRIVATE_BACKUP_TESTS} tests on stand-in storage.",
+        "3. The operative safeguard, a rule BOTH tools satisfy: the backup is created and verified BEFORE any historical "
+        "scoring record is modified; a failed backup or a mismatch stops the migration with zero data writes. Proven on "
+        "stubs — public: "
+        + "; ".join(f"`{t}`" for t in SAFEGUARD_TESTS["public"])
+        + "; private: "
+        + "; ".join(f"`{t}`" for t in SAFEGUARD_TESTS["private"])
+        + "; and both together in the end-to-end test.",
+        "4. The synthetic probe objects are retained as internal migration evidence; neither tool nor this runner deletes them.",
+        "- Of the preflights' stated limits, the conditional put is thus proven on this bucket and role through the public "
+        "path; request-time write permission on the day of the apply remains unprovable by a read.",
+    ]

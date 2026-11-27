@@ -425,8 +425,8 @@ def summary_md(c: dict, preliminary: bool) -> str:
         f"previous day. Definition: {sd.get('definition')}",
         "- Approval and apply must fall in ONE nightly cycle: both tools refuse once a newer stored sheet exists.",
         "- #6096 landing first would change the plan (re-run, re-approve).",
-        "- The conditional put: see the backup section — proven per tool from the evidence files given; request-time "
-        "write permission on the day remains unprovable by a read.",
+        "- The conditional put: proven through the public path (backup section); request-time write permission on the "
+        "day remains unprovable by a read.",
         "",
     ]
     return "\n".join(lines)
@@ -488,7 +488,7 @@ def main(argv: list) -> int:
         "--probe-evidence",
         action="append",
         default=[],
-        help="a conditional-put probe evidence JSON (one per tool; repeatable) — printed in the backup section, never run here",
+        help="the public tool's conditional-put probe evidence JSON — printed in the backup section; no probe is run here",
     )
     ap.add_argument("--previous", help="a previous public dry run's manifest.json (e.g. #6283's) — the event deltas since it")
     args = ap.parse_args(argv)
