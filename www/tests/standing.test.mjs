@@ -32,7 +32,7 @@ test("the four parts carry served figures, the producer's verdict as a status, a
   assert.deepEqual(parts.map((p) => [p.id, p.value, p.status]), [
     ["body", "38.6 lb", "measured"],
     ["behaviour", "1 of 5", "being tested"],
-    ["life", "3 of 6", "not established"],
+    ["life", "3 of 6", "measured in part"],
     ["ai", "37 v 39", "no advantage shown"],
   ]);
   const none = fourParts({ body: null, lab: null, measured: 0, lead: null });

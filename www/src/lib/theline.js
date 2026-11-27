@@ -30,6 +30,12 @@ const PAPER = "#F4F4F0";
  * }} o
  */
 export function theLine(o) {
+  return theLineParts(o).svg;
+}
+
+/** The same figure with its geometry, for a figure that stands on it (lib/thedays.js draws the days under The Line on
+ *  one time axis): { svg, W, H, pad, baseY, points } — `points` are the readings in the svg's own units. */
+export function theLineParts(o) {
   const mobile = Boolean(o.mobile);
   const W = o.width || (mobile ? 350 : 1240);
   const H = o.height || (mobile ? 280 : 400);
@@ -38,7 +44,7 @@ export function theLine(o) {
   const all = (o.days || []).filter((d) => d && d.date);
   const days = all.filter((d) => (!o.from || d.date >= o.from) && (!o.to || d.date <= o.to));
   const readings = days.filter((d) => d.value != null && !d.gap);
-  if (!readings.length) return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || "no weigh-ins")}"></svg>`;
+  if (!readings.length) return { svg: `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || "no weigh-ins")}"></svg>`, W, H, pad: { l: 0, r: 0, t: 0, b: 0 }, baseY: H, points: [] };
   const pad = { l: mobile ? 8 : 14, r: mobile ? 8 : 14, t: mobile ? 34 : 40, b: (o.chapters || []).length ? (mobile ? 52 : 56) : 30 };
   const x0 = t(days[0].date);
   const x1 = t(days[days.length - 1].date);
@@ -148,7 +154,7 @@ export function theLine(o) {
   const last = readings[readings.length - 1];
   marks += `<circle cx="${X(first.date).toFixed(1)}" cy="${Y(first.value).toFixed(1)}" r="${mobile ? 4 : 5}" fill="${PAPER}" stroke="${INK}" stroke-width="2"/>`;
   marks += `<circle cx="${X(last.date).toFixed(1)}" cy="${Y(last.value).toFixed(1)}" r="${mobile ? 5 : 6}" fill="${COBALT}"/>`;
-  label(X(first.date), [Y(first.value) - 12, pad.t - 16], `${num(first.value, 1)} ${unit} · ${dayInWords(first.date, { short: true })}`, "start", INK, 600);
+  label(X(first.date) + (o.startLabelDx || 0), [Y(first.value) - 12, pad.t - 16], `${num(first.value, 1)} ${unit} · ${dayInWords(first.date, { short: true })}`, "start", INK, 600);
   label(X(last.date) - 10, [Y(last.value) + 4, Y(last.value) - 14, Y(last.value) + 20], `${num(last.value, 1)} ${unit} · ${dayInWords(last.date, { short: true })}`, "end", COBALT, 600);
   for (const r of o.rungs || []) {
     if (!r.date || r.date < days[0].date || r.date >= last.date || r.lb < lo || r.lb > hi) continue;
@@ -163,7 +169,9 @@ export function theLine(o) {
     v: d.value,
     label: `${dayInWords(d.date, { weekday: true })} · ${num(d.value, 1)} ${unit}${o.startDate && d.date !== o.startDate && o.startValue != null ? ` · ${num(d.value - o.startValue, 1)} since day one` : ""}`,
   }));
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(o.aria || "")}" data-chart data-points="${esc(JSON.stringify(points))}">${g}${marks}${labels}</svg>`;
+  // `bare` (the days figure nests this drawing inside its own svg): no inspector hooks, no accessible name of its own
+  const head = o.bare ? `<svg x="0" y="${o.y || 0}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">` : `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(o.aria || "")}" data-chart data-points="${esc(JSON.stringify(points))}">`;
+  return { svg: `${head}${g}${marks}${labels}</svg>`, W, H, pad, baseY, points };
 }
 
 /** Counts for the figure's caption, from the same days the figure draws. */

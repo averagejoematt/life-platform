@@ -53,7 +53,8 @@ export function fourParts({ body, lab, measured, lead }) {
   return [
     { id: "body", part: "The body", status: "measured", value: body ? `${num(Math.abs(body.lost), 1)} lb` : null, short: body ? (lighter ? "lighter" : "heavier") : "not served" },
     { id: "behaviour", part: "The behaviour", status: "being tested", value: lab ? `${lab.decided} of ${lab.open}` : null, short: lab ? "tests with a verdict" : "not served" },
-    { id: "life", part: "The life", status: "not established", value: `${measured} of ${DIMENSIONS}`, short: "dimensions measured" },
+    // owner, 2026-11-27: coverage, not a verdict — an uninstrumented dimension is "not measured", never "not established"
+    { id: "life", part: "The life", status: "measured in part", value: `${measured} of ${DIMENSIONS}`, short: "dimensions have a public measure" },
     {
       id: "ai",
       part: "The AI",

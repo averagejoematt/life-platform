@@ -22,6 +22,7 @@ import { ARCHIVE_SEGMENT, archivalFor, archivalWhat, editionFor, editionReading 
 import { bodyForPage } from "../../lib/chapter_body.js";
 import { loadChapterEditions } from "../../lib/snapshot.js";
 import FeaturedNext from "../../components/FeaturedNext.astro";
+import TheDays from "../../components/TheDays.astro"; // the chapter's days as the record holds them (2026-11-27, proposal)
 import { PATH, PATH_CHAPTERS } from "../../lib/editorial.js"; // the editorial release: the featured path, in this page's chrome only
 import { FEATURE_LIST } from "../../lib/feature.js";
 
@@ -331,7 +332,8 @@ const mins = (s: number | null) => (s == null ? null : `${Math.floor(s / 60)}:${
         {
           weekDays.length > 0 && (
             <div style="margin-top:48px" id="days">
-              <p class="label">The week, day by day</p>
+              {c.status === "published" && win && <TheDays variant="week" from={win[0]} to={win[1]} id="week-record" />}
+              <p class="label" style="margin-top:28px">The week, day by day</p>
               <nav class="rows" aria-label="The week, day by day" style="margin-top:8px">
                 {weekDays.map((d) => {
                   const row = dayRow(d);

@@ -10,6 +10,7 @@ import StatusTag from "../components/StatusTag.astro";
 import VersusGuess from "../components/VersusGuess.astro";
 import WhatHappensNext from "../components/WhatHappensNext.astro";
 import OwnWords from "../components/OwnWords.astro";
+import TheDays from "../components/TheDays.astro";
 import { NARRATOR_BYLINE } from "../lib/narrator.js";
 import { headline, weeklyBars } from "../lib/chart.js";
 import { readingWords, scaleWords, weeklySpark } from "../lib/spark.js";
@@ -259,7 +260,8 @@ const standing: Standing[] = [
   },
   {
     ...fig("life"),
-    text: `dimensions of a life have a public measure${measured === 3 ? ", all of them the body's" : ""}. Whether I'm happier is not established.`,
+    // owner, 2026-11-27: the coverage is stated as coverage; what is not instrumented is never an unfavourable result
+    text: `dimensions of a life have a public measure${measured === 3 ? ", all of them the body's" : ""}. The others are not measured here, which says nothing about them.`,
     to: "#portrait",
   },
   {
@@ -324,25 +326,10 @@ const standing: Standing[] = [
           }
         </ol>
       </div>
-      {
-        lineData && (
-          <figure class="theline" id="the-line" data-theline data-payload={JSON.stringify(lineData)} data-aria={lineAria}>
-            <figcaption class="theline-head">
-              <span class="label theline-fig">Fig. 1 — The Line · the part that is measured · every morning on the scale since day one</span>
-            </figcaption>
-            <div class="theline-chart" data-theline-chart set:html={lineSvg} />
-            <div class="theline-key">
-              <ul class="theline-legend">
-                <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><path d="M2,9 L14,4 L26,6" fill="none" stroke="#121212" stroke-width="1.6"/><circle cx="14" cy="4" r="2.6" fill="#121212"/></svg>a morning on the scale · {lineCount.readings} in {lineCount.days} days</li>
-                <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><path d="M2,4 L26,8" fill="none" stroke="#121212" stroke-width="1.4" stroke-dasharray="2 3"/><rect x="12.5" y="4" width="3" height="7" fill="none" stroke="#5C5C58"/></svg>no weigh-in · {lineCount.missing} {lineCount.missing === 1 ? "morning" : "mornings"}, left blank</li>
-                <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><rect x="1" y="1" width="26" height="10" fill="#1B3FD6" opacity="0.14"/></svg>below the first morning</li>
-                {lineChapters.length > 0 && <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><line x1="14" y1="0" x2="14" y2="7" stroke="#1B3FD6" stroke-width="1.5"/></svg>a chapter, numbered</li>}
-              </ul>
-              <a href={href("/data/journey/")}>The journey: the pace, the milestones, every reading →</a>
-            </div>
-          </figure>
-        )
-      }
+      {/* 2026-11-27 (proposal): The Line and the days under it are one figure (components/TheDays.astro). It replaces the
+          Line as a lone weight chart AND Fig. 2, the six portrait tiles: the three measured dimensions are staves on the same
+          days, the three unmeasured ones are staves left empty. */}
+      <TheDays variant="start" id="the-line" />
       <div class="row" style="margin-top:20px">
         {/* owner decision 2A on PR #6263 (2026-11-24): the old "Start here: the moments" button is retired; it competed with
             the first screen's one primary entry into the story (the featured path). /story/moments/ stays reachable from /story/. */}
@@ -351,41 +338,10 @@ const standing: Standing[] = [
     </div>
   </section>
 
-  <section class="section hair portrait-band">
+  {/* owner, 2026-11-27: the "three measured, three not yet" line is cut — a count beside the quotation implied the
+      uninstrumented parts of a life were absent or deficient. His sentence and its provenance stand alone. */}
+  <section class="section hair portrait-band" id="portrait">
     <div class="wrap">
-      <figure class="portrait" id="portrait">
-        <figcaption class="between">
-          <span class="label">Fig. 2 — The portrait{edition?.day_n != null && `, day ${edition.day_n}`}</span>
-          <span class="verified" style="font-size:11px">{edition ? `As of ${dayInWords(edition.as_of, { short: true })}` : "From the platform"} · blank where nothing is measured in public</span>
-        </figcaption>
-        <div class="tiles portrait-tiles">
-          {
-            dims.map((d) =>
-              d.href ? (
-                <a class="tile" href={href(d.href)}>
-                  <span class="label">{d.label} · {d.instrument}</span>
-                  <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}{d.value != null && d.what && <small class="v-what"> {d.what}</small>}</span>
-                  <span class="spark" data-spark-of={d.key} data-latest={d.latest} set:html={sparkOf(d).svg} />
-                  {scaleWords(sparkOf(d).plan, d) && <span class="spark-scale mono">{scaleWords(sparkOf(d).plan, d)}</span>}
-                  <span class="note">{d.note}</span>
-                </a>
-              ) : (
-                <div class="tile">
-                  <span class="label">{d.label} · {d.instrument}</span>
-                  <span class={`v num ${d.value == null ? "hollow" : ""}`}>{d.value == null ? "—" : d.value}{d.value != null && d.unit && <small> {d.unit}</small>}{d.value != null && d.what && <small class="v-what"> {d.what}</small>}</span>
-                  <span class="spark" data-spark-of={d.key} data-latest={d.latest} set:html={sparkOf(d).svg} />
-                  {scaleWords(sparkOf(d).plan, d) && <span class="spark-scale mono">{scaleWords(sparkOf(d).plan, d)}</span>}
-                  <span class="note">{d.note}</span>
-                </div>
-              ),
-            )
-          }
-        </div>
-        <p class="serif muted portrait-ratio">
-          {WORDS[measured] ? WORDS[measured][0].toUpperCase() + WORDS[measured].slice(1) : measured} {measured === 1 ? "dimension" : "dimensions"} measured,{" "}
-          {WORDS[6 - measured] || 6 - measured} not yet. That ratio is the project: the body is the easy part to instrument.
-        </p>
-      </figure>
       <OwnWords id="content" class="portrait-words" note="One evening's sentence, not a measurement — nothing published here measures how I feel." />
     </div>
   </section>
