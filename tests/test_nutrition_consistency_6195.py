@@ -62,9 +62,12 @@ def off_render():
 def test_every_item_ships_off():
     # Committed state (owner ruling 2026-11-22): GROUP 1 (LABELLING) ON, GROUP 2 (COMPUTED) OFF. The name is historical.
     # ROLLBACK: set the item back to False in common/nutrition_consistency.py, then fleet + site API + MCP deploys.
-    assert COMMITTED == {k: (k in nc.LABELLING) for k in nc.SWITCHES}, COMMITTED
+    # 2026-11-27 (owner, the 21 November partial-day defect): ONE computed item is on — DAY_PAGE_PARTIAL_LABELLED — after
+    # its before/after was read on the live record (one day page changes). Every other computed item stays off.
+    activated = {nc.DAY_PAGE_PARTIAL_LABELLED}
+    assert COMMITTED == {k: (k in nc.LABELLING or k in activated) for k in nc.SWITCHES}, COMMITTED
     assert COMMITTED and all(COMMITTED[k] is True for k in nc.LABELLING)
-    assert all(COMMITTED[k] is False for k in nc.COMPUTED)
+    assert all(COMMITTED[k] is False for k in nc.COMPUTED if k not in activated)
 
 
 def test_the_two_activation_groups_partition_the_switchboard():

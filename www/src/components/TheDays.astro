@@ -1,0 +1,197 @@
+---
+// The Days — every day of the experiment as one column, on one time axis (lib/thedays.js). One figure, three depths:
+//   variant="start"   an introduction: The Line and ONE contrast under it (gym sessions against steps), opened on one
+//                     counted observation, with the door to the full record. No controls but the cursor.
+//   variant="full"    the Data room's primary figure: every stave, the lenses, the range and its pager, the day readout
+//                     with its links, and the same days as a table. On a phone it opens on the newest four weeks.
+//   variant="week"    one chapter's days, wide columns: the week a chapter covers, as the record holds it.
+// It renders nothing when the snapshot holds no Day objects, so a build without them is unchanged.
+import { loadAll, loadCalibration, loadJourney, loadSeries } from "../lib/snapshot.js";
+import { verifiedLead } from "../lib/calibration.js";
+import { roomPublic } from "../lib/room.js";
+import { chapterMeta, chapterWindow, dayInWords, num } from "../lib/format.js";
+import { href, pathOf } from "../lib/url.js";
+import { daysPayload, readout, readoutLine, theDays, topStepsWords, STAVES_FULL, STAVES_START, STAVES_WEEK } from "../lib/thedays.js";
+
+interface Props {
+  variant?: "start" | "full" | "week";
+  from?: string | null;
+  to?: string | null;
+  id?: string;
+}
+const { variant = "full", from = null, to = null, id = "the-days" } = Astro.props;
+
+const all = await loadAll();
+const series = await loadSeries();
+const journey: any = await loadJourney();
+const dayObjs = [...(all.byType.day || [])].filter((d: any) => d.readings).sort((a: any, b: any) => (a.date < b.date ? -1 : 1));
+const chapters = (all.byType.chapter || [])
+  .filter((c: any) => c.status === "published" && Number.isInteger(c.week) && c.week >= 1)
+  .map((c: any) => {
+    const win = chapterWindow(c);
+    const meta = chapterMeta(c);
+    return win && meta ? { from: win[0], to: win[1], n: meta.number, title: c.title, u: href(pathOf("chapter", c.id)) } : null;
+  })
+  .filter(Boolean);
+// what a call was about, in plain words (the ledger's own metric key; an unnamed subject is left out of the count)
+const SUBJECT: Record<string, string> = {
+  weight_lbs: "weight",
+  recovery_score: "recovery score",
+  sleep_duration_hours: "sleep duration",
+  total_protein_g: "protein",
+  total_calories_kcal: "calories",
+  hrv_7day_avg: "heart-rate variability",
+  hrv: "heart-rate variability",
+  deep_pct: "deep sleep",
+  rem_pct: "REM sleep",
+  steps: "steps",
+  resting_heart_rate: "resting heart rate",
+  resting_hr: "resting heart rate",
+};
+// The coaches against a simple guess on the same calls: the room's verified record, as the front page states it. The
+// subject counts in the calls lens never appear without it.
+let baselineWords: string | null = null;
+if (roomPublic()) {
+  try {
+    const f: any = await loadCalibration();
+    const lead = f?.state === "ok" ? verifiedLead(f.calibration || {}) : null;
+    if (lead?.baseline) baselineWords = `On the ${lead.n} forecasts that could be checked fairly, the coaches were right ${lead.k} times and a guess that nothing changes ${lead.baseline.right}${lead.sign?.words ? `: ${lead.sign.words}` : ""}.`;
+  } catch {
+    baselineWords = null;
+  }
+}
+const predById = new Map((all.byType.prediction || []).map((p: any) => [p.id, p]));
+const payload = dayObjs.length
+  ? daysPayload({
+      days: dayObjs,
+      weight: series["weight_lbs"]?.days || [],
+      kcal: series["total_calories_kcal"]?.days || [],
+      protein: series["total_protein_g"]?.days || [],
+      journey,
+      chapters,
+      dayHref: (dayId: string) => href(pathOf("day", dayId)),
+      subjectOf: (pid: string) => SUBJECT[(predById.get(pid) as any)?.metric_key] || null,
+      ledgerHref: href("/system/ledger/"),
+      baselineWords,
+    })
+  : null;
+const staves = variant === "start" ? STAVES_START : variant === "week" ? STAVES_WEEK : STAVES_FULL;
+const D = payload?.days || [];
+const inWindow = D.filter((d: any) => (!from || d.d >= from) && (!to || d.d <= to));
+const show = Boolean(payload && inWindow.length);
+const first = inWindow[0];
+const last = inWindow[inWindow.length - 1];
+const weighed = inWindow.filter((d: any) => d.w != null);
+const sessions = inWindow.filter((d: any) => d.ses).length;
+const aria = show
+  ? `${inWindow.length} days, ${dayInWords(first.d)} to ${dayInWords(last.d)}, one column each. ${weighed.length ? `Weight from ${num(weighed[0].w, 1)} to ${num(weighed[weighed.length - 1].w, 1)} pounds across ${weighed.length} weigh-ins. ` : ""}A gym session was logged on ${sessions} of the ${inWindow.length} days.${variant === "start" ? " The full record, day by day, is in the data room." : " Each day is listed in the table that follows and opens its own page."}`
+  : "";
+const mark = variant === "start" && payload ? payload.topSteps : [];
+const drawn = show ? theDays(payload, { staves, from, to, aria, mark }) : null;
+const cursor = show ? D.indexOf(last) : 0;
+const lensList = variant === "full" && payload ? payload.lenses : [];
+const lost = payload && weighed.length > 1 ? (payload.startValue ?? weighed[0].w) - weighed[weighed.length - 1].w : null;
+const observation = variant === "start" && payload ? topStepsWords(payload) : "";
+---
+
+{
+  show && (
+    <figure class={`thedays thedays-${variant}`} id={id} data-thedays data-variant={variant} data-from={from || undefined} data-to={to || undefined} data-aria={aria} data-mark={mark.length ? mark.join(",") : undefined} data-payload={JSON.stringify(payload)}>
+      <figcaption class="thedays-head">
+        {variant === "start" && <span class="label">Fig. 1 — The Line, and the days under it · every morning on the scale since day one</span>}
+        {variant === "full" && <span class="label">Every day since {dayInWords(D[0].d)} · one column a day · move across it, or tap a day</span>}
+        {variant === "week" && <span class="label">The week in the record · {inWindow.length} days, one column each</span>}
+        {variant === "full" && (
+          <button type="button" class="thedays-play" data-thedays-play data-needs-js hidden>
+            <span aria-hidden="true">▶</span> Play the days
+          </button>
+        )}
+      </figcaption>
+      {variant === "start" && observation && (
+        <p class="thedays-lede serif">
+          {lost != null && lost > 0 && <><b>{num(lost, 1)} pounds lighter</b> in {D.length} days. </>}
+          {observation} <span class="muted">One example of what the days show: they are the cobalt bars below.</span>
+        </p>
+      )}
+      {lensList.length > 1 && (
+        <div class="toolbar thedays-tools" role="toolbar" aria-label="Which days to show" data-needs-js hidden>
+          <div class="toolgroup">
+            <span class="label">Show</span>
+            <span class="seg" role="group" aria-label="Days">
+              {lensList.map((l: any, i: number) => (
+                <button type="button" data-lens={l.id} aria-pressed={i === 0 ? "true" : "false"}>
+                  {l.label}
+                </button>
+              ))}
+            </span>
+          </div>
+          <div class="toolgroup">
+            <span class="label">Range</span>
+            <span class="seg" role="group" aria-label="Range">
+              <button type="button" data-range="all" aria-pressed="true">since the start</button>
+              <button type="button" data-range="56" aria-pressed="false">8 weeks</button>
+              <button type="button" data-range="28" aria-pressed="false">4 weeks</button>
+            </span>
+            <span class="thedays-pager" data-thedays-pager hidden>
+              <button type="button" class="tog-plain" data-page="-1" aria-label="Earlier days">← earlier</button>
+              <span class="mono" data-thedays-span />
+              <button type="button" class="tog-plain" data-page="1" aria-label="Later days">later →</button>
+            </span>
+          </div>
+        </div>
+      )}
+      {lensList.length > 1 && <p class="thedays-count serif" data-thedays-count aria-live="polite" hidden />}
+      <div class="thedays-chart" data-thedays-chart set:html={drawn!.svg} />
+      {variant === "start" ? (
+        <div class="thedays-readout thedays-readout-line" data-thedays-readout aria-live="polite" set:html={readoutLine(payload, cursor)} />
+      ) : (
+        <div class="thedays-readout" data-thedays-readout aria-live="polite" set:html={readout(payload, cursor)} />
+      )}
+      <div class="thedays-key">
+        <ul class="theline-legend">
+          <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><rect x="5" y="2" width="5" height="10" fill="#121212"/><circle cx="20" cy="6" r="2.6" fill="#121212"/></svg>ink: a recorded value</li>
+          <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><rect x="9" y="2.5" width="9" height="7" fill="none" stroke="#5C5C58" stroke-dasharray="2 2"/></svg>hollow: missing or incomplete, never a zero</li>
+          <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><line x1="2" y1="9" x2="26" y2="9" stroke="#121212"/></svg>blank above the rule: no gym session logged (not a rest day)</li>
+          {variant === "start" && <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><rect x="11" y="1" width="6" height="10" fill="#1B3FD6"/></svg>the ten days with the most steps</li>}
+          {staves.includes("calls") && <li><svg viewBox="0 0 28 12" width="28" height="12" aria-hidden="true"><rect x="5" y="3" width="6" height="6" fill="#1B3FD6"/><rect x="17" y="3" width="6" height="6" fill="#D9341C"/></svg>a call graded right, wrong</li>}
+        </ul>
+        {variant === "week" && <a href={href("/data/") + "#the-days"}>These days among all {D.length} →</a>}
+      </div>
+      {variant === "start" && (
+        <div class="row thedays-doors">
+          <a class="btn" href={href("/data/") + "#the-days"}>Explore all {D.length} days: sleep, food, the bar, the coaches' calls →</a>
+          <a class="thedays-door2" href={href("/data/journey/")}>The journey: the pace, the milestones →</a>
+        </div>
+      )}
+      {variant !== "start" && (
+        <details class="thedays-table">
+          <summary>The same days as a table</summary>
+          <div class="thedays-scroll">
+            <table>
+              <thead>
+                <tr><th scope="col">Day</th><th scope="col">Scale, lb</th><th scope="col">Gym session</th><th scope="col">Steps</th><th scope="col">Slept, h</th><th scope="col">Recovery</th><th scope="col">Food, kcal</th></tr>
+              </thead>
+              <tbody>
+                {[...inWindow].reverse().map((d: any) => (
+                  <tr>
+                    <th scope="row"><a href={d.u}>{dayInWords(d.d, { short: true })}</a></th>
+                    <td>{d.w != null ? num(d.w, 1) : "—"}</td>
+                    <td>{d.ses ? (d.vol ? `${num(Math.round(d.vol), 0)} kg` : "logged") : "none logged"}</td>
+                    <td>{d.st != null ? num(d.st, 0) : "—"}</td>
+                    <td>{d.sl != null ? num(d.sl, 1) : "—"}</td>
+                    <td>{d.rec != null ? num(d.rec, 0) : "—"}</td>
+                    <td>{d.fs === "ok" ? num(d.kcal, 0) : d.fs === "wait" ? "not exported yet" : d.fs === "part" ? "incomplete" : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+    </figure>
+  )
+}
+
+<script>
+  import "../islands/thedays.js";
+</script>

@@ -173,6 +173,8 @@ const steps = [
         )
       }
       <a class="btn ghost sm" href={href("/system/ledger/")} style="align-self:flex-start">Open the ledger</a>
+      {/* 2026-11-27 (proposal): the calls' one interactive figure lives in the data room; System links to it, never redraws it */}
+      <a href={href("/data/") + "#the-days"} style="align-self:flex-start;font-size:13px;font-weight:700;color:inherit">See each call on the day it settled, beside what the days held →</a>
     </div>
   </section>
 

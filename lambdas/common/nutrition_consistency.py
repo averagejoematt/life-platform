@@ -62,7 +62,7 @@ DAY_PAGE_PARTIAL_LABELLED = "day_page_partial_labelled"
 BOD_INTRO_CHARTER_RATE = "bod_intro_charter_rate"
 
 # #6195 activation (owner ruling 2026-11-22, verified factual-labelling corrections): GROUP 1 (LABELLING) ON, GROUP 2
-# (COMPUTED) stays OFF until its before/after numbers are read. ROLLBACK: set an item back to False + fleet, site API and MCP deploys.
+# (COMPUTED) stays OFF until its before/after numbers are read — DAY_PAGE_PARTIAL_LABELLED has been (2026-11-27, below). ROLLBACK: set an item back to False + fleet, site API and MCP deploys.
 SWITCHES: dict[str, bool] = {
     PUBLIC_VERDICT_NOT_CLEARANCE: True,
     MAINTENANCE_LABELLED: True,
@@ -73,7 +73,11 @@ SWITCHES: dict[str, bool] = {
     OVERSHOOT_OPTION_LAYERS: True,
     PARTIAL_EXPORT_EXCLUDED: False,
     DAY_PAGE_MAINTENANCE_DATED: False,
-    DAY_PAGE_PARTIAL_LABELLED: False,
+    # ON (owner, 2026-11-27, "own the November 21 partial-day defect"): the day page for 2026-11-21 printed 80 kcal and 15 g
+    # of protein — one breakfast entry, exported at 12:13 — as the day's intake and graded it against the protein floor,
+    # while /api/series already withheld that day. Before/after read on the live record: one day page changes (2026-11-21),
+    # from an unlabelled day to "a partial export, stated as one"; no number, target or grade elsewhere moves.
+    DAY_PAGE_PARTIAL_LABELLED: True,
     BOD_INTRO_CHARTER_RATE: False,
 }
 

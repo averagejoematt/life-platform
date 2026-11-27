@@ -6,6 +6,7 @@ import Base from "../../layouts/Base.astro";
 import Provenance from "../../components/Provenance.astro";
 import LabEntry from "../../components/LabEntry.astro"; // the Laboratory (L1): renders nothing unless WEB_LAB=1
 import FourParts from "../../components/FourParts.astro"; // the four parts of the experiment; this room holds the body
+import TheDays from "../../components/TheDays.astro"; // every day as one column (2026-11-27, proposal)
 import { labEnabled } from "../../lib/lab.js";
 import { headline, weeklyBars } from "../../lib/chart.js";
 import { readingWords, scaleWords, weeklySpark } from "../../lib/spark.js";
@@ -57,8 +58,8 @@ const meansWords = (days: any[]) => {
       <div style="max-width:760px">
         <h1 style="font-size:48px">The data room</h1>
         <p class="dek" style="margin-top:10px;font-size:19px">
-          Pick a dimension, read the latest reading, stop there if you like — or open it, compare it with another at a lag of a day or two, and
-          read what the platform found when it paired them. These readings are one part of the experiment, not its verdict. {window ? `The window is ${dayInWords(window.from)} to ${dayInWords(window.to)}.` : ""}
+          Every day of the experiment is one column below: move across it and each row reads that day. Then pick a dimension, compare it
+          with another at a lag of a day or two, and read what the platform found when it paired them. These readings are one part of the experiment, not its verdict. {window ? `The window is ${dayInWords(window.from)} to ${dayInWords(window.to)}.` : ""}
         </p>
       </div>
       <p class="muted" style="font-size:13px;max-width:300px">
@@ -66,24 +67,15 @@ const meansWords = (days: any[]) => {
       </p>
     </div>
   </section>
+  {/* 2026-11-27 (proposal): the room opens on the days themselves. The figure's readout is the door to any day, so the
+      "Any day since …" row is gone; the tiles below stay as each series' own door. */}
+  <section class="wrap" style="padding-bottom:36px">
+    <TheDays variant="full" />
+  </section>
   {
     (latestDay || hasJourney) && (
       <section class="wrap" style="padding-bottom:28px" aria-label="Into the depth">
         <div class="rows" style="max-width:760px">
-          {latestDay && (
-            <a href={href(pathOf("day", latestDay.id))}>
-              <span>
-                <b>Any day since {dayInWords(firstDay.date)}</b>
-                <br />
-                <span class="muted" style="font-size:13px">
-                  everything recorded on one date — the readings, the session, the night, the food, the coaches — with a slider back to day one
-                </span>
-              </span>
-              <span class="mono muted" style="font-size:12px">
-                →
-              </span>
-            </a>
-          )}
           {hasJourney && (
             <a href={href("/data/journey/")}>
               <span>
