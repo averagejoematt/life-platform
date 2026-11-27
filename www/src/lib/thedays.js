@@ -661,12 +661,13 @@ export function veilMarkup(geom, idx) {
 
 const KIT = ["", "a pencil sketch at the start", "boots and a stick", "a scarf and a stride", "a pack and a lit lantern", "the full kit"];
 
-/** One day on one line, for the Start figure: the date, the scale, the gym and the steps — and the door to the day. */
+/** One day on one line, for the Start figure: the date, the scale, the gym and the steps. No link: the front page's
+ *  reach is ratcheted (tests/test_site_nav_reach_ratchet.py), and the door to any day is the data room's figure. */
 export function readoutLine(p, i) {
   const d = p.days[i];
   if (!d) return "";
   const parts = [d.w != null ? `${num(d.w, 1)} lb` : "no weigh-in", d.ses ? (d.vol ? `gym, ${num(Math.round(d.vol), 0)} kg moved` : "gym session") : "no gym session", d.st != null ? `${num(d.st, 0)} steps` : null].filter(Boolean);
-  return `<p class="td-line"><b>${dayInWords(d.d, { weekday: true })}</b><span class="mono">day ${num(d.n, 0)}</span><span>${parts.join(" · ")}</span><a href="${esc(d.u)}">That day →</a></p>`;
+  return `<p class="td-line"><b>${dayInWords(d.d, { weekday: true })}</b><span class="mono">day ${num(d.n, 0)}</span><span>${parts.join(" · ")}</span></p>`;
 }
 
 /** One day in words, as a small table: the readout under the figure. The build writes it for the newest day; the
