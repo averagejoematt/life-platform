@@ -23,7 +23,8 @@ All fixtures are synthetic and impersonal (the repo is public).
 import os
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 os.environ.setdefault("TABLE_NAME", "life-platform-test")
 os.environ.setdefault("USER_ID", "matthew")
@@ -115,9 +116,16 @@ class WireTable:
         return [c for c in self.calls if c[0] in ("put_item", "update_item") and c[1] == pk]
 
 
+def _frozen_pacific_now():
+    """The handler clock, frozen at noon Pacific on TODAY (the date every write keys on)."""
+    return datetime(TODAY.year, TODAY.month, TODAY.day, 12, 0, tzinfo=ZoneInfo("America/Los_Angeles"))
+
+
 @pytest.fixture
 def wire(monkeypatch):
     t = WireTable()
+    monkeypatch.setattr(tm, "pacific_now", _frozen_pacific_now)
+    monkeypatch.setattr(pm, "pacific_now", _frozen_pacific_now)
     monkeypatch.setattr(tpw, "_table_ref", t)
     monkeypatch.setattr(tm, "_table_ref", t)
     monkeypatch.setattr(tc, "table", t)

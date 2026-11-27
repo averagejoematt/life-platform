@@ -172,7 +172,13 @@ from mcp.tools_lifestyle import (
     tool_update_insight_outcome,
 )
 from mcp.tools_may_tracker import GET_MAY_TRACKER_DESCRIPTION, GET_MAY_TRACKER_INPUT, tool_get_may_tracker  # #5073
-from mcp.tools_memory import tool_delete_platform_memory, tool_list_memory_categories, tool_read_platform_memory, tool_write_platform_memory
+from mcp.tools_memory import (
+    WRITE_PLATFORM_MEMORY_INPUT,
+    tool_delete_platform_memory,
+    tool_list_memory_categories,
+    tool_read_platform_memory,
+    tool_write_platform_memory,
+)
 from mcp.tools_meta import list_registered_tools  # #3668: the meta-tool body, lifted out of this table
 from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_nutrition
 from mcp.tools_owner_words import LOG_OWNER_NOTE_DESCRIPTION, LOG_OWNER_NOTE_INPUT, tool_log_owner_note  # #4584
@@ -1245,68 +1251,7 @@ TOOLS = {
         "schema": {
             "name": "write_platform_memory",
             "description": WRITE_PLATFORM_MEMORY_DESCRIPTION,
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "category": {
-                        "type": "string",
-                        "description": (
-                            "Sanctioned memory category (e.g. 'life_context', 'constraints_preferences', "
-                            "'failure_patterns', 'what_worked', 'coaching_calibration'). Aliases accepted: "
-                            "'episodic_wins' → what_worked, 'failure_pattern' → failure_patterns."
-                        ),
-                    },
-                    "content": {"type": "object", "description": 'Key-value dict; put the readable core in "summary" — what coaches read.'},
-                    "date": {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
-                    "replace_key": {"type": "string", "description": "Exact sk of the one row to rewrite; default adds a new row (#4171)"},
-                    "privacy_tier": {
-                        "type": "string",
-                        "enum": ["public_ok", "coach_context", "private"],
-                        "description": (
-                            "Optional per-record privacy override — may only TIGHTEN the category default. "
-                            "'private' never reaches any generation prompt."
-                        ),
-                    },
-                    "domains": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": (
-                            "Optional bare coach ids this memory is relevant to (sleep, training, nutrition, mind, "
-                            "physical, glucose, labs, explorer). Default: the category's rule (usually all coaches)."
-                        ),
-                    },
-                    # #6287: provenance — personal_record only (queue-only; see the description)
-                    "evidence_kind": {
-                        "type": "string",
-                        "enum": [
-                            "owner_statement",
-                            "confirmed_event",
-                            "recollection",
-                            "self_report",
-                            "observed_pattern",
-                            "ai_interpretation",
-                            "competing_hypothesis",
-                            "confirmed_insight",
-                            "rejected_interpretation",
-                        ],  # == platform_memory.EVIDENCE_KINDS (tests/test_personal_record_review_6287.py)
-                        "description": "personal_record only (required there): what kind of evidence the record is.",
-                    },
-                    "event_date": {
-                        "type": "string",
-                        "description": "personal_record only: when the event happened — YYYY, YYYY-MM, YYYY-<season> or YYYY-MM-DD.",
-                    },
-                    "event_date_precision": {
-                        "type": "string",
-                        "enum": ["day", "month", "season", "year", "unknown"],  # == platform_memory.DATE_PRECISIONS
-                        "description": "personal_record only: precision of event_date (inferred from its shape if omitted; 'unknown' = no date).",
-                    },
-                    "source_ref": {
-                        "type": "string",
-                        "description": "personal_record only: opaque reference to where it came from (e.g. a Notion page id); never fetched.",
-                    },
-                },
-                "required": ["category", "content"],
-            },
+            "inputSchema": WRITE_PLATFORM_MEMORY_INPUT,
         },
     },
     "read_platform_memory": {

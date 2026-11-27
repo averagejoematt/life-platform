@@ -486,7 +486,7 @@ def effective_tier(record: dict, spec: dict) -> str:
     override = record.get("privacy_tier")
     if override in _TIER_RANK and _TIER_RANK[override] > _TIER_RANK[default]:
         return override
-    if override in spec.get("opt_in_tiers", ()) and override != TIER_PUBLIC_OK:
+    if isinstance(override, str) and override in spec.get("opt_in_tiers", ()) and override != TIER_PUBLIC_OK:
         return override
     return default
 
