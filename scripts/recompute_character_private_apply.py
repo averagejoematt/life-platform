@@ -52,6 +52,26 @@ def planned_sheets(plan_path: str) -> dict:
     return {r["date"]: as_float(r["planned_item"]) for r in plan["rows"] if r["pk"] == SHEET_PK and r["planned_item"] is not None}
 
 
+def planned_receipts(plan_path: str) -> dict:
+    """{date: planned receipt item, every number a float} from a plan file — the convention of ``planned_sheets`` (an
+    unchanged row's planned item is the stored item; a "not_planned" row is omitted). Integrity-checked first."""
+    plan = load_plan(plan_path)
+    return {r["date"]: as_float(r["planned_item"]) for r in plan["rows"] if r["pk"] == RECEIPT_PK and r["planned_item"] is not None}
+
+
+def ladder_states(plan_path: str) -> dict:
+    """The chain's per-date values after each ladder step, cumulatively: {cause: {date: {character_level, character_xp,
+    composite, pillars: {pillar: {raw_score, level}}, events: [{who, type, old, new}]}}}, causes in ladder order (the
+    shape is documented in ``recompute_character_private``'s docstring). Integrity-checked first; a plan written before
+    the field existed is refused (re-run the dry run), never guessed."""
+    plan = load_plan(plan_path)
+    states = plan.get("ladder_states")
+    if not isinstance(states, dict):
+        raise PlanGuardError("this plan carries no ladder_states — re-run the dry run with the current tool")
+    order = [step["cause"] for step in plan.get("ladder") or []]
+    return {c: states[c] for c in order if c in states}
+
+
 # ── apply, verify, rollback ─────────────────────────────────────────────────────────────────────────────────────────
 
 

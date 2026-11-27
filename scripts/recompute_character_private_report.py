@@ -351,3 +351,38 @@ def summary_md(plan: dict, preliminary: bool = False) -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+STATE_PILLARS = ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency")
+
+
+def chain_state(rec: Optional[dict]) -> Optional[dict]:
+    """One date's chain values as plain floats (the ``ladder_states`` leaf; see the main module's docstring)."""
+    if not rec:
+        return None
+
+    def num(v: Any) -> Optional[float]:
+        try:
+            return None if v is None else float(v)
+        except (TypeError, ValueError):
+            return None
+
+    pillars, raws = {}, []
+    for p in STATE_PILLARS:
+        pd = rec.get(f"pillar_{p}") or {}
+        pillars[p] = {"raw_score": num(pd.get("raw_score")), "level": num(pd.get("level"))}
+        if pd.get("raw_score") is not None and not pd.get("not_instrumented"):
+            raws.append(float(pd["raw_score"]))
+    events = [{k: e.get(k) for k in ("who", "type", "old", "new")} for e in _flat_events({str(rec.get("date") or ""): rec})]
+    return {
+        "character_level": num(rec.get("character_level")),
+        "character_xp": num(rec.get("character_xp")),
+        "composite": round(sum(raws) / len(raws), 1) if raws else None,
+        "pillars": pillars,
+        "events": events,
+    }
+
+
+def ladder_states(ladder_f: list) -> dict:
+    """{cause: {date: chain_state}} for every ladder step, in ladder order (each step's records, cumulative)."""
+    return {cause: {d: chain_state(r) for d, r in sorted(recs.items())} for cause, recs in ladder_f}
