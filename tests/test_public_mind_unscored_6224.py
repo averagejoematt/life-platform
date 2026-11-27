@@ -252,12 +252,13 @@ def test_a_method_change_is_never_a_headline_event(histories):
 
 
 def test_the_method_is_versioned_and_says_mind_is_not_scored():
-    assert character_privacy.PUBLIC_METHOD_VERSION == "character-public-v2"
-    assert character_privacy.PUBLIC_METHOD_VERSIONS == ("character-public-v1", "character-public-v2")
-    note = character_privacy.PUBLIC_METHOD_HISTORY[-1]["note"]
-    assert "Mind is not scored in public" in note and "food-delivery" in note
+    # #6224/#6293: v3 is current (Relationships not scored, no neutral fill, no XP debt); v2's entry keeps its own words
+    assert character_privacy.PUBLIC_METHOD_VERSION == "character-public-v3"
+    assert character_privacy.PUBLIC_METHOD_VERSIONS == ("character-public-v1", "character-public-v2", "character-public-v3")
+    v2_note = next(m for m in character_privacy.PUBLIC_METHOD_HISTORY if m["version"] == character_privacy.PUBLIC_METHOD_V2)["note"]
+    assert "Mind is not scored in public" in v2_note and "food-delivery" in v2_note
     for origin, label in character_privacy.PUBLIC_METHOD_LABELS.items():
-        assert "Mind is not scored in public" in label and "(v2)" in label, origin
+        assert "Mind and Relationships are not scored in public" in label and "(v3)" in label, origin
     v1 = {"public_method_version": character_privacy.PUBLIC_METHOD_V1, "origin": "recomputed", "character_level": 3}
     assert "(v1)" in character_privacy.public_method_label({"public": v1})["label"]  # a v1 value keeps its own words
 

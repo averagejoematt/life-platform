@@ -374,6 +374,8 @@ def summary_md(manifest: dict, notice: str, out_dir: str) -> str:
         "# Public character recompute — dry run (#6224)",
         "",
         f"Generated {manifest['generated_at']} · method {manifest['public_method_version']} · mode {manifest['mode']}",
+        f"Public plan id `{plan.get('public_plan_id')}` · private plan id `{plan.get('private_plan_id')}` · method-1 basis: "
+        f"{plan.get('method1_basis')}",
         "",
         "## What changes for readers (before = what the public routes serve today, the stored `public` block)",
         f"- Character dates: {s['character_dates']}. Overall level changes on {len(s['level_changed_dates'])} dates "
@@ -727,6 +729,12 @@ def main(argv: list) -> int:
         default="all",  # dry runs plan everything; an --apply must name its phase (below)
         help="pre-merge: sheets + day grades + the ledger (inert on the old code); post-merge: the receipts (after the deploy)",
     )
+    ap.add_argument(
+        "--plan-in",
+        help="#6224/#6311: a private recompute plan (character-private-recompute-plan-v1) — the public dry run reads its "
+        "PLANNED character rows instead of the stored ones, and the public apply requires exactly those rows live",
+    )
+    ap.add_argument("--approved-public-plan-id", help="with --plan-in --apply: the public_plan_id the owner approved (must reproduce)")
     args = ap.parse_args(argv)
     if args.apply and not args.rollback and args.phase == "all":
         ap.error("--apply needs --phase pre-merge or post-merge: a receipt written before the merge is served early by the old code")
@@ -750,6 +758,16 @@ def main(argv: list) -> int:
         ap.error("--out is required (a directory outside the repo)")
     os.makedirs(args.out, exist_ok=True)
     snap = load_snapshot(table, args.to)
+    import backfill_public_variant_planin as PI
+
+    private_plan, expected = None, {}
+    if args.plan_in:
+        try:
+            private_plan = PI.load_private_plan(args.plan_in)
+            expected = PI.apply_to_snapshot(snap, private_plan)
+        except PI.PlanInError as exc:
+            print(f"REFUSED: {exc}", file=sys.stderr)
+            return 3
     config = load_config(table, boto3.client("s3", region_name=region))
     char, receipts, grades = run_replays(snap, config, run_ts, order_fix=not args.no_order_fix)
     privacy_only = char if args.no_order_fix else run_replays(snap, config, run_ts, order_fix=False)[0]
@@ -803,7 +821,12 @@ def main(argv: list) -> int:
     stored.update({(B.RECEIPT_PK, f"DATE#{d}"): r for d, r in snap["receipts"].items()})
     stored.update({(B.GRADE_PK, f"DATE#{d}"): r for d, r in snap["grades"].items()})
     plan, skipped_unchanged = narrow_plan(plan_all, stored)  # #6224 F(8): only the projections that change are written
+    plan = PI.attach_expected(plan, expected)  # #6311: each write requires the PLANNED private row's fingerprint
+    private_plan_id = (private_plan or {}).get("plan_id")
     manifest["plan"] = {
+        "private_plan_id": private_plan_id,
+        "public_plan_id": PI.public_plan_id(private_plan_id, character_privacy.PUBLIC_METHOD_VERSION, plan),
+        "method1_basis": "the private plan's PLANNED rows (--plan-in)" if private_plan else "the stored rows",
         "writes": len(plan),
         "skipped_unchanged": skipped_unchanged,
         "touches": "only the `public` attribute of existing character_sheet / character_receipt / day_grade items, plus the "
@@ -828,6 +851,20 @@ def main(argv: list) -> int:
     if not args.apply:
         print(f"DRY RUN — nothing written. {len(plan)} planned writes, {len(phase_plan)} in phase {args.phase}; manifest in {args.out}")
         return 0
+    if private_plan is not None:
+        if args.approved_public_plan_id != manifest["plan"]["public_plan_id"]:
+            print(
+                f"REFUSED: public_plan_id {manifest['plan']['public_plan_id']} is not the approved {args.approved_public_plan_id}",
+                file=sys.stderr,
+            )
+            return 3
+        off = PI.unplanned_rows(lambda key: table.get_item(Key=key).get("Item"), phase_plan)
+        if off:
+            print(
+                f"REFUSED: {len(off)} live row(s) are not the approved private plan's rows (e.g. {off[0]}) — run the private apply first",
+                file=sys.stderr,
+            )
+            return 3
     export = B.build_export(lambda key: table.get_item(Key=key).get("Item"), phase_plan, run_ts)
     export["phase"] = args.phase
     export_path = os.path.join(args.out, f"export_{args.phase}_{run_ts.replace(':', '')}.json")

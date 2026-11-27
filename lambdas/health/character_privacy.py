@@ -285,14 +285,19 @@ def public_pillar(name: str, pillar: Any) -> Any:
 # (fail closed: never a fallback to method 1). The arithmetic is ``health.character_public``.
 PUBLIC_KEY = "public"
 PUBLIC_METHOD_V1 = "character-public-v1"
-PUBLIC_METHOD_VERSION = "character-public-v2"  # #6224 (2026-11-26): Mind not scored in public; no restraint/delivery input
+PUBLIC_METHOD_V2 = "character-public-v2"  # #6224 (2026-11-26): Mind not scored in public; no restraint/delivery input
+# #6224/#6293 (2026-11-27): the amended public chain — Relationships not scored (not instrumented), no neutral fill for a
+# day with no usable measurement, no XP debt. Variants written since the v2 deploy carry the v2 label WITH Relationships
+# at a neutral value and held days filled, so the amended chain needs its own version to be told apart.
+PUBLIC_METHOD_VERSION = "character-public-v3"
 # Every version a reader may serve; an unknown one is not served. A v1 variant stays servable until the recompute
 # replaces it — ``public_sheet`` serves its Mind as not scored, but its composite, level and XP still carry Mind's
 # contribution until then (``scripts/backfill_public_variant.py``).
-PUBLIC_METHOD_VERSIONS = (PUBLIC_METHOD_V1, PUBLIC_METHOD_VERSION)
+PUBLIC_METHOD_VERSIONS = (PUBLIC_METHOD_V1, PUBLIC_METHOD_V2, PUBLIC_METHOD_VERSION)  # v1, v2: servable, older
 PUBLIC_METHOD_EFFECTIVE_FROM = "2026-09-06"  # the first date the method applies to: the experiment's genesis
 PUBLIC_METHOD_DEFINED_ON = "2026-11-05"  # the owner's ruling
 PUBLIC_METHOD_V2_DEFINED_ON = "2026-11-26"  # #6224: the owner's rulings that Mind is not scored in public
+PUBLIC_METHOD_V3_DEFINED_ON = "2026-11-27"  # #6224/#6293: the amended method (owner rulings 2026-11-26/27)
 METHOD_1 = "method-1"
 PUBLIC_METHOD_HISTORY = (
     {
@@ -312,13 +317,24 @@ PUBLIC_METHOD_HISTORY = (
         "were recomputed from the stored inputs; what the site showed on those dates at the time was computed under method 1.",
     },
     {
-        "version": PUBLIC_METHOD_VERSION,
+        "version": PUBLIC_METHOD_V2,
         "from": PUBLIC_METHOD_EFFECTIVE_FROM,
         "defined_on": PUBLIC_METHOD_V2_DEFINED_ON,
+        "published_until": PUBLIC_METHOD_V3_DEFINED_ON,
         "note": "Mind is not scored in public: its inputs are private. It has no public score, level, tier or XP, and the "
         "composite, the overall level and the XP total are worked out from the other areas without it, not with Mind at a "
         "neutral score. The food-delivery adjustment to Nutrition is not applied, and restraint habits count nowhere. Dates "
         "before it was adopted were recalculated the same way.",
+    },
+    {
+        "version": PUBLIC_METHOD_VERSION,
+        "from": PUBLIC_METHOD_EFFECTIVE_FROM,
+        "defined_on": PUBLIC_METHOD_V3_DEFINED_ON,
+        "note": "Everything in v2, and: Relationships is not scored in public, because it is not instrumented — it is left "
+        "out of the level, the composite, consistency and every other combined figure. A day with no usable public "
+        "measurement for an area is left out of that area's history, never filled with a neutral value. XP debt no longer "
+        "exists. Scores written after v2 was adopted carried Relationships at a neutral value and filled those days, so "
+        "this version marks the corrected scores apart. Dates before it was adopted were recalculated the same way.",
     },
 )
 # The label a public history surface prints beside a value. It depends on the method and the record's origin only
@@ -333,6 +349,14 @@ PUBLIC_METHOD_LABELS_BY_VERSION = {
         "left out. The score shown on this date at the time came from an earlier method and is not republished.",
     },
     PUBLIC_METHOD_VERSION: {
+        "live": "Computed that morning under the public method (v3), from the records available then. Private inputs are "
+        "left out, and Mind and Relationships are not scored in public: the level and composite are worked out without them.",
+        "recomputed": "Recalculated later under the public method (v3), from the records available when it was "
+        "recalculated, not from what was available on this date. Private inputs are left out, and Mind and Relationships "
+        "are not scored in public: the level and composite are worked out without them. The score shown on this date at the "
+        "time came from an earlier method and is not republished.",
+    },
+    PUBLIC_METHOD_V2: {
         "live": "Computed that morning under the public method (v2), from the records available then. Private inputs are "
         "left out, and Mind is not scored in public: the level and composite are worked out without it.",
         "recomputed": "Recalculated later under the public method (v2), from the records available when it was "
@@ -364,7 +388,12 @@ PUBLIC_CORRECTION_NOTICE = (
     "activities and measurements have not changed.\n\n"
     "Mind is no longer scored publicly. Previous character scores are superseded by the corrected values."
 )
-PUBLIC_CORRECTION_NOTICES = {PUBLIC_METHOD_V1: PUBLIC_CORRECTION_NOTICE_V1, PUBLIC_METHOD_VERSION: PUBLIC_CORRECTION_NOTICE}
+# The owner-approved notice applies to v3 (the one final recompute); v2 was never applied as a recomputation.
+PUBLIC_CORRECTION_NOTICES = {
+    PUBLIC_METHOD_V1: PUBLIC_CORRECTION_NOTICE_V1,
+    PUBLIC_METHOD_V2: PUBLIC_CORRECTION_NOTICE,
+    PUBLIC_METHOD_VERSION: PUBLIC_CORRECTION_NOTICE,
+}
 
 # The record keys a public view carries from the stored record's envelope (identity, phase, the input manifest — which
 # public routes re-judge over public sources themselves). Every score comes from the public variant.
@@ -563,7 +592,9 @@ def scrub_unscored(view: dict[str, Any]) -> dict[str, Any]:
     names = [n for n in _PILLAR_WORDS if not pillar_scored_in_public(n)]
     if not names:
         return view
-    v1 = view.get("public_method_version") == PUBLIC_METHOD_V1
+    # an OLDER-method variant (v1: Mind scored; v2: Relationships at a neutral value) evaluated ``all_pillars`` over a
+    # pillar the current method does not score, so its firing is not served either
+    older = view.get("public_method_version") != PUBLIC_METHOD_VERSION
     for name in names:
         view[f"pillar_{name}"] = not_scored_pillar(name)
     view["unscored_pillars"] = list(names)
@@ -571,7 +602,7 @@ def scrub_unscored(view: dict[str, Any]) -> dict[str, Any]:
         kept = []
         for e in view["active_effects"]:
             cond = e.get("condition") if isinstance(e, dict) else None
-            if any(_condition_reads(cond, n) for n in names) or (v1 and _condition_reads(cond, "all_pillars")):
+            if any(_condition_reads(cond, n) for n in names) or (older and _condition_reads(cond, "all_pillars")):
                 continue
             if isinstance(e, dict) and isinstance(e.get("targets"), dict):
                 e = dict(e, targets={k: t for k, t in e["targets"].items() if k not in names})

@@ -1,4 +1,4 @@
-"""character_public.py — the character sheet's PUBLIC method, ``character-public-v2`` (owner rulings 2026-11-05, 2026-11-26).
+"""character_public.py — the character sheet's PUBLIC method, ``character-public-v3`` (owner rulings 2026-11-05, 2026-11-26).
 
 THE RULING. "Public Mind, composite, XP, Day grades and overall levels must depend only on public-eligible
 inputs. Recompute affected historical public values using the corrected methodology. Preserve the original
