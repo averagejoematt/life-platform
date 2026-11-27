@@ -254,10 +254,10 @@ def aerobic_tests(inputs: Mapping[str, Any], today: str) -> dict[str, Any]:
 
 
 def zone2_volume(inputs: Mapping[str, Any], today: str) -> dict[str, Any]:
-    key = "zone2_minutes_per_week"
+    ind = "zone2_minutes_per_week"
     failed = _read_failed(inputs, "zone2_sessions", "observed_days")
     if failed:
-        return _failed_indicator(key, ZONE2_LABEL, failed, counts=False)
+        return _failed_indicator(ind, ZONE2_LABEL, failed, counts=False)
     wins = windows(today, MEASURED_WINDOW_DAYS)
     sessions = [(str(s.get("date"))[:10], _num(s.get("minutes")) or 0.0) for s in inputs.get("zone2_sessions") or []]
     elig = _eligible_days(inputs, wins, (d for d, _m in sessions))
@@ -269,19 +269,19 @@ def zone2_volume(inputs: Mapping[str, Any], today: str) -> dict[str, Any]:
     ev = _measured_evidence(today, wins, n, fig, "min/week", "training.zone2_minutes counted sessions", elig, ZONE2_LABEL, counts=False)
     if min(n.values()) < MEASURED_MIN_DAYS:
         return _indicator(
-            key, ZONE2_LABEL, INSUFFICIENT, f"fewer than {MEASURED_MIN_DAYS} eligible observed days in a window ({n})", ev, counts=False
+            ind, ZONE2_LABEL, INSUFFICIENT, f"fewer than {MEASURED_MIN_DAYS} eligible observed days in a window ({n})", ev, counts=False
         )
     margin = max(ZONE2_MARGIN_MIN, ZONE2_MARGIN_FRACTION * float(fig["prior"] or 0.0))
     direction = _compare(float(fig["recent"] or 0.0), float(fig["prior"] or 0.0), margin)
     reason = f"training volume {'up' if direction == BETTER else 'down' if direction == WORSE else 'about the same'}; shown, never counted as capacity"
-    return _indicator(key, ZONE2_LABEL, direction, reason, ev, counts=False)
+    return _indicator(ind, ZONE2_LABEL, direction, reason, ev, counts=False)
 
 
 def training_days(inputs: Mapping[str, Any], today: str) -> dict[str, Any]:
-    key = "training_days_per_week"
+    ind = "training_days_per_week"
     failed = _read_failed(inputs, "training_days", "observed_days")
     if failed:
-        return _failed_indicator(key, TRAINING_DAYS_LABEL, failed, counts=False)
+        return _failed_indicator(ind, TRAINING_DAYS_LABEL, failed, counts=False)
     wins = windows(today, MEASURED_WINDOW_DAYS)
     trained = {str(d)[:10] for d in inputs.get("training_days") or []}
     elig = _eligible_days(inputs, wins, trained)
@@ -297,10 +297,10 @@ def training_days(inputs: Mapping[str, Any], today: str) -> dict[str, Any]:
     )
     if min(n.values()) < MEASURED_MIN_DAYS:
         return _indicator(
-            key, TRAINING_DAYS_LABEL, INSUFFICIENT, f"fewer than {MEASURED_MIN_DAYS} eligible observed days ({n})", ev, counts=False
+            ind, TRAINING_DAYS_LABEL, INSUFFICIENT, f"fewer than {MEASURED_MIN_DAYS} eligible observed days ({n})", ev, counts=False
         )
     direction = _compare(float(fig["recent"] or 0.0), float(fig["prior"] or 0.0), TRAINING_DAYS_MARGIN)
-    return _indicator(key, TRAINING_DAYS_LABEL, direction, "frequency; shown as context, never counted as consistency", ev, counts=False)
+    return _indicator(ind, TRAINING_DAYS_LABEL, direction, "frequency; shown as context, never counted as consistency", ev, counts=False)
 
 
 def adherence_windows(today: str) -> dict[str, list[str]]:
