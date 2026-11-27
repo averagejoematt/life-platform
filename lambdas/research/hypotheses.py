@@ -292,10 +292,10 @@ def _approved_via(value: Any) -> dict[str, str]:
     return {"pending_id": str(value["pending_id"]), "approved_at": str(value.get("approved_at") or "")}
 
 
-# ── row constructors (the owner tool is their only caller; fold replays events through build_event) ────
+# ── row constructors (the owner tool is their only caller; fold replays events through build_hypothesis_event) ────
 
 
-def build_head(
+def build_hypothesis_head(
     *,
     user_id: str,
     question: Any,
@@ -345,7 +345,7 @@ def build_head(
     }
 
 
-def build_event(
+def build_hypothesis_event(
     *, user_id: str, current: dict[str, Any], kind: str, recorded_at: str, today: str, approved_via: Any, revision: int = 1, **fields: Any
 ) -> dict[str, Any]:
     """One append-only event, checked against the hypothesis's current (folded) view. (`current`, not `view`: an
@@ -573,7 +573,7 @@ def _replay(view: dict[str, Any], e: dict[str, Any]) -> dict[str, Any]:
         changes = dict(fields["changes"])
         changes["explanations"] = {x["key"]: {"label": x["label"], "statement": x["statement"]} for x in changes["explanations"]}
         fields["changes"] = changes
-    return build_event(
+    return build_hypothesis_event(
         user_id="_", current=view, kind=kind, recorded_at=recorded_at, today="9999-12-31", approved_via=e.get("approved_via"), **fields
     )
 
@@ -623,7 +623,7 @@ def _order(e: dict[str, Any]) -> tuple:
 
 def fold(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Rows -> one current view per hypothesis, newest first. The head is never edited; every event is REPLAYED through
-    `build_event` against the view it would apply to. A row the rules would refuse — no approval stamp, a forged kind, an
+    `build_hypothesis_event` against the view it would apply to. A row the rules would refuse — no approval stamp, a forged kind, an
     event on a hypothesis he closed — is never applied: it is counted in `invalid_events`."""
     heads: dict[str, dict[str, Any]] = {}
     events: dict[str, list[dict[str, Any]]] = {}

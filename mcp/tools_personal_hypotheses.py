@@ -186,7 +186,7 @@ def _plan(args: dict[str, Any], action: str, approved_via: dict[str, Any]) -> di
     today = pacific_today()
     if action == "propose":
         views = _views()
-        head = ph.build_head(
+        head = ph.build_hypothesis_head(
             user_id=_user_id_ref,
             question=args.get("question"),
             dedupe_key=args.get("dedupe_key"),
@@ -216,7 +216,7 @@ def _plan(args: dict[str, Any], action: str, approved_via: dict[str, Any]) -> di
         ph.refuse_over_cap(_views())
     kind, fields = _event_fields(args, action)
     events = [r for r in rows if r.get("record_type") == ph.RECORD_TYPE_EVENT]
-    return ph.build_event(
+    return ph.build_hypothesis_event(
         user_id=_user_id_ref,
         current=view,
         kind=kind,
