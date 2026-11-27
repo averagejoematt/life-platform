@@ -98,6 +98,14 @@ class StubStore:
         self.items[(item["pk"], item["sk"])] = _normalise(copy.deepcopy(item))
         self.writes.append((item["pk"], item["sk"]))
 
+    versioning = "Enabled"
+
+    def list_backups(self, prefix):
+        return sorted(k for k in self.objects if k.startswith(prefix))
+
+    def bucket_versioning(self):
+        return self.versioning
+
     def put_backup(self, key, body):
         assert key.startswith("backups/") and key not in self.objects
         self.objects[key] = bytes(body)
@@ -644,3 +652,135 @@ def test_stored_states_reader_refuses_a_plan_without_them(seeded, tmp_path):
     assert A.ladder_states(path)  # the other readers still work
     with pytest.raises(T.PlanGuardError):
         A.stored_states(path)
+
+
+# ── final-state equality, stress accounting, exact-plan approval, preflight ────────────────────────────────────────
+
+
+def _plan_path(plan, tmp_path):
+    (tmp_path / "out").mkdir(exist_ok=True)
+    return T.write_outputs(plan, str(tmp_path / "out"))["plan"]
+
+
+def test_planned_states_are_computed_from_the_planned_items_and_equal_the_last_step(seeded, tmp_path):
+    import recompute_character_private_report as R
+
+    _store, plan = seeded
+    path = _plan_path(plan, tmp_path)
+    planned = A.planned_states(path)
+    sheets = A.planned_sheets(path)
+    assert planned == {d: R.chain_state(sheets[d]) for d in sorted(sheets)}
+    assert planned == A.ladder_states(path)["missing_data"]  # every field, composite included
+    assert all(v["composite"] is not None for v in planned.values())
+    with pytest.raises(T.PlanGuardError):
+        A.planned_states(_plan_path({k: v for k, v in plan.items() if k != "planned_states"}, tmp_path))
+
+
+def test_a_corrupted_composite_fails_the_final_state_check(seeded):
+    import recompute_character_private_report as R
+
+    _store, plan = seeded
+    R.check_final_state(plan["ladder_states"], plan["planned_states"])  # the real plan passes
+    bad = copy.deepcopy(plan["planned_states"])
+    bad[_d(4)]["composite"] = (bad[_d(4)]["composite"] or 0) + 0.1
+    with pytest.raises(T.PlanGuardError, match="composite"):
+        R.check_final_state(plan["ladder_states"], bad)
+
+
+def test_the_dry_run_itself_refuses_when_the_final_composite_disagrees(tmp_path, monkeypatch):
+    import recompute_character_private_report as R
+
+    real = R.ladder_states
+
+    def corrupt(ladder_f):
+        out = real(ladder_f)
+        last = out[list(out)[-1]]
+        last[_d(2)] = dict(last[_d(2)], composite=(last[_d(2)]["composite"] or 0) + 1.0)
+        return out
+
+    monkeypatch.setattr(R, "ladder_states", corrupt)
+    with pytest.raises(T.PlanGuardError, match="composite"):
+        plan_for(seed_store(), tmp_path, "corrupt")
+
+
+def test_stress_days_are_distinct_add_up_and_are_all_planned_writes(seeded):
+    import recompute_character_private_report as R
+
+    _store, plan = seeded
+    acc = plan["stress_days"]["accounting"]
+    assert acc == {"dates": 5, "distinct": 5, "computed_days": 4, "sick_day_frozen_copies": 1, "planned_writes": 5}
+    sd = copy.deepcopy(plan["stress_days"])
+    sd["stored_with_stress"].append(sd["stored_with_stress"][0])  # a planted duplicate
+    with pytest.raises(T.PlanGuardError, match="twice"):
+        R.check_stress_days(sd, plan["rows"])
+    sd = copy.deepcopy(plan["stress_days"])
+    sd["computed_days"] = sd["computed_days"][1:]  # one day unaccounted
+    with pytest.raises(T.PlanGuardError, match="make up"):
+        R.check_stress_days(sd, plan["rows"])
+    rows = [dict(r, action="unchanged") if r["date"] == _d(0) and r["pk"] == T.SHEET_PK else r for r in plan["rows"]]
+    with pytest.raises(T.PlanGuardError, match="planned write"):
+        R.check_stress_days(plan["stress_days"], rows)
+
+
+def test_approval_requires_the_exact_plan_id():
+    plan = {"plan_id": "abc123"}
+    assert "needs --approved-plan-id" in A.check_approval(None, plan)
+    assert "not this plan file" in A.check_approval("zzz", plan)
+    assert "re-derived" in A.check_approval("abc123", plan, "def456")
+    assert A.check_approval("abc123", plan) is None and A.check_approval("abc123", plan, "abc123") is None
+
+
+@pytest.mark.parametrize(
+    "approved, live_id, expect_apply", [(None, None, False), ("wrong", None, False), ("SAME", "other", False), ("SAME", "SAME", True)]
+)
+def test_apply_cli_refuses_without_the_exact_approval_before_any_backup_or_write(
+    seeded, tmp_path, monkeypatch, approved, live_id, expect_apply
+):
+    store, plan = seeded
+    path = _plan_path(plan, tmp_path)
+    pid = plan["plan_id"]
+    calls = {"dry_run": 0, "apply": 0}
+
+    def fake_dry_run(*_a, **_k):
+        calls["dry_run"] += 1
+        return dict(plan, plan_id=pid if live_id == "SAME" else "f" * 16)
+
+    def fake_apply(*_a, **_k):
+        calls["apply"] += 1
+        return {"written": [], "aborted": [], "export": "x"}
+
+    monkeypatch.setattr(T, "live_store", lambda writable: store)
+    monkeypatch.setattr(T, "dry_run", fake_dry_run)
+    monkeypatch.setattr(A, "apply_plan", fake_apply)
+    argv = ["--out", str(tmp_path / "cli"), "--apply", "--plan-in", path]
+    if approved:
+        argv += ["--approved-plan-id", pid if approved == "SAME" else approved]
+    rc = T.main(argv)
+    assert (calls["apply"] == 1) is expect_apply
+    assert rc == (0 if expect_apply else 4)
+    if approved in (None, "wrong"):
+        assert calls["dry_run"] == 0  # refused before even the read-back
+    assert store.writes == [] and store.s3_writes == []
+
+
+def test_preflight_is_read_only_and_names_what_it_cannot_prove(seeded, tmp_path):
+    store, plan = seeded
+    ok = A.preflight(store, plan)
+    assert ok["ok"] is True and ok["verified_read_only"]["bucket_versioning"] == "Enabled"
+    assert ok["verified_read_only"]["no_backup_under_prefix_yet"] is True and ok["unverifiable_without_a_write"]
+    store.objects[f"{T.BACKUP_PREFIX}/{plan['plan_id']}/all-x/export.json"] = b"{}"
+    assert A.preflight(store, plan)["ok"] is False
+    store.objects.clear()
+    store.versioning = "Suspended"
+    assert A.preflight(store, plan)["ok"] is False
+    assert store.writes == [] and store.s3_writes == []
+
+
+def test_apply_plan_rechecks_a_given_approval_before_the_export(seeded, tmp_path):
+    store, plan = seeded
+    plan = saved_plan(plan, tmp_path)
+    with pytest.raises(T.PlanGuardError):
+        A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00", approved_plan_id="0" * 16)
+    assert store.writes == [] and store.s3_writes == []
+    done = A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00", approved_plan_id=plan["plan_id"])
+    assert done["written"] and done["aborted"] == []
