@@ -448,10 +448,9 @@ def build_data_narrative(data, registry=None):
             row["training_load"] = safe_float(st, "total_kilojoules")
             row["zone2_min"] = _by_day.get(date, {}).get("zone2_minutes")
 
-        # Notion journal
+        # Notion journal — #6286: his own 1-5 rating first; the enrichment model's score only when he gave none.
         nj = next((i for i in data.get("notion", []) if i.get("date") == date), {})
         if nj:
-            # #6286: his own 1-5 rating first; the enrichment model's score only when he gave none.
             row["mood"] = resolved_value(nj, "mood")
             row["energy"] = resolved_value(nj, "energy")
             row["journal_stress"] = resolved_value(nj, "stress")
