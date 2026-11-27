@@ -323,6 +323,13 @@ REPLAY_SEMANTICS: dict[str, tuple[str, str]] = {
         "source, link or no-op correction is refused by its rule, and a decision or personal result reads the newest event "
         "of its kind first, so an identical replay writes nothing",
     ),
+    "manage_personal_hypothesis": (
+        READ_BEFORE_WRITE,
+        "#6292: every write is performed by manage_pending_writes approve (a conditional status move, so an approval runs "
+        "once). propose writes PERSONAL_HYPOTHESIS#<ph_ + sha256(dedupe_key)[:12]> under attribute_not_exists after refusing any "
+        "hypothesis with the key; an event appends PERSONAL_HYPOTHESIS#<id>#EV#<ts>#<kind>#<nnn> after reading the folded view — a "
+        "repeated evidence item, conversation, status or no-op correction is refused by its rule",
+    ),
     "update_decision_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied DECISION# sk in place; no new row is ever created"),
     "update_insight_outcome": (DETERMINISTIC_KEY, "updates the caller-supplied INSIGHT# sk in place; no new row is ever created"),
     "write_platform_memory": (

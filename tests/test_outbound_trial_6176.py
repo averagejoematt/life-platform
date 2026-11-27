@@ -98,8 +98,8 @@ def test_the_committed_state_is_consolidated_standing_and_every_item_has_a_descr
     ROLLBACK, per item: set that ONE line to exactly ``False`` in common/outbound_trial.py, then deploy_fleet.sh (and
     deploy_site_api.sh for the status page). See test_rolling_back_one_item_leaves_every_other_item_consolidated.
     """
-    assert len(COMMITTED_TRIAL) == 10 and all(v is True for v in COMMITTED_TRIAL.values()), COMMITTED_TRIAL
-    assert set(ot.ITEMS) == set(COMMITTED_TRIAL) == set(ot.DESCRIPTIONS) and len(ot.ITEMS) == 10
+    assert len(COMMITTED_TRIAL) == 14 and all(v is True for v in COMMITTED_TRIAL.values()), COMMITTED_TRIAL
+    assert set(ot.ITEMS) == set(COMMITTED_TRIAL) == set(ot.DESCRIPTIONS) and len(ot.ITEMS) == 14
     # no expiry of any spelling: the 2026-12-07 lapse that would have restored the old mail is gone
     assert not hasattr(ot, "TRIAL_ENDS_ON") and not hasattr(ot, "trial_ended")
     src = (ROOT / "lambdas" / "common" / "outbound_trial.py").read_text(encoding="utf-8")
@@ -243,6 +243,8 @@ ALLOWED_READERS = {
     "lambdas/emails/evening_nudge_lambda.py",
     "lambdas/coach/evening_checkin.py",
     "lambdas/coach/morning_checkin_ledger.py",
+    "lambdas/coach/coach_event_triggers.py",
+    "lambdas/coach/calibration_deadman_alert.py",
     "lambdas/operational/dlq_consumer_lambda.py",
     "lambdas/operational/canary_lambda.py",
     "lambdas/operational/traffic_digest_lambda.py",

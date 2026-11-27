@@ -72,6 +72,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Callable, Optional
 
+from common import outbound_trial  # #6302: the owner's per-item holds on celebration / calibration sends
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from health.personal_baselines import percentile
 
@@ -111,6 +112,7 @@ KIND_RECOVERY_SLIDE = "recovery_slide"
 # than the data. Same candidate shape, same claim, same sweep.
 KIND_PROMISE = "promise"
 KIND_PRE_EVENT = "pre_event"
+KIND_CALIBRATION_PROMPT = "calibration_prompt"
 KIND_EARLY_WARNING = "early_warning"  # #5121: the response owner answers the relapse flag
 
 # ── Who owns the lane ─────────────────────────────────────────────────────────
@@ -322,13 +324,16 @@ def detect_milestone(events: list, today: str) -> Optional[dict]:
             f"The measurement behind it: trailing {int(window) if window else '?'}-day mean {round(mean, 1)} "
             f"over n={int(n)} readings. Quote the n if you quote the number."
         )
-    return _event(
+    out = _event(
         kind=KIND_MILESTONE,
         event_id=f"{KIND_MILESTONE}#{ev.get('milestone_id') or _slug(str(ev.get('label')))}",
         provenance=coach_outbound.PROVENANCE_CELEBRATION,
         persona_id=MILESTONE_LADDER_OWNER.get(ladder, LEAD_OWNER),
         evidence=evidence,
     )
+    if out:
+        out["ladder"], out["milestone_id"] = ladder, str(ev.get("milestone_id") or "")  # the #6302 hold predicate reads these
+    return out
 
 
 # ── Trigger 3: the recovery slide ─────────────────────────────────────────────
@@ -428,7 +433,7 @@ def detect_calibration(block: dict, today: str) -> list:
     events = []
     for row in cc.prompts_due(block or {}):
         ev = _event(
-            kind="calibration_prompt",
+            kind=KIND_CALIBRATION_PROMPT,
             event_id=cc.prompt_key(row["kind"], row["cycle_start"]),
             provenance=coach_outbound.PROVENANCE_CALIBRATION,
             persona_id=NUTRITION_OWNER,
@@ -470,6 +475,39 @@ def detect_early_warning(block: dict, today: str) -> Optional[dict]:
         persona_id=owner,
         evidence=evidence,
     )
+
+
+# ── The owner's holds (#6302, ruling 2026-11-26) ─────────────────────────────────────────────
+
+#: Milestone ladders that count his OWN actions (a logging streak, days tracked, a level): he made every one of them, so a
+#: congratulation carries nothing he does not already have. A measured ladder (weight, waist, trends, sessions) is not here.
+SELF_COUNT_LADDERS = frozenset({"streak", "days_tracked", "level"})
+
+
+def milestone_is_untold(ev: dict, digest_sent_ids) -> bool:
+    """True when a milestone candidate reports something he has not otherwise been told — the one case that still sends.
+
+    Untold = a MEASURED ladder (not ``SELF_COUNT_LADDERS``) whose id the milestone digest has not already mailed. An
+    unreadable digest cursor (``None``) reads as "told": the hold fails toward silence, never toward a repeat."""
+    if digest_sent_ids is None or not ev.get("milestone_id"):
+        return False
+    return ev.get("ladder") not in SELF_COUNT_LADDERS and ev["milestone_id"] not in digest_sent_ids
+
+
+def held_by_ruling(ev: dict, digest_sent_ids=None) -> Optional[str]:
+    """The ``outbound_trial`` item holding this candidate, or None when it may send. Pure; KEEP kinds never appear here."""
+    kind = ev.get("kind")
+    if kind == KIND_LIFT_PR and outbound_trial.is_on(outbound_trial.TELEGRAM_LIFT_PR_HELD):
+        return outbound_trial.TELEGRAM_LIFT_PR_HELD
+    if (
+        kind == KIND_MILESTONE
+        and outbound_trial.is_on(outbound_trial.TELEGRAM_MILESTONE_HELD)
+        and not milestone_is_untold(ev, digest_sent_ids)
+    ):
+        return outbound_trial.TELEGRAM_MILESTONE_HELD
+    if kind == KIND_CALIBRATION_PROMPT and outbound_trial.is_on(outbound_trial.TELEGRAM_CALIBRATION_PROMPT_HELD):
+        return outbound_trial.TELEGRAM_CALIBRATION_PROMPT_HELD
+    return None
 
 
 # ── Candidates ────────────────────────────────────────────────────────────────
@@ -570,6 +608,13 @@ def gather_signals(table, today: str) -> dict:
         from health.milestone_ledger import read_announced_events
 
         signals["milestones"] = read_announced_events(table, "USER#matthew")
+        if signals["milestones"]:  # #6302: which ones the milestone digest already mailed (None = unreadable = held)
+            from health.milestone_ledger import read_digest_state
+
+            try:
+                signals["milestone_digest_sent"] = set(read_digest_state(table, "USER#matthew")["sent_ids"])
+            except Exception as e:
+                logger.warning("[event-triggers] milestone digest cursor read failed: %s", type(e).__name__)
     except Exception as e:
         logger.warning("[event-triggers] milestone ledger read failed: %s", e)
 
@@ -655,12 +700,21 @@ def run_sweep(
         return {"ok": True, "reason": "budget", "candidates": 0}
 
     today = now_pt.strftime("%Y-%m-%d")
-    found = candidates(gather_signals(table, today) if signals is None else signals, today)
+    sigs = gather_signals(table, today) if signals is None else signals
+    found = candidates(sigs, today)
     n = len(found)
     if not found:
         return {"ok": True, "reason": "no events", "candidates": 0}
 
+    held = 0
     for ev in found:
+        # #6302 (owner ruling 2026-11-26): celebration and calibration nudges are held BEFORE the seat, the claim and the
+        # day's budget — nothing is consumed, so the one-line restore sends a still-fresh event. Counted in `candidates`.
+        item = held_by_ruling(ev, (sigs or {}).get("milestone_digest_sent"))
+        if item:
+            held += 1
+            outbound_trial.suppressed(item, "telegram-coach-worker#EventOutbound", log=logger.info, kind=ev["kind"])
+            continue
         token, chat_id = seat(ev["persona_id"])
         if not token or chat_id is None:
             logger.info("[event-triggers] %s dark — bot not registered for %s", ev["kind"], ev["persona_id"])
@@ -677,4 +731,6 @@ def run_sweep(
             return {"ok": True, "reason": "capped", "event_id": ev["event_id"], "candidates": n}
         return {**speak(ev, token, chat_id), "candidates": n}
 
+    if held and held == n:
+        return {"ok": True, "reason": "held by owner ruling, not sent", "candidates": n, "held": held}
     return {"ok": True, "reason": "nothing sendable", "candidates": n}
