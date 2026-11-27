@@ -59,14 +59,15 @@ def test_a_recomputed_corrected_chain_date_serves_its_own_events():
 
 def test_must_fail_control_an_older_method_recomputed_date_still_serves_none():
     view = CP.public_sheet(_rec("2026-10-01", 5, "recomputed", V1, events=[SLEEP_UP]))
-    assert view["level_events"] == [] and view["recalculated_level_events"] == [SLEEP_UP]
+    # #6224 (2026-11-27): an older-method block is "being recalculated" whatever the switch says — no event at all
+    assert view["level_events"] == [] and view["recalculated_level_events"] == [] and view["scores_pending"] is True
 
 
 def test_the_level_series_credits_the_corrected_public_level():
     recs = [_rec("2026-10-01", 18, "recomputed", V2, m1_level=13), _rec("2026-10-02", 21, "recomputed", V2, m1_level=16)]
     assert CP.event_level_series(recs) == [("2026-10-01", 18), ("2026-10-02", 21)]
     old = [_rec("2026-10-01", 18, "recomputed", V1, m1_level=13)]
-    assert CP.event_level_series(old) == [("2026-10-01", 13)]  # control: an older method keeps the 11-06 crediting
+    assert CP.event_level_series(old) == []  # control: an older-method block credits no level (#6224 per-block rule)
 
 
 def test_level_badges_follow_the_corrected_chain_kept_moved_or_withheld_never_invented():

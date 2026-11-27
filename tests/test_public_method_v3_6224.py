@@ -94,7 +94,9 @@ def test_the_labels_and_the_notice_per_version():
     assert CP.PUBLIC_CORRECTION_NOTICE.endswith("Previous character scores are superseded by the corrected values.")
 
 
-def test_a_v2_block_is_served_with_relationships_not_scored_and_no_relationships_number():
+def test_a_v2_block_is_served_with_relationships_not_scored_and_no_relationships_number(monkeypatch):
+    # the scrub is its own layer: held here with the per-block rule off (an older block is otherwise always pending)
+    monkeypatch.setattr(CP, "older_method", lambda _v: False)
     view = CP.public_sheet(_rec(V2, origin="live"))
     assert view["pillar_relationships"] == CP.not_scored_pillar("relationships")
     assert RW.unscored_numbers(view) == []
@@ -106,6 +108,7 @@ def test_a_v2_block_is_served_with_relationships_not_scored_and_no_relationships
 
 
 def test_must_fail_control_without_the_scrub_a_v2_relationships_number_is_seen(monkeypatch):
+    monkeypatch.setattr(CP, "older_method", lambda _v: False)
     monkeypatch.setattr(CP, "scrub_unscored", lambda view: view)
     assert RW.unscored_numbers(CP.public_sheet(_rec(V2, origin="live")))
 
@@ -155,3 +158,23 @@ def test_the_public_pages_never_show_dormant_and_never_call_silence_decline():
     assert not any("dormant</" in ln or ">dormant" in ln for ln in shown)
     assert 'if (m === "dormant") return "unavailable";' in js  # a stored pre-amendment label reads unavailable
     assert "unavailable — logging has been quiet" in js and "fading — the measured days are trending down" in js
+
+
+def test_the_removed_debt_atrophy_and_decay_wording_is_gone_from_the_character_page():
+    """#6299 (ff9f2c8c7): the reader-facing wording follows the amended rule — no atrophy chip or line, no "−N owed" XP
+    debt cell or hero figure, no neglect-decay dimming, no "decaying while the logging is dark" banner, and no CSS for
+    them; "dormant" survives only as the mapping of a stored pre-amendment label to "unavailable"."""
+    js = open(os.path.join(ROOT, "site", "assets", "js", "evidence_character.js"), encoding="utf-8").read()
+    for gone in ("ch-atrophy", "atrophy", "owed", "ch-xpdebt", "xp_debt", "neglect_decay", "decaying while"):
+        assert gone not in js, gone
+    import re
+
+    code = re.sub(r"/\*.*?\*/", "", js, flags=re.S)  # block comments out; then line comments
+    code_lines = [ln.split("//")[0] for ln in code.splitlines()]
+    assert [ln.strip() for ln in code_lines if "dormant" in ln] == [
+        'if (m === "dormant") return "unavailable";',
+        'const stored = ch.character_mood === "dormant" ? "unavailable" : ch.character_mood;',
+    ]
+    css = open(os.path.join(ROOT, "site", "assets", "css", "evidence.css"), encoding="utf-8").read()
+    for gone in (".ch-atrophy", ".ch-xpdebt", 'data-state="dormant"'):
+        assert gone not in css, gone

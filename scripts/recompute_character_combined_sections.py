@@ -116,6 +116,8 @@ def failures(c: dict, preliminary: bool) -> list:
         out.append(f"public composite differs from /api/character on {len(pc['mismatches'])} date(s)")
     if fs.get("mismatches"):
         out.append(f"last ladder step differs from planned_states on {len(fs['mismatches'])} field(s)")
+    if (c.get("unplanned_public") or {}).get("servable"):
+        out.append(f"{c['unplanned_public']['servable']} stored public block(s) outside both plans would be served")
     pf = c.get("preflight") or {}
     if pf and not ((pf.get("private") or {}).get("ok") and (pf.get("public") or {}).get("ok")):
         out.append("a backup preflight did not pass")
@@ -216,6 +218,19 @@ def operations_lines(c: dict) -> list:
     pc = p["counts"]
     silent = c.get("silent_tests")
     lines = [
+        "**When a public score is served — two independent conditions.** A public character number (overall level, tier, "
+        "XP, XP debt, composite, mood, effects, level events, pillar levels) is served only when (1) the stored block is "
+        "CURRENT-method (`character_privacy.older_method` is false: v3) AND (2) the global containment switch "
+        '`PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE` is off. Either one alone serves "being recalculated"; an '
+        "older-method block also credits no level, badge, milestone or event. So a sheet the recompute missed, or a "
+        'ROLLBACK of the public apply (which restores the older blocks), returns every affected date to "being '
+        'recalculated", never to the old numbers — tested with the switch forced off '
+        "(tests/test_recompute_combined_6224.py end-to-end; tests/test_tombstoned_public_blocks_6224.py, incl. the route "
+        "walk's `--older-method` case).",
+        "",
+        "**Not changed (flagged):** `web/site_api_rollups.py` reads a method-1 field (`overall_score`) from raw sheets; "
+        "no stored sheet carries it (0 of 177), so it serves nothing from the character partition.",
+        "",
         "**Write counts (exact).** Private plan `"
         + str(p["plan_id"])
         + "`: "
@@ -343,3 +358,97 @@ def mood_lines(c: dict) -> list:
         f"- While the scores are pending, `/api/character` serves mood = {m.get('served_while_pending')} (the route's own "
         "code on the planned records: suppressed with the rest of the headline).",
     ]
+
+
+# ── every stored item with a `public` block that neither plan covers (owner, 2026-11-27) ─────────────────────────────
+
+PUBLIC_PARTITIONS = ("character_sheet", "character_receipt", "day_grade")
+
+
+def publicly_servable(source: str, item: dict) -> bool:
+    """Would the code on THIS tree serve anything public from ``item`` once the scores are live? (The public readers
+    themselves: ``character_privacy.public_sheet``, the receipt route's ``_public_receipt``, ``day_grade_public``.)"""
+    from common.numeric import decimals_to_float
+    from health import character_privacy as CP, day_grade_public
+    from web import site_api_character as ch
+
+    rec = decimals_to_float(item)
+    saved = CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE
+    CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = False
+    try:
+        if source == "character_sheet":
+            return CP.public_sheet(rec, pending=False) is not None
+        if source == "character_receipt":
+            return ch._public_receipt({k: v for k, v in rec.items() if k not in ("pk", "sk")}) is not None
+        return day_grade_public.public_grade(rec) is not None
+    finally:
+        CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = saved
+
+
+def why_skipped(item: dict) -> str:
+    from experiment.phase_filter import singleton_visible
+
+    if item.get("tombstone"):
+        return "tombstoned"
+    if not singleton_visible(item):
+        return f"phase {item.get('phase')}"
+    return "not in either plan"
+
+
+def unplanned_public_items(items: dict, accounted: set) -> dict:
+    """``items``: {source: [stored items]}; ``accounted``: {(source, sk)} every key a plan writes or the public dry run
+    recomputed and found unchanged. Returns each stored item with a ``public`` block outside that set, why, and whether
+    the public routes would serve it (the run FAILS on any servable one)."""
+    rows = []
+    for source, its in items.items():
+        for it in its:
+            if "public" not in it or (source, it["sk"]) in accounted:
+                continue
+            rows.append({"source": source, "date": it["sk"][5:], "why": why_skipped(it), "servable": publicly_servable(source, it)})
+    return {"count": len(rows), "servable": sum(1 for r in rows if r["servable"]), "rows": rows}
+
+
+def read_public_items() -> dict:
+    """Read-only: every stored item of the three public-carrying partitions (DynamoDB Query, no write)."""
+    import boto3
+    from boto3.dynamodb.conditions import Key
+
+    table = boto3.resource("dynamodb", region_name=os.environ.get("AWS_DEFAULT_REGION", "us-west-2")).Table(
+        os.environ.get("TABLE_NAME", "life-platform")
+    )
+    out = {}
+    for source in PUBLIC_PARTITIONS:
+        items, kw = [], {"KeyConditionExpression": Key("pk").eq(f"USER#matthew#SOURCE#{source}")}
+        while True:
+            r = table.query(**kw)
+            items += r["Items"]
+            if "LastEvaluatedKey" not in r:
+                break
+            kw["ExclusiveStartKey"] = r["LastEvaluatedKey"]
+        out[source] = items
+    return out
+
+
+def accounted_keys(out: str) -> set:
+    import json
+
+    priv = json.load(open(os.path.join(out, "private", "plan.json"), encoding="utf-8"))
+    pman = json.load(open(os.path.join(out, "public", "manifest.json"), encoding="utf-8"))
+    pub = json.load(open(os.path.join(out, "public", "plan.json"), encoding="utf-8"))
+    keys = {(r["pk"].split("#SOURCE#")[-1], r["sk"]) for r in priv["rows"]}
+    keys |= {(w["pk"].split("#SOURCE#")[-1], w["sk"]) for w in pub}
+    keys |= {tuple(s.split(" ", 1)) for s in pman["plan"]["skipped_unchanged"]}
+    return keys
+
+
+def unplanned_lines(c: dict) -> list:
+    u = c.get("unplanned_public") or {}
+    lines = [
+        f"- Stored items with a `public` block that NEITHER plan covers (not written, not recomputed-and-unchanged): "
+        f"{u.get('count')}; publicly servable under this tree once the switch flips: {u.get('servable')} (the run FAILS on any)."
+    ]
+    for r in u.get("rows") or []:
+        lines.append(
+            f"  - {r['source']} {r['date']}: {r['why']} — the public routes will serve {'IT (FAIL)' if r['servable'] else 'nothing'}"
+        )
+    return lines

@@ -139,6 +139,33 @@ def public_plan(store, plan_path) -> tuple:
     return plan, pid
 
 
+def _served_overall(store) -> dict:
+    """{date: the overall numbers a public route serves} for every stored sheet, the global switch forced OFF: through
+    ``public_sheet`` and through ``/api/character``'s own handler on a stub table holding that one record."""
+    import recompute_character_verify as VF
+
+    out = {}
+    saved = CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE
+    CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = False
+    try:
+        for (pk, sk), item in sorted(store.items.items()):
+            if pk != B.SHEET_PK:
+                continue
+            rec = decimals_to_float(item)
+            view = CP.public_sheet(rec, pending=False) or {}
+            nums = {k: view.get(k) for k in ("character_level", "character_xp", "character_xp_debt") if view.get(k) is not None}
+            if view:
+                route = VF.route_character_of(rec)
+                nums.update(
+                    {f"route.{k}": route.get(k) for k in ("level", "xp_total", "xp_debt", "composite_score") if route.get(k) is not None}
+                )
+            if nums:
+                out[sk] = nums
+    finally:
+        CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = saved
+    return out
+
+
 def _canon(store) -> dict:
     return {str(k): T.canonical(T.to_typed(v)) for k, v in sorted(store.items.items())}
 
@@ -178,7 +205,12 @@ def test_end_to_end_apply_verify_and_rollback_restore_every_item_byte_identicall
 
     from_s3 = BK.load_export(f"s3://bucket/{applied['backup']['key']}", s3)  # PUBLIC first, from the S3 copy (sha256 verified)
     assert {(e["pk"], e["sk"]) for e in from_s3["entries"]} == {(w["pk"], w["sk"]) for w in pub}  # coverage == write set
+    served_after_apply = _served_overall(store)
+    assert served_after_apply, "control: after the public apply the v3 blocks serve their numbers with the switch off"
     assert B.rollback(table, from_s3, apply=True)["refused"] == []
+    # #6224: a rollback of the public apply returns every date to "being recalculated", never to the old numbers —
+    # the restored blocks are older-method, and the switch is forced OFF here
+    assert _served_overall(store) == {}, _served_overall(store)
     done = A.rollback(store, priv["export"], apply=True)  # then PRIVATE
     assert done["refused"] == [] and done["verified"]["mismatches"] == []
     assert _canon(store) == start

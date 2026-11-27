@@ -26,6 +26,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from experiment.phase_filter import singleton_visible  # the ONE visibility predicate (tombstone, phase) — #6224
+
 STRESS_SCALE_MAX = 4  # the evening check-in's 0-4 scale (coach/evening_checkin.py), 4 = the most stressed
 
 # component -> the owner-only source it reads (privacy.field_tiers SOURCE_TIERS)
@@ -190,6 +192,16 @@ CHAIN_PILLARS = ("consistency",)  # every value of these is a chain result (cros
 
 def scores_pending() -> bool:
     return bool(PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE)
+
+
+def older_method(view: Any) -> bool:
+    """#6224 (2026-11-27): a public block computed under an OLDER public method than ``PUBLIC_METHOD_VERSION``. Its
+    chain-carried values (overall level, tier, XP, XP debt, composite, mood, effects, level events, pillar levels) were
+    computed with inputs the current method withholds, so they are ALWAYS served "being recalculated" — independently of
+    the global switch: a public score is served only when the block is current-method AND the switch is off. A sheet
+    missed by the recompute, or a rollback of the public apply after the switch is off, therefore never serves the old
+    numbers. An older-method block credits no level, badge, milestone or event either (``event_level_series``)."""
+    return isinstance(view, dict) and view.get("public_method_version") != PUBLIC_METHOD_VERSION
 
 
 def pending_pillar(name: str) -> dict[str, Any]:
@@ -401,7 +413,12 @@ _ENVELOPE_KEYS = ("pk", "sk", "date", "phase", "cycle", "input_manifest", "input
 
 
 def public_variant(record: Any) -> Optional[dict[str, Any]]:
-    """The stored public variant of a ``character_sheet`` record, or None when there is none a reader may serve."""
+    """The stored public variant of a ``character_sheet`` record, or None when there is none a reader may serve.
+
+    #6224: a tombstoned (or other-phase) record serves nothing, whatever its stored ``public`` block holds — a get_item
+    by date bypasses the query's phase filter, and the filter does not read the tombstone (``singleton_visible``)."""
+    if isinstance(record, dict) and not singleton_visible(record):
+        return None
     pv = record.get(PUBLIC_KEY) if isinstance(record, dict) else None
     if not isinstance(pv, dict) or pv.get("public_method_version") not in PUBLIC_METHOD_VERSIONS:
         return None
@@ -530,10 +547,12 @@ def event_level_series(records: Any) -> list[tuple[str, int]]:
         return out
     event_days = {str(v.get("date")) for v in public_event_sheets(records)}
     for rec in records or []:
-        if not isinstance(rec, dict):
+        if not isinstance(rec, dict) or not singleton_visible(rec):  # #6224: a tombstoned sheet credits no level
             continue
         d = str(rec.get("date") or str(rec.get("sk", "")).replace("DATE#", ""))[:10]
         pv = public_variant(rec)
+        if pv is not None and older_method(pv):
+            continue  # #6224: an older-method block credits no level (no badge, no milestone)
         if pv is not None and is_corrected_chain(pv):  # #6224: the corrected public chain's level on every date (badges, milestones)
             out.append((d, _level(pv.get("character_level"))))
         elif pv is None or _origin(pv) != "live":
@@ -574,7 +593,9 @@ def public_sheet(record: Any, pending: Optional[bool] = None, internal: bool = F
         for key in ("level_events", "recalculated_level_events"):
             if isinstance(out.get(key), list):
                 out[key] = [without_provenance(e) for e in out[key] if not is_reconstructed(e)]
-    if scores_pending() if pending is None else pending:  # #6224 containment: the chain values are being recalculated
+    # #6224: the chain values are being recalculated — globally (the containment switch) OR for this block (an older
+    # public method: two independent conditions, ``older_method``)
+    if (scores_pending() if pending is None else pending) or older_method(out):
         suppress_pending(out)
     return out
 
