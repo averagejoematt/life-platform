@@ -407,7 +407,7 @@ def owner_channel_check(text: str) -> OwnerVerdict:
 
 
 # The additive note an MCP write result carries when the owner's own words in that call match
-# SELF_HARM (``mcp/owner_support_note.py``). Addressed to the CALLING MODEL, which can see his
+# SELF_HARM (``mcp/handler.py::_owner_support_note``). Addressed to the CALLING MODEL, which can see his
 # whole conversation and this regex cannot — hence the explicit ignore-if-not-meant clause: a
 # drill name, a book title or someone else's story must not turn a journal write into a lecture.
 OWNER_MODEL_NOTE = (
@@ -419,3 +419,17 @@ OWNER_MODEL_NOTE = (
     "platform monitors him or will respond; it does not, and nobody has been alerted. If it plainly is "
     "not what he meant, ignore this note and do not mention it."
 )
+
+
+def owner_words_self_harm(value, _depth: int = 0) -> bool:
+    """Whether any string in ``value`` (nested dicts/lists, a few levels) is SELF_HARM under the
+    owner policy. The MCP handler's test for adding ``OWNER_MODEL_NOTE`` to a write result."""
+    if _depth > 4:
+        return False
+    if isinstance(value, str):
+        return owner_channel_check(value).hazard == SELF_HARM
+    if isinstance(value, dict):
+        return any(owner_words_self_harm(v, _depth + 1) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(owner_words_self_harm(v, _depth + 1) for v in value)
+    return False

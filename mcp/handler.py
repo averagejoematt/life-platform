@@ -41,12 +41,12 @@ import uuid
 from decimal import Decimal
 from typing import Any, cast
 
+from ai import safety_contract  # #6303 — the owner support note on owner-words write results
 from common.text_guards import residue_fragments  # #4190 — shared, bundled (#781)
 
 from mcp import (
     audit as mcp_audit,
     invoke_gate,  # #5540 — privileged branches gated before they run
-    owner_support_note,  # #6303 — additive support note on owner-words write results
 )
 from mcp.config import __version__, logger
 from mcp.core import (
@@ -223,6 +223,38 @@ def _timeout_error(name, arguments):
     return mcp_error(message=message, error_code="QUERY_TOO_BROAD")
 
 
+# #6303: the write tools whose arguments carry the owner's own words.
+_OWNER_WORDS_TOOLS = frozenset(
+    {"log_coach_checkin", "log_owner_note", "log_field_note_response", "write_platform_memory", "manage_pending_writes"}
+)
+SUPPORT_NOTE_KEY = "support_note"
+
+
+def _owner_support_note(name, arguments, result):
+    """``result`` plus ``support_note`` when his words in this call match SELF_HARM (#6303); else ``result``.
+
+    The server cannot see his conversation with the Claude app, but these write tools carry his
+    words, and a calling model deep in a task ("log these answers") can file a sentence it should
+    have stopped for. The note (``safety_contract.OWNER_MODEL_NOTE``) tells that model to stop and
+    point him to human support, and to ignore it if that is plainly not what he meant.
+
+    It cannot corrupt the write: it runs AFTER the tool returned, only ADDS a key to a NEW dict
+    built from a successful dict result (an error payload, a list or a string passes untouched),
+    none of these tools declares an ``outputSchema`` (and every schema leaves
+    ``additionalProperties`` open), and any exception returns the original result. It is a nudge
+    to the calling model, NOT a code gate: the Claude-app safeguard is that model's own behaviour
+    plus the coaching skills' instructions.
+    """
+    try:
+        if name not in _OWNER_WORDS_TOOLS or not isinstance(result, dict) or is_error_payload(result):
+            return result
+        if safety_contract.owner_words_self_harm(arguments):
+            return {**result, SUPPORT_NOTE_KEY: safety_contract.OWNER_MODEL_NOTE}
+        return result
+    except Exception:  # noqa: BLE001 — a nudge must never cost him the write's own answer
+        return result
+
+
 def handle_tools_call(params):
     name = params.get("name")
     arguments = params.get("arguments", {})
@@ -276,9 +308,7 @@ def handle_tools_call(params):
         _pool.shutdown(wait=False)
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
         _audit_tool_call(name, arguments, "success", (time.time() - _t0) * 1000)  # #753
-        # #6303: additive, post-write, fail-safe — a support note for the calling model on the few
-        # write tools that carry his own words; never blocks or rewrites the write (mcp/owner_support_note.py).
-        result = owner_support_note.annotate(name, arguments, result)
+        result = _owner_support_note(name, arguments, result)  # #6303: additive, post-write, fail-safe
         return _call_result(name, result)
     except Exception as e:
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=False)

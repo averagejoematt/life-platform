@@ -505,15 +505,29 @@ def test_group_boundary_reaches_the_speaker_turn(monkeypatch, wire):
 # ── MCP: the additive support note ────────────────────────────────────────────
 
 
-def test_support_note_is_additive_on_a_self_harm_write():
-    from mcp import owner_support_note as note
+@pytest.fixture()
+def mcp_handler():
+    # mcp.config reads these at import (the tests/test_mcp_audit.py pattern); setdefault never
+    # overrides a value another test already bound.
+    import os
 
+    os.environ.setdefault("S3_BUCKET", "test-bucket")
+    os.environ.setdefault("USER_ID", "matthew")
+    os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+    from mcp import handler
+
+    return handler
+
+
+def test_support_note_is_additive_on_a_self_harm_write(mcp_handler):
     result = {"ok": True, "id": "n1"}
-    out = note.annotate("log_owner_note", {"text": "honestly I want to kill myself"}, result)
-    assert out == {"ok": True, "id": "n1", note.SUPPORT_NOTE_KEY: sc.OWNER_MODEL_NOTE}
+    out = mcp_handler._owner_support_note("log_owner_note", {"text": "honestly I want to kill myself"}, result)
+    assert out == {"ok": True, "id": "n1", mcp_handler.SUPPORT_NOTE_KEY: sc.OWNER_MODEL_NOTE}
     assert result == {"ok": True, "id": "n1"}, "the tool's own result object is not mutated"
-    nested = note.annotate("manage_pending_writes", {"action": "queue", "target_args": {"content": "I feel suicidal"}}, {"ok": True})
-    assert note.SUPPORT_NOTE_KEY in nested
+    nested = mcp_handler._owner_support_note(
+        "manage_pending_writes", {"action": "queue", "target_args": {"content": "I feel suicidal"}}, {"ok": True}
+    )
+    assert mcp_handler.SUPPORT_NOTE_KEY in nested
 
 
 @pytest.mark.parametrize(
@@ -528,18 +542,31 @@ def test_support_note_is_additive_on_a_self_harm_write():
         ("log_owner_note", {"text": "I want to kill myself"}, ["not", "a", "dict"]),
     ],
 )
-def test_support_note_leaves_everything_else_untouched(name, args, result):
-    from mcp import owner_support_note as note
-
-    assert note.annotate(name, args, result) is result
+def test_support_note_leaves_everything_else_untouched(mcp_handler, name, args, result):
+    assert mcp_handler._owner_support_note(name, args, result) is result
 
 
-def test_support_note_fails_safe(monkeypatch):
-    from mcp import owner_support_note as note
-
+def test_support_note_fails_safe(mcp_handler, monkeypatch):
     monkeypatch.setattr(sc, "owner_channel_check", lambda t: 1 / 0)
     result = {"ok": True}
-    assert note.annotate("log_owner_note", {"text": "I want to kill myself"}, result) is result
+    assert mcp_handler._owner_support_note("log_owner_note", {"text": "I want to kill myself"}, result) is result
+
+
+def test_support_note_rides_the_real_tools_call_after_the_write(mcp_handler, monkeypatch):
+    writes = []
+    monkeypatch.setitem(
+        mcp_handler.TOOLS,
+        "log_owner_note",
+        dict(mcp_handler.TOOLS["log_owner_note"], fn=lambda args: writes.append(dict(args)) or {"ok": True}),
+    )
+    monkeypatch.setattr(mcp_handler, "_check_write_rate_limit", lambda name: None)
+    monkeypatch.setattr(mcp_handler, "_audit_tool_call", lambda *a, **k: None)
+    monkeypatch.setattr(mcp_handler, "_emit_tool_metric", lambda *a, **k: None)
+    out = mcp_handler.handle_tools_call({"name": "log_owner_note", "arguments": {"text": "I want to kill myself"}})
+    assert writes == [{"text": "I want to kill myself"}], "the write ran once, with his words unchanged"
+    payload = json.loads(out["content"][0]["text"])
+    assert payload["ok"] is True and payload[mcp_handler.SUPPORT_NOTE_KEY] == sc.OWNER_MODEL_NOTE
+    assert not out.get("isError")
 
 
 def test_support_note_wording_never_claims_monitoring():
