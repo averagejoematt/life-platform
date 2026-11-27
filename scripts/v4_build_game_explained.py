@@ -85,7 +85,7 @@ MECHANICS_FUNCTIONS = (
     "_level_step",
     "evaluate_level_changes",
 )
-RECORDED_ENGINE_FINGERPRINT = "9700bd64b55e"  # re-read 2026-11-26 (#6293 final amendments: planned rest, lab ageing as weight, rest-day completeness, mood 'unavailable'); prior b75287942475 (#6293 amendment: no XP decay/debt, shield on measured verdicts, held days, no neglect atrophy, only habits two-state); prior f1d96247c11a, re-read 2026-10-23 (#5129: owner-only components held out of _weighted_pillar_score — the table labels them); prior e56973e1c2ee, engine v1.7.0 + #1412, 2026-07-19
+RECORDED_ENGINE_FINGERPRINT = "9520396c988f"  # re-read 2026-11-26 (#6293 final amendments: planned rest, lab ageing as weight, rest-day completeness, mood 'unavailable'); prior b75287942475 (#6293 amendment: no XP decay/debt, shield on measured verdicts, held days, no neglect atrophy, only habits two-state); prior f1d96247c11a, re-read 2026-10-23 (#5129: owner-only components held out of _weighted_pillar_score — the table labels them); prior e56973e1c2ee, engine v1.7.0 + #1412, 2026-07-19
 
 
 def engine_fingerprint() -> str:

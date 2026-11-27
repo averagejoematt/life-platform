@@ -452,23 +452,15 @@ def planned_rest_in_window(data: dict[str, Any]) -> int:
     return len({str(d)[:10] for d in days} & window)
 
 
-# The five sources the day's data completeness counts (``character_sheet_lambda`` reports which arrived).
-COMPLETENESS_SOURCES = ("whoop", "macrofactor", "apple", "strava", "habitify")
-
-
 def data_completeness_pct(present: dict[str, Any], activity_elsewhere: bool) -> Optional[float]:
-    """The day's data completeness (0-100) from which of ``COMPLETENESS_SOURCES`` arrived.
+    """The day's data completeness (0-100) from ``present`` — {source: arrived?} for the sources the caller counts.
 
-    #6293 rest_day_completeness (owner ruling 2026-11-26): a day with no activity is not missing data. The Strava row is
-    expected only when another source shows a session that day (``activity_elsewhere``: Hevy, Whoop or the Apple Watch,
-    counted by ``training.session_count``); on a day no source shows activity it leaves the denominator. A Strava row that
-    did arrive always counts. With the switch off: the pre-amendment rule, all five always expected."""
-    expected = [
-        s
-        for s in COMPLETENESS_SOURCES
-        if not (REST_DAY_COMPLETENESS and s == "strava" and not present.get("strava") and not activity_elsewhere)
-    ]
-    return round(sum(1 for s in expected if present.get(s)) / len(expected) * 100, 1)
+    #6293 rest_day_completeness (owner ruling 2026-11-26): a day with no activity is not missing data. The ``strava``
+    row is expected only when another source shows a session that day (``activity_elsewhere``: Hevy, Whoop or the
+    Apple Watch, by ``training.session_count``); on a day no source shows activity it leaves the denominator. A Strava
+    row that did arrive always counts. With the switch off: the pre-amendment rule, every source always expected."""
+    expected = [s for s in present if not (REST_DAY_COMPLETENESS and s == "strava" and not present.get(s) and not activity_elsewhere)]
+    return round(sum(1 for s in expected if present.get(s)) / len(expected) * 100, 1) if expected else None
 
 
 def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:

@@ -44,8 +44,10 @@ from health import (
     character_privacy,  # owner ruling 2026-11-05: character_stats.json is read through the public variant
     character_public,  # owner ruling 2026-11-05: the public variant computed beside method 1
     character_public_rows,  # #6224: the rows of a pillar/headline with no public number
+    character_rest,  # noqa: E402 — #6293: planned rest + rest-day activity (the two final inputs)
     personal_baselines,  # #1412: personal-variance targets overlay (ADR-105 rule 4)
 )
+from health.character_rest import activity_elsewhere  # noqa: E402 — module-level name: tests patch csl.activity_elsewhere
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -376,43 +378,6 @@ def _safe_float(rec, field):
 # ==============================================================================
 
 
-def activity_elsewhere(data, day):
-    """#6293 rest_day_completeness: whether a source other than Strava (Hevy, Whoop, the Apple Watch) shows a training
-    session on ``day`` — THE session count (``training.session_count``) over the already-fetched 7-day rows."""
-    try:
-        from training import session_count
-
-        week = session_count.count(
-            hevy=data.get("hevy_7d"), whoop=data.get("whoop_7d"), apple=data.get("apple_7d"), start_date=day, end_date=day
-        )
-        return bool(week.get("sessions"))
-    except Exception as e:  # a count that cannot run is no evidence of activity: Strava stays not-expected
-        logger.warning(f"[character] activity_elsewhere({day}) failed (non-fatal): {e}")
-        return False
-
-
-def fetch_planned_rest_days(start_date, end_date):
-    """#6293 planned_rest: the dates in [start, end] that are a recorded planned pause — a sick-day record
-    (``SOURCE#sick_days``, not cleared, via ``sick_day_checker``) or a travel log (``SOURCE#travel``): the same set
-    ``engagement_core`` excuses as a planned pause. Owner-only; never written to the receipt's input rows."""
-    days = set()
-    try:
-        from health.sick_day_checker import get_sick_days_range
-
-        days |= {str(r.get("date"))[:10] for r in get_sick_days_range(table, USER_ID, start_date, end_date) if r.get("date")}
-    except Exception as e:
-        logger.warning(f"[character] planned-rest sick-day read failed (non-fatal): {e}")
-    try:
-        resp = table.query(
-            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
-            ExpressionAttributeValues={":pk": USER_PREFIX + "travel", ":s": "DATE#" + start_date, ":e": "DATE#" + end_date + "~"},
-        )
-        days |= {str(i.get("sk", "")).replace("DATE#", "")[:10] for i in resp.get("Items", [])}
-    except Exception as e:
-        logger.warning(f"[character] planned-rest travel read failed (non-fatal): {e}")
-    return sorted(d for d in days if start_date <= d <= end_date)
-
-
 def assemble_data(yesterday_str):
     """Build the data dict that character_engine.compute_character_sheet() expects.
 
@@ -498,7 +463,7 @@ def assemble_data(yesterday_str):
     data["hevy_workout_days_7d"] = fetch_hevy_workout_days(strava_7d_start, yesterday_str)
 
     # #6293 planned_rest: the window's recorded planned-pause days (sick / travel) — Movement's window targets prorate
-    data["planned_rest_days_7d"] = fetch_planned_rest_days(strava_7d_start, yesterday_str)
+    data["planned_rest_days_7d"] = character_rest.planned_rest_days(table, USER_ID, strava_7d_start, yesterday_str)
 
     # #965: reading-session days (trailing 7, ADR-097 GSI2) — mind's reading_practice
     data["reading_session_days_7d"] = fetch_reading_session_days(strava_7d_start, yesterday_str)

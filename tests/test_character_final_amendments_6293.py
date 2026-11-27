@@ -154,7 +154,9 @@ def test_a_missing_sync_on_a_training_day_still_counts_missing():
 
 def test_a_strava_row_that_arrived_always_counts_and_silence_is_zero():
     assert ce.data_completeness_pct(dict(ALL_BUT_STRAVA, strava=True), activity_elsewhere=False) == 100.0
-    assert ce.data_completeness_pct({}, activity_elsewhere=False) == 0.0  # the engine reads an exact 0 as unknown
+    nothing = dict.fromkeys(ALL_BUT_STRAVA, False)
+    assert ce.data_completeness_pct(nothing, activity_elsewhere=False) == 0.0  # compute_consistency_raw reads 0 as unknown
+    assert ce.data_completeness_pct({}, activity_elsewhere=False) is None
 
 
 def test_completeness_switch_off_is_the_pre_amendment_rule(switch):
