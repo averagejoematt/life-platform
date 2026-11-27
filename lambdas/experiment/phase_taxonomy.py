@@ -574,6 +574,9 @@ MEMORY_DURABLE_CATEGORIES = frozenset(
         # fact about Matthew's body, not the current experiment run — same reasoning
         # as constraints_preferences, a reset must not silently clear one.
         "training",
+        # #6287: a reviewed personal record (a recollection, a confirmed event) is a fact
+        # about Matthew's life the owner approved — a reset must not clear it.
+        "personal_record",
     }
 )
 MEMORY_SCOPED_CATEGORIES = frozenset(
