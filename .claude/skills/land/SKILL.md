@@ -109,6 +109,13 @@ gh run view "$(gh run list --workflow web-preview-deploy.yml --branch main --sta
 gh run view "$(gh run list --workflow ci-cd.yml --branch main --status completed --limit 1 --json databaseId -q '.[0].databaseId')" --json headSha,jobs -q '.headSha[0:9] + "  " + ([.jobs[] | select(.name | startswith("Auto-rollback")) | .name + ": " + .conclusion] | join(", "))'   # Lambda fleet
 ```
 
+**A page assertion the root smoke makes is held before the merge (2026-11-27, #6320).** `deploy/smoke_test_site.sh`
+asserts fixed strings on the live v9 pages and runs only after the sync; #6321 removed asserted markup, passed every
+pre-merge gate and was rolled back in production. `scripts/check_www_build.py`'s scan now reads those rows
+(`scripts/www_smoke_pins.py`) and fails the web gate on the PR. When a www change removes or renames page markup, change
+the smoke row in the same PR; a `deploy/`- or `qa/`-only fix does not trigger the v9 deploy, so dispatch
+`gh workflow run web-preview-deploy.yml --ref main -f target=root` and read that run.
+
 **A privacy fix to the site has more than one copy (2026-11-15, #6083).** The root being right says nothing about
 the preview `/next/v9/` (empty outside a rehearsal), the pages a build no longer writes (the sync never deletes), or
 the nightly archive `/archive/latest.tar.gz`. One command reads every public copy against the live publication policy

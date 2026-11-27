@@ -24,6 +24,7 @@ Last updated: 2026-11-26 (+1 row — restraint-derived figures on public paths t
 
 | Date | Severity | Summary | Root Cause | TTD* | TTR* | Data Loss? |
 |------|----------|---------|------------|------|------|------------|
+| 2026-11-27 | **P3** (deploy plane; LOUD at deploy, SILENT before it — every pre-merge gate was green; the site served the previous build, nothing wrong was shown to a reader) | **The first root publish of The Days (#6321, run 45984492062) synced and was rolled back by its own smoke test.** One row of `deploy/smoke_test_site.sh` still asserted `portrait-tiles` on the front page, which the change removed (301 of 302 rows passed; visual and AI-vision QA and the public-copies guard were green). The site sat on the previous build for about 1 h 40 min; the partial-day label for 21 November waited with it. | The root smoke asserts fixed strings on live pages and runs only after the sync. Nothing before the merge reads those rows, so a PR that removes asserted markup is green everywhere and fails in production. The author's own sweep grepped `www/` and the web gates, not `deploy/`. Fix: #6325 corrected the row and the page's declared intent; #6327 makes the build gate read the smoke script's `check_body_contains` rows and hold the built pages to them (proved both ways: the stale row fails the gate, the corrected one passes). Procedure: `.claude/skills/land/SKILL.md` §4 names the check. Two pins of the same shape stay in the full unit suite, which is pre-merge: the front page's reach ceiling and the page intents' word limit. | 0 min (the deploy's smoke) | ~1 h 40 min | No |
 | 2026-11-26 | **P2** (privacy; SILENT — found by the focused review the 24 Nov row owed, not by any guard; past exposure cannot be recalled) | **The 24 Nov withholding of restraint data (#6262) missed the paths that derive from it.** `/api/character` and `/api/snapshot` served an effect and a Mind driver named for restraint streaks; the tier-0 count on `/api/habit_streaks`, `/api/habits`, `/api/achievements`, the public Ask context and `public_stats.json` included restraint habits; 22 CI screenshot artifacts on this public repo showed the withheld page; and the public archive kept the pre-fix `character.json` and `snapshot.json` after the routes were fixed, while `check_public_copies.py --check` passed. | #6262 withheld the restraint ROUTES; nothing asked whether another public figure was computed FROM restraint inputs (a derived effect, a pillar component, a count's denominator), and the copies guard compares an archive with the live policy for withheld pages, not for tokens a route has stopped serving. Fix: #6277 (merged 26 Nov, `d35512471`) — one shared public tier-0 predicate, no restraint input to the public character, and a route walk that fails when any public body moves with restraint state. Containment by hand, 26 Nov, on the owner's rulings: 22 artifacts preserved privately then deleted; `site-stats-refresh` invoked once (06:26Z) to rewrite `public_stats.json`; CloudFront invalidations `ICGUMVOT2XVWH5I9507G9CTHX3` (seven API paths and `/public_stats.json`) and `I1FIA904HWHBUW80REKFSY68R3` (`/archive/*`); the 25 Nov archive copied to `backups/quarantine/public-copies/20261126T064530Z/` and `life-platform-permanence` invoked (06:48Z) to replace it. Class tracker: #6224 (open). Still open at this row: stored public scores carry the restraint contribution until an owner-approved recompute; the public character configuration names the rule; a paused source's last-recorded date is served; streak milestones and two correlation metrics count restraint habits; the copies guard does not yet catch the archive class (#6223). A deployed fix is not a closed exposure: the labels left the routes while the archive and the stored scores kept them. | Unknown — the derived figures predate #6262 (found 26 Nov) | Same day to the deployed fix and the replaced archive; the residuals remain open | No data lost; an exposure — copies fetched earlier cannot be recalled |
 | 2026-11-25 | **P4** (deploy plane; LOUD — two root builds red on the public-copies guard; no privacy violation; the rollback job ran and declined, as designed for a copies-guard-only red) | **Two v9 root builds (06:33Z and 06:38Z) went red on the public-copies guard, neither for a copy that was wrong.** (a) The guard reported two legacy pages unreadable anonymously because another session quarantined their stored copies before its repo stub (#6266, merged 07:38Z) landed; (b) one anonymous fetch in the guard's legacy-chapter read hit a TLS handshake timeout and the uncaught error ended the run. The site served correctly throughout. | Two gaps. Ordering: the quarantine ran before the repo-side stub, so for ~32 min the guard and the repo disagreed about what those addresses should serve. Retry: `check_public_copies.py` retries its bulk downloads (`DOWNLOAD_RETRIES = 3`) but the legacy-chapter reads are a single attempt, so one transient network error reds the build. Procedure: `land` skill §4 now says merge the repo stub or fix FIRST, then quarantine. The bounded retry for the remaining single-attempt fetches is owed under #6223 (open). | ~0 (the run itself) | ~37 min (green after #6266 merged 07:38Z) | No |
 | 2026-11-24 | **P2** (privacy; SILENT — found by an independent reader review, not by any guard; past exposure cannot be recalled) | **`/data/vices/` and four public API routes served named streaks and an aggregate from which the count and the behaviour of private categories could be derived, with no owner approval on record.** A reader of the live page or the routes could see it; the public archive carried it too. | An old public surface was grandfathered: it predates the approval rule, and no privacy guard asks whether a published figure about a private category has an owner approval behind it — guards match vocabulary and named fields, and this surface used neither. Fix: #6262 (merged 15:36Z) withholds every such figure at the API without an owner approval on record; archive rebuilt. Class tracker: #6224 (open; #6262 refs it) under epic #5945 (privacy enforced by tier, not vocabulary). Procedure: the `full` review's Security/privacy row now traces every public figure about a private category to an owner approval and names grandfathering. A focused privacy review is owed per the incident skill. Silent: no alarm or guard announced it; it was found by someone looking. | Unknown — the surface predates this session (found 24 Nov) | ~1 d from detection to the deployed withhold + archive rebuild | No data lost; an exposure — copies fetched earlier cannot be recalled |
@@ -321,7 +322,7 @@ Last updated: 2026-11-26 (+1 row — restraint-derived figures on public paths t
 > that looks maintained and is three months stale is worse than one that is obviously old.
 
 <!-- INCIDENT-PATTERNS:DISTRIBUTION:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**Distribution — 275 dated rows, 240 post-June** (newest row 2026-11-26):
+**Distribution — 276 dated rows, 241 post-June** (newest row 2026-11-27):
 
 | month | rows |
 |---|---|
@@ -334,19 +335,19 @@ Last updated: 2026-11-26 (+1 row — restraint-derived figures on public paths t
 | 2026-08 | 126 |
 | 2026-09 | 41 |
 | 2026-10 | 15 |
-| 2026-11 | 22 |
+| 2026-11 | 23 |
 
-**By severity:** P1 6 · P2 43 · P3 109 · P4 112 · Low 3 · Info 1 · DR drill 1.
+**By severity:** P1 6 · P2 43 · P3 110 · P4 112 · Low 3 · Info 1 · DR drill 1.
 
 **By root-cause class** (keyword-derived over Summary + Root Cause; a row may match more
 than one, and 37 match none):
 
 | n | class |
 |---|---|
-| 171 | deployment error |
-| 70 | stale config / literal drift |
-| 51 | QA-oracle false positive |
-| 47 | QA false positive — deploy-race (#2978) |
+| 172 | deployment error |
+| 71 | stale config / literal drift |
+| 52 | QA-oracle false positive |
+| 48 | QA false positive — deploy-race (#2978) |
 | 38 | deploy-plane wedge / strand / race |
 | 38 | lane-subset / union-breach main red |
 | 35 | secret / credential |
@@ -367,7 +368,7 @@ than one, and 37 match none):
 > 2026-08-22: 14 rows in July (1 per 2.2 days), 15 in 2026-08-01→22 (1 per 1.5 days).
 
 <!-- INCIDENT-PATTERNS:TOPCLASSES:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-The three classes the old list omitted entirely — **QA-oracle false positives (51)**, **lane-subset/union-breach main reds (38)** and **deploy-plane wedges/strands/races (38)** — are now the 3rd, 6th and 5th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
+The three classes the old list omitted entirely — **QA-oracle false positives (52)**, **lane-subset/union-breach main reds (38)** and **deploy-plane wedges/strands/races (38)** — are now the 3rd, 6th and 5th largest. They are the shape of this platform's failures *today*; **deployment error** remains the largest single class but is increasingly a co-tag on those three rather than a category of its own.
 <!-- INCIDENT-PATTERNS:TOPCLASSES:END -->
 
 ### Silence is an axis, not a class
@@ -380,17 +381,17 @@ scored orthogonally (loud/silent × class) rather than as a tenth category.
 but modest*, and materially weaker than this axis was described as when filed:
 
 <!-- INCIDENT-PATTERNS:SILENCE:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**66 of 275 rows are silent.**
+**66 of 276 rows are silent.**
 
 | | silent | loud |
 |---|---|---|
-| rows | 66 | 209 |
-| TTD parseable | 48 | 143 |
+| rows | 66 | 210 |
+| TTD parseable | 48 | 144 |
 | median TTD | **32 min** | 20 min |
-| mean TTD | 5,959 min | 2,633 min |
+| mean TTD | 5,959 min | 2,615 min |
 | exceeded 1 day | 8 (17% of parsed) | 14 (10% of parsed) |
 
-Silent rows take **~1.6× longer to detect at the median** and are **~1.7× more likely to run past a day**. But the *means* are only 56% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (7 rows past a week, vs 3 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **84 of 275 TTD cells (31%) state no parseable duration** — they are excluded rather than counted as zero.
+Silent rows take **~1.6× longer to detect at the median** and are **~1.7× more likely to run past a day**. But the *means* are only 56% apart, and the "days-scale TTD for silent vs minutes for loud" framing does **not** reproduce over the population — it comes from reading the worst handful of silent rows, and the loud set has its own long tail (7 rows past a week, vs 3 silent). **Two caveats that bound all of this:** the classifier is keyword-based over free prose, and **84 of 276 TTD cells (30%) state no parseable duration** — they are excluded rather than counted as zero.
 <!-- INCIDENT-PATTERNS:SILENCE:END -->
 
 The durable finding is not the multiplier. It is that **38 failures in this corpus
@@ -401,7 +402,7 @@ by making a silent class loud.
 ### Pre-July frequencies are FLOORS, not counts
 
 <!-- INCIDENT-PATTERNS:FLOORS:START (generated by scripts/incident_log_patterns.py — do not hand-edit) -->
-**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September, 15 in October and 22 in November. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
+**April has zero rows, May has one and June has two**, against 36 in July, 126 in August, 41 in September, 15 in October and 23 in November. The platform was not stable in those months — it was under-logged. Two proofs: the 2026-08-02 Whoop row cites *"the same class as the 2026-06 outage"* and no June Whoop row existed until #2840 backfilled it, and two shipped timezone fixes (#2675, #2670) left no rows at all. Never compare a pre-July class frequency against a post-July one and call the difference a trend; the denominator is not the same instrument.
 <!-- INCIDENT-PATTERNS:FLOORS:END -->
 
 ### Row-inclusion rule (extends #1332)

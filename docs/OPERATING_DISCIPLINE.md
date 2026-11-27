@@ -217,6 +217,9 @@ Working-style corrections the owner has made more than once. They are not author
    stop a review loop when a round finds nothing new; in the wrap, record the defects the
    checks actually caught, the rework and the time saved. Rigour stays where the risk is
    real — security, privacy and correctness.
+8. **Times told to the owner are in Seattle time** (owner, 2026-11-27). A deadline, a window or
+   "when X runs" is written as Pacific time, with UTC in brackets only where it must match a log
+   or a schedule source. Code, commits and cross-session technical messages stay in UTC.
 
 ---
 

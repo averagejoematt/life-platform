@@ -1,28 +1,62 @@
-# Handover — Editorial Overhaul 2026-11-21 → 25: eight Chronicle second editions published and verified, the compact Morning Brief live, outbound consolidation made standing, the editorial release live; four other sessions' handovers carried verbatim
+# Handover — The Days 2026-11-26 → 27: the shared-timeline figure live on Start, Data and the chapter pages; the character release merged with its history NOT migrated; three other lanes' states carried
 
 ## Driving instruction
-One session ran from the owner's editorial, coaching and experience review (21 Nov) through his rulings to publication. In order, the owner asked for: the Chronicle back-catalogue remastered and published as second editions with privacy corrections; a one-minute Morning Brief and an audit of every outbound message; an independent outside-in review of the public site; and an editorial release that makes the human story the product. He then called a two-week observation period (24 Nov → 7 Dec): no new workstreams, fixes only for things that break, closure notes on 30 Nov and 7 Dec, escalation only for an actual privacy exposure, a significant failure or a rollback.
+The owner asked for a substantially better visual experience and told the session to challenge his own heat-map idea rather than implement it, inside the existing Start / Story / Data / System architecture, with no new pages or navigation. Over three rounds he approved "The Days", reduced it on Start, kept the detail in Data, switched the placeholder walker off, removed staves for unmeasured dimensions, and authorised merge and deploy once the normal gates passed. On 27 Nov he accepted it as shipped and returned priority to the corrected character history and the personal-intelligence experience. This wrap also carries the closing states of the two sessions he cleared on 27 Nov and the still-open queue of the 25 Nov handover, so that nothing is lost between them.
 
-Every owner ruling of this session is saved verbatim in private folders (never in the repo). The single index of what is verified, what is started but unconfirmed and what is deferred is the commitment register at `~/Documents/Claude/closure-2026-11-23/COMMITMENT_REGISTER.md`. Four other sessions closed beside this one; each handover is carried below, verbatim.
+## READ FIRST — the character history is in a mixed state from the next nightly compute
+- The single character release (#6328, `0f0b574da`) is merged and deployed: `lambdas/health/character_engine.py` is at `ENGINE_VERSION = "1.10.0"`.
+- **The historical recompute was NOT applied.** It was attempted under approval on 27 Nov, stopped and rolled back; the session that ran it reports every value restored exactly. A defect in the private tool (#6329) is why it cannot resume or re-apply after a write.
+- `lambdas/compute/character_sheet_lambda.py` has no guard against a method change. So the next nightly compute writes the newest day under 1.10.0 on top of history still under 1.8.0. This is read from the code at this wrap, not observed on a run. The 27 Nov row was written before the release deployed.
+- Public output is unaffected: the public character still serves "recalculating", Mind is not scored in public, and **#6224 stays OPEN with scores suppressed — it is not closed or corrected.**
+- No approval is live. The identifiers approved on 27 Nov are void. A private pre-migration backup and the synthetic probe objects are kept; their locations are in the private register, not here.
+- **Owner ruling, 27 Nov: leave the nightly compute running.** The mixed days are accepted until the recompute rewrites every day; no schedule is paused and nothing is reverted. A private reading that jumps on those days is expected, not a defect to chase.
 
-## Editorial Overhaul — what is COMPLETE (merged, deployed, verified live)
-- **Eight Chronicle second editions** (#6193; PRs #6201, #6219, #6222, #6228, #6235, #6236). Each deployed chapter and each of the seven historical pages matches its owner-approved SHA-256 when rebuilt from the live page (`scripts/chronicle_edition_verify.py`, re-run on 25 Nov after the editorial release: all eight pass). Nothing was sent to subscribers. Edition withdrawal and site rollback have only been simulated.
-- **Privacy corrections on the back catalogue**: 46 removed passages are absent from live pages, stored copies and the archive's chapter files; legacy `/journal/posts/<id>/` addresses redirect (#6234); weeks 8, 9 and 11 are retired in the record (#6200); held audio stays held; old link-preview images quarantined; nine CI artifacts carrying pre-correction pages deleted after private preservation.
-- **Compact Morning Brief** (#6240; PRs #6241, #6248). Switched on 23 Nov; the first real send was 24 Nov 18:01Z: compact format, 206 words, no fallback, no error, one send. The owner is the check on how it reads in his mail client.
-- **Outbound consolidation is standing** (#6243; PR #6247): no end date; only an explicit per-item `False` restores a message. Verified on real runs so far: Monday Compass suppressed, single-channel evening check-in. Not yet observed: Sundays 29 Nov and 13 Dec.
-- **Public-content corrections from the independent reader review** (#6224; PRs #6261, #6262, #6255): unsupported medical wording and a pending-data claim withheld from the coaching pages and two public data files; vice and restraint data withheld at the API; the essay's stale summary, the chapter call-card labels, the subscribe page, the podcast and attempts placeholders; 25 unscorable calls now serve a sentence (was 24 blank). All read back on the live site.
-- **`/next/` previews retired** (#6223; PR #6257): 21 pages removed at source, 21 redirects published, stored copies quarantined, guard passing.
-- **The editorial release** (#6258–#6260; PR #6263), live 25 Nov 06:37Z: homepage first screen with the owner's approved first-person headline and opening as static text, a platform-voiced dated progress line, the featured path, "Park's Blind Spot, revisited" at `/story/features/parks-blind-spot-revisited/` (rebuilt from the live page: SHA-256 `68406186…`, the approved hash), three-coach introduction, date-first chapter labels, one new feed item. No subscriber email.
-- **Public forecast**: first filing 23 Nov 17:00Z; the public route returned 500 until #6239 deployed (~19:30Z); it now serves the forecast. Not yet graded.
-- **Public-copies guard** (#6251): a cleared status comment is no longer treated as a withholding; verified on a real root build with the exemption count printed.
+## The Days — what is COMPLETE (merged, deployed, verified live)
+- **The figure** (#6320; PRs #6321 `9a0ced07b`, #6325 `3b30c5e24`): `www/src/lib/thedays.js`, `www/src/components/TheDays.astro`, `www/src/islands/thedays.js`. Every day is one column on one time axis; each row keeps its own unit and is drawn by position, never by colour. `theline.js` exposes its geometry; its output is unchanged.
+- **Start**: The Line with one stave under it (gym sessions above, whole-day steps below) and one counted observation; the six portrait tiles and the "three measured, three not yet" line are gone; the 8 November quotation and its provenance stay; the Life card reads "measured in part".
+- **Data**: the full figure — every stave, lenses that only count days, a range with a pager (a phone opens on four weeks), the day readout with its links, the same days as a table. **Chapter pages**: the chapter's own days. **System**: a link to the figure, no second figure.
+- **A partial food export is labelled on its day page** (Refs #6195): `DAY_PAGE_PARTIAL_LABELLED` is on. Read on the live record first: exactly one Day object changed (21 November); no other number moved. The other three computed switches are unchanged by owner ruling.
+- **Verified**: root deploy run 45994128809 on `3b30c5e24` — sync, smoke, visual and AI-vision QA and the public-copies guard all succeeded, no rollback, recorded as the previous green build; the live pages were then read back by content (the evidence is on #6320).
+- **The root smoke's page assertions are held before the publish** (PR #6327 `6e7ddc82a`, Refs #6320): `scripts/www_smoke_pins.py` reads the smoke script's rows and `check_www_build.py`'s scan holds the built pages to them. Proved both ways.
 
-## Editorial Overhaul — built and NOT live, or live and NOT yet exercised
-- **Recommendation-record pilot** (#6158; PR #6232): merged with `CANONICAL_INTAKE_LIVE = False`. The writer function and both stacks are deployed, production permissions were simulated against the live roles, and the dark validation (one read pass, three refusals) passed with zero rows written. A real write, a real response and an outcome have never happened. Activate only on the owner's go, after the compact brief has run well.
-- **Short Saturday Nutrition Review** (#6245; PR #6249): switch set to `compact` on 24 Nov; first send is Saturday 28 Nov.
-- **Between-chapters subscriber email** (#6244; PR #6246): repaired and HELD in code (`OWNER_RELEASE = None`); its schedule was also disabled by hand on 23 Nov and has not been re-enabled. Release needs the owner's review of a rendered copy.
-- **Coach-context switch** (#6149): off. Round 5 failed three of six criteria.
+## The Days — NOT done, stated as such
+- **Safari itself (Mac, iPhone) and Firefox are unverified** (WebKit through Playwright passed 81 of 81). By owner ruling no compatibility initiative is opened; an actual defect is fixed when found.
+- Day, week and month views, a colour overview and the proper walker are not built and not scheduled: the owner will judge the live experience first. No further Days work or reports until real use and real readers say what it needs.
 
-## Editorial Overhaul — awaiting the owner
+## The Days — gotchas learned
+- **The first publish was rolled back** (run 45984492062): one row of `deploy/smoke_test_site.sh` still asserted the removed portrait tiles (301 of 302 passed). PR CI never ran that script.
+- **Two more pins the www gates do not run**, both in the 35-minute unit suite: the front page's reach ceiling of 15 (`tests/test_site_nav_reach_ratchet.py`) and the page intents in `qa/qa_manifest.py` (30 words).
+- **A `deploy/`- or `qa/`-only fix does not trigger the v9 deploy**: dispatch `web-preview-deploy.yml` with `target=root` and read that run.
+- **Semantics checked before publishing**: the public `steps` series is the whole-day count, not walks; a "session" is a logged gym session, so a day without one is not a rest day; a heavier set at fewer reps is not a like-for-like gain, so the lift stave joins only sets of the same rep count.
+- **The public Day object did not carry the partial flag the series already honoured**; the figure reads food from the series for that reason.
+- **A release window is a reason to hold every other commit to `main`**: this wrap and #6327 waited behind the character release by owner decision.
+
+## Personal-intelligence lane — closing state, 27 Nov (session cleared by the owner)
+- **Shipped and verified live**: #6285 (PR #6297), #6286 (#6301), #6287 (#6300), #6288 and #6289 (#6296, #6309), #6292 (#6308), #6303 (#6306), #6294 (#6322, superseding the closed #6317); #6298 and #6318.
+- **Deployed, never exercised — do not record as verified**: #6290 (PR #6295) evening and weekday-morning holds; #6302 (#6304) narrow event rules; #6291 (#6307) shared context, switch off; #6312 (#6313) corrections reach the absorbing coach and the brief reads the stored scan; #6303's distress safeguard, which must never be triggered live as a test. No complete real conversation ending in a reviewed save has been observed for ask, reflect, the profile or hypotheses.
+- **Open PRs**: none. Its method and private-tool PRs went in through #6328.
+- **Awaiting the owner**: whether the shared-context switch may be turned on, after he reads the private dry render; the two held Telegram texts. The skill re-upload is done.
+- **Its own error, recorded by it**: #6313 merged without a re-run on #6307, one pinned test red on main, fixed by #6318.
+- **Found, not fixed**: an owner ranking tool still counts profile disagreements; one page-speed overrun on a coaching index page (2.68 s against 2.5 s, run 45962069227).
+- The AI budget tier was 1 at its last read: internal and development AI calls are paused at that tier.
+
+## Privacy and recompute lane — closing state, 27 Nov (session cleared by the owner)
+- **Shipped and verified live**: #6328 (`0f0b574da`) — the final scoring method, both recompute tools, the public v3 projection and event reconciliation; main's CI/CD run 46054157248 succeeded including smoke and visual QA, and the deployed bundles are stamped with that commit. Earlier (Refs #6224): #6277, #6278, #6279; #6282; #6281; latency and pagination #6276, #6305, #6310, #6316 (Refs #6271); #6273 (Refs #4531); #6324; docs #6280, #6298.
+- **Merged, not verified live**: #6275 (Refs #6270) until the 29 November field-notes run; #6274 (Refs #6268), the qa-smoke alarms were still red.
+- **Open PRs**: none. #6283, #6299, #6314, #6319 and #6323 are closed as superseded by #6328.
+- **The attempt**: the recompute was attempted under approval, then stopped and rolled back. The private tool's replay depends on the field order of stored records, so it cannot resume or re-apply after a write (#6329). Values are restored exactly; the restored score records now carry their fields in alphabetical order, which is harmless to scores and is why the old plan no longer reproduces. The public plan identifier changes when a release deploys, so a final dry run must be taken after the deploy.
+- **Next attempt, in order**: fix #6329 → one combined dry run after any deploy → the owner's fresh approval of both new identifiers → the private apply in a single pass → the public apply → the archive rebuild → the PR that lifts the suppression → the deferred site-API memory trial.
+- **Awaiting the owner**: that fresh approval; the five-person reader test, which is his to run.
+- **Found, not fixed**: `/api/edition` about 5.6 s and `/api/chapters` about 5.0 s uncached; `/api/habits` computed metrics will truncate around April 2027; empty restraint keys in `/api/mind_overview`; registry classification debt (#6315); a date-boundary fixture in `tests/test_site_api_derived_phase_4088.py` that failed once at 08:20Z on 27 Nov and has passed since.
+
+## Backlog — a portfolio reset was applied on 27 Nov (another session, owner-approved)
+- 49 issues and 13 epics were closed with ADR-099 verdicts; open issues went from 172 to 115; `Now` holds 11 stories and 3 epics. Five issues were filed: #6330–#6334. No code and no merges.
+- Epic consolidation: the training epics #5050, #5051, #5067, #5770 and #5861 into #6014; #5925 and #5926 into #5946; #5134 into #5928; #5945 into #5539; #6206's outcome into #6158; #5529 closed (v9 live since 1 Nov), its open stories #6114 and #6135 now under #5946.
+- Left open on request: #6195 (moved to `Next`), #6224, #6329, #6311, #6293, #6271, #6270, #6268, #6315, #6227, #6223. #4531 was to be checked before closing: the week-12 draft is still held and its alarm is red.
+- **The 25 Nov queue carried below predates that reset.** A line citing a closed issue (#5067, #6206 and others) now belongs to the epic it was folded into; read each state fresh before acting.
+- That session continues after this wrap; its own wrap must carry this handover forward, not overwrite it.
+
+## Carried from the 25 Nov handover — awaiting the owner (verbatim; archived as `HANDOVER_2026-11-25_Editorial-Overhaul.md`)
 - The five-person unprimed reader test (approved; who and when).
 - Two optional questions put to him for the human centre of the new feature (why 30 September had no logged session; whether he knew of the wrong scoreboard grades at the time). Never inferred.
 - Release or keep holding the between-chapters email, after reviewing its render.
@@ -34,257 +68,19 @@ Every owner ruling of this session is saved verbatim in private folders (never i
 - Activation of the recommendation pilot.
 - His draft priority statement (never written into his record as his words).
 
-## Editorial Overhaul — gotchas learned
-- **A matching fingerprint is not a true attribution.** An owner-dictated one-line correction would have attributed the narrator's bet to him; the published chapters settled it. Check the record, stop that one item, show the evidence, offer the fix.
-- **A privacy removal must follow images, CI artifacts, generated public JSON and subscriber mail**, not only the pages the guard enumerates. The Morning Brief's summary line was being copied into two public data files and the archive.
-- **Verify the thing a person receives.** The hybrid brief "sent in the trial format" was 13 pages; the send record said nothing about length.
-- **A new token-gated route needs a declared refusal in the smoke sweep**, or every root build's smoke reds and the rollback baseline stops advancing.
-- **The fixture must be the wire**: a null `url` on retired weeks crashed the edition verifier; `Decimal` values broke the forecast route on its first live row.
-- **Stored text is validated only at build time**: a correction note's evidence line broke every site build twice. Proposal-time validation now exists; an approved feature text still tripped the raw-id check at PR time.
-- **A commit hook's doc sweep rides a plain `git commit`** when concluding a merge; conclude lane merges in agent-commit mode.
-- **This machine sleeps**: background checks paused twice overnight. Long waits belong to the pipeline, not to a local timer.
-- **The release's own page checks are vacuous on a hand-fetched folder** (`is_site_build` is false); recompute the hash directly when verifying live.
-
-## Cross-session notes the next session must hold
-- **The remediation agent is OFF** by the owner's ruling of 24 Nov (#6265; SSM `/life-platform/remediation-mode` = `off`). Any older text saying "shadow permanently" is superseded; do not set it back without a separate owner approval.
-- **`qa-smoke-warnings` red now carries information** (retuned by #6231): read its `PERSISTENT` line. **`calibration-deadman` is red on purpose** until the owner logs a real tape and photo entry.
-- **Weekly digest reader numbers still include the platform's own tools**; only the subscribe funnel lines are corrected (#6267). Do not cite page views or unique visitors as readership.
-- **"Deployed" is not "exercised"** for the research PRs (#6213, #6214, #6217), the pilot writer, the cadence change and the edition withdrawal path.
-- **The phrase "AI journalist" is permitted** (owner, 23 Nov); the fault is implying a human with personal experience of events.
-- **Generic "this cycle" wording stays**; numeric cycle or attempt counts do not appear on the public site.
-- The three official pillars (owner, 24 Nov): understand me; research for me; learn what works for me. The human documentary is their public expression, not a fourth pillar.
-
-## Product assessments session — carried verbatim from its 2026-11-25 handover (private file, abridged for the public repo)
-
-Sections carried word for word: 1, 2, 3, 4, 6, 7, 8, 10. Omitted here and kept in the private file `~/Documents/Claude/closure-2026-11-23/handovers/product-assessments.md`: the owner's rulings quoted verbatim, the working-state inventory of private folders, and anything that must not be public.
-
-### What this session was for
-Three analysis-only product assessments commissioned by the owner (legacy and hidden capabilities; visual experience with four mockups; cost economics) and one unified portfolio. The owner then issued rulings on four items the assessments surfaced, and this session executed them.
-
-### Shipped
-| Item | Status |
-|---|---|
-| Assessment package (3 reports, portfolio, 4 mockups, appendices) — private files only, nothing in the repo | Delivered; owner read it and ruled on it 24 Nov |
-| **#6264** (`3e57477ae`) — numeric cycle reference removed from the `/system/calibration/` header | **VERIFIED IN REAL USE** — live page read 25 Nov ~16:45Z: header reads "System · the Coaching Room · through 24 November 2026"; no "cycle N" on the page |
-| **#6265** (`8eb3e6075`) — remediation agent OFF: CLAUDE.md, PROPORTIONALITY, REMEDIATION_TAXONOMY, RUNBOOK, remediation/README, ADR-129 amendment, recorded value in `tests/public_claims_registry.py` | **MERGED; switch read back `off`** (25 Nov ~16:45Z). The gate's no-op on a scheduled run is **not yet observed** — next scheduled run is Wed 25 Nov 17:35Z |
-| **#6266** (`442887eee`) — two legacy pages replaced by a "no longer available" stub; public-copies guard rule E extended to both | **VERIFIED IN REAL USE** — both addresses serve the 274-byte stub; stored objects are the stub (written 07:41Z); archive regenerated; `check_public_copies.py --remediation` exits clean on every copy |
-| **#6267** (`1ebae0aba`) — traffic digest subscribe funnel counts the platform's own tools apart from readers; canary on its own line; reader traffic labelled an estimate; funnel HTML builder moved to `lambdas/operational/traffic_digest_funnel_html.py` | **DEPLOYED BUT NOT YET EXERCISED** — deployed function code contains the change (read from the function's bundle, LastModified 08:38Z); no real digest has run with it. First real run: Monday 30 Nov ~17:02Z |
-
-### Still open
-- **No open PRs or drafts from this session.** All four PRs merged.
-- **Four lane worktrees still on disk, clean, branches merged** — not removed, per instruction:
-  - `~/dev/worktrees/life-platform/fix-calibration-no-cycle-number` (`fix/calibration-no-cycle-number`)
-  - `~/dev/worktrees/life-platform/docs-remediation-off` (`docs/remediation-agent-off-2026-11-24`)
-  - `~/dev/worktrees/life-platform/fix-legacy-two-pages` (`fix/legacy-two-pages-quarantine`)
-  - `~/dev/worktrees/life-platform/fix-digest-internal-ua` (`fix/digest-exclude-internal-tools`)
-  Remote branches: none of the four remain on origin (deleted on merge). Next action: retire the worktrees and local branches at wrap.
-- **No locks held. No background jobs or scheduled checks running.**
-- **Two failed "v9 deploy (preview · root)" runs** (heads `3e57477a` and `95a9ffe0`, 25 Nov ~06:33–07:10Z): the only failed job was the public-copies guard; sync, smoke and visual QA passed and nothing rolled back. Cause for `3e57477a` was not read from the log (unverified); it ran while the two legacy pages were being re-published and the archive was older than the build. The guard is green now. Next action: confirm the next v9 deploy run is green.
-- **To observe, not yet seen:** (a) Wed 25 Nov 17:35Z remediation run no-ops at the gate; (b) Mon 30 Nov digest shows the new funnel lines.
-
-### Shared state changed (including what git does not show)
-- **SSM `/life-platform/remediation-mode`: `shadow` → `off`**, version 6, set 25 Nov 04:16Z by this session on the owner's ruling. Roll back (needs a separate owner approval): `aws ssm put-parameter --name /life-platform/remediation-mode --value shadow --type String --overwrite --region us-west-2`. Parameter history shows version 5 (`shadow`) was set 2026-10-17 under `matthew-admin` with no recorded decision.
-- **S3 quarantine, run twice** with `deploy/quarantine_public_copy.sh --apply` for `site/legacy/story/index.html` and `site/legacy/archive/v1/supplements_protocol/index.html`:
-  - `s3://matthew-life-platform/backups/quarantine/public-copies/20261125T063912Z/`
-  - `s3://matthew-life-platform/backups/quarantine/public-copies/20261125T073900Z/` (same two originals again)
-  Each run removed the public objects and invalidated the four CloudFront paths. The public keys now hold the stub (from the #6266 site deploy).
-- **`life-platform-permanence` invoked by hand** (~16:43Z 25 Nov) to regenerate the public archive; then a CloudFront invalidation of `/archive/*`. Archive sha256 matched its manifest.
-- **Cost Explorer queried** 8 times by the cost assessment (~$0.08). Read-only otherwise.
-- **Memory written before this handover request** (see section 9 note): three new memory files and three new lines in `MEMORY.md`.
-- Nothing else: no schedules changed, no secrets or tokens touched, no IAM or CDK change, no DynamoDB write, no test subscribers, no email sent.
-
-### Waiting on the owner
-- The actual billed Claude and OpenAI charges (Monarch hides the amounts); the cost report's subscription row is blank.
-- Whether the site-wide page-view and unique-visitor counts should also exclude the platform's own tools (left unchanged; they feed the emitted traffic metrics).
-- Who runs the five-person reader test and when.
-- Go-ahead and scope for the scoreboard release and the forecast chart (direction approved, build not authorised).
-- The original text of the two quarantined pages remains in the public repo's git history — whether that joins the existing repo privacy remediation plan.
-
-### Safeguards tested only synthetically
-- **Rule E for the two quarantined pages** — proven red on planted filler in tests; never fired on a real re-publication.
-- **Digest internal-tool separation** — unit-tested on fixture log rows using the real user-agent strings; not yet run on real logs.
-- **Remediation `off` gate** — code read (`remediation/agent.py` exits at `mode == "off"`); not observed on a real scheduled run since the flip. Live reconciliation test (`CLAIMS_LIVE_RECONCILE=1`) could not run locally (invalid token under pytest); the value was read back by CLI instead.
-
-### Deferred on purpose
-| Item | Why | Resume when |
-|---|---|---|
-| Scenario explorer, documentary timeline, character representation, reader-call supply | Owner: "preserved future opportunities" | Owner asks |
-| Staged retirement of unused legacy features and public write paths | Owner's investment #4; plan not started | After the reader test and scoreboard, on owner's go |
-| AWS cost-reduction programme | Owner ruled it out for $20–45/month | Not unless the bill changes materially |
-| Re-pour of `/subscribe/` and share cards | Direction favoured, build not authorised | Owner's go |
-| Excluding own tools from site-wide traffic counts | Outside the "narrowly scoped" correction; feeds emitted metrics | Owner decision (section 6) |
-| Cost ledger close rows for September and October; GitHub Actions contingent figure ($53 recorded vs ~$524 measured) | Bookkeeping, not ruled on | Next cost close |
-
-### The one thing the next session will get wrong without being told
-**The weekly digest's reader numbers are mostly the platform talking to itself.** In the week to 23 Nov all 117 "successful sign-ups" were the subscribe canary, about 280 of 358 `/subscribe/` views were QA and audit tools, and the last real subscriber row is from 3 July. The funnel lines are corrected from the next run, but the headline page views, unique visitors (3,885) and returning share (4%) are **not** — they still include those tools and still feed the emitted traffic metrics. Do not cite them as readership, and do not read a rise on a heavy build day as audience growth.
-
-
-
-## Platform Integrity session — carried verbatim from its 2026-11-25 handover (private file, abridged for the public repo)
-
-Sections carried word for word: 1, 2, 3, 4, 6, 7, 8, 10. Omitted here and kept in the private file `~/Documents/Claude/closure-2026-11-23/handovers/platform-integrity.md`: the owner's rulings quoted verbatim, the working-state inventory of private folders, and anything that must not be public.
-
-### What this session was for
-An independent, read-only audit of why the platform passed technical review while producing avoidable experience failures (22 Nov), then a narrow implementation phase under owner rulings (23 Nov): close the public CI-artifact path, retune one alarm, change one charter cadence, start a manual weekly scorecard, and verify other sessions' fixes. Role going forward: independent verifier, not a feature owner.
-
-### Shipped
-| Change | Status |
-|---|---|
-| PR #6229 — `web-gate.yml` and `v4-gate.yml` no longer upload `v9-preview-<sha>` / `pr-render-gate-capture` | **VERIFIED IN REAL USE.** Merged 23 Nov 02:16Z. No artifact of either kind created since; checked at four sweeps on 23 Nov, on 24 Nov, and now (25 Nov 16:47Z) across runs from several lanes |
-| PR #6231 — `qa-smoke-warnings` watches `PersistentWarnCount` (same warning three Pacific days running; `reader_truth:confirm` from day one; owner check-in warning counted apart) | **VERIFIED IN REAL USE.** Lambda deployed 23 Nov 04:32Z; monitoring stack 05:10Z. Observed: day-one rule named `reader_truth:confirm` on 22 Nov PT; alarm cleared ALARM→OK at 23 Nov 23:28 PT after a clean day; three-day rule fired OK→ALARM at 24 Nov 00:07 PT naming `data:pk_family_census`, `public_brief:cycle_liveness`, `story_season:chapter_door` (and `weeks:fact_agreement` in three runs). In ALARM now on those ids. Its fail-closed and dry-run paths: unit tests only |
-| PR #6230 — charter 1.53.0, tape and photo cadence 2 → 4 weeks | **DEPLOYED BUT NOT YET EXERCISED.** Deployed bundle carries 1.53.0; deployed code on the live table returns both kinds two cycles overdue. No real entry has been logged, so the cycle reset is unobserved |
-| Scorecard week 1 (manual, read-only; outside the repo) | Produced 23 Nov; owner accepted it as baseline. Not a deployed thing |
-| Five issues filed: #6223, #6224, #6225, #6226, #6227 | Open. See section 3 |
-| Verification of PR #6221 (Editorial's) — fallback attribution guard, five narrator prompts | **DEPLOYED BUT NOT YET EXERCISED.** Deployed bundles carry build `4cce3a54e`; the deployed gate flags a synthetic bad draft. No real fallback draft has passed through it |
-
-### Still open
-- **Open PRs or drafts of mine:** none.
-- **Remote branches of mine:** none (all three deleted at merge).
-- **Lane worktrees, all unlocked, clean, merged — not removed:** `~/dev/worktrees/life-platform/issue-6223-pr-artifact-uploads`, `issue-5067-calibration-cadence-4wk`, `issue-5928-qa-smoke-persistent-warns`. Next action: the reaper retires them at wrap. (Two other `issue-6223-*` worktrees there are LOCKED and are not mine.)
-- **Locks held:** none.
-- **Background jobs or scheduled checks:** none. The three one-shot overnight sweeps of 22–23 Nov fired and expired.
-- **Owed by this role, undone:**
-  - Scorecard week 2 — manual run on or after 30 Nov: `python3 scorecard/experience_health.py` and `public_copy_inventory.py` in my private folder.
-  - Trim the preserved artifacts (section 8).
-- **#6223:** eight screenshot/build upload steps remain; 43 page or screenshot artifacts are public now (`v9-root` 11, `v9-root-visual-qa` 10, `visual-qa-screenshots` 14, `site-deploy-visual-qa-screenshots` 5, standalone 2, webkit 1). Per-step recommendation is in my comment on the issue. Owner: Editorial / CI. Manifest not built by me; later work on it by others is unverified by me.
-- **#6224:** the 190 g example is still in `lambdas/coach/coach_extraction_prompt.py` on main (read now). Stored corrections re-check, real-render tests, the spoken Episode 0 line: unverified since 23 Nov.
-- **#6226, #6227:** nothing built by me; later commits by others unverified by me.
-- **Residue of #6231, unassigned:** `docs/alarm_citations.json` and `scripts/check_alarm_citations.py` still describe `qa-smoke-warnings` as an any-warning alarm.
-
-### Shared state I changed
-**Not visible in git:**
-- **CloudFormation:** `LifePlatformMonitoring` deployed 23 Nov 05:10Z with `bash deploy/cdk_deploy.sh LifePlatformMonitoring -- --require-approval never --exclusively`, on the owner's go. Changed the `QaSmokeWarnings` alarm's metric (`WarnCount` → `PersistentWarnCount`) and removed tags from two dashboards (pre-existing drift carried by the deploy). Rollback: revert the #6231 commit, deploy that stack again.
-- **DynamoDB:** the QA job now writes one state row every run — pk `USER#matthew#SOURCE#qa_predict_dark`, sk `STATE#warn_streaks`. Not written by hand. Inert if #6231 is reverted.
-- **New CloudWatch metrics** in `LifePlatform/QaSmoke`: `PersistentWarnCount`, `OwnerEngagementWarnCount` (the second has no alarm, by ruling).
-- **GitHub Actions artifacts deleted:** 55 in total (18 + 10 on 23 Nov, 27 in four pre-approved sweeps to 12:47Z 23 Nov), page and screenshot kinds from finished runs only, never `v9-root-<sha>`. Each was downloaded and its archive verified first. Lists: `inventory_before.tsv`, `preserved.tsv`, `round2/log.tsv`, `overnight/log.tsv` in the preserved folder.
-- **GitHub issue comments** recording owner rulings: #6223 (×3), #6224 (×2), #6225, #6226 (×2), #5067 (×2), #5928 (×2), #5934.
-- **Main checkout:** fast-forwarded once (`git pull --ff-only`, 23 Nov ~05:08Z) for that deploy.
-
-**Visible in git:** PRs #6229, #6230, #6231 only.
-
-**Not changed by me:** switches, feature flags, schedules, secrets or tokens, IAM, S3 objects, any content row.
-
-### Waiting on the owner
-- Log a real tape measurement and progress-photo set (`calibration-deadman` stays red until then).
-- May one memory entry about this role be added? (Listed below instead of written.)
-- Approve trimming the preserved artifacts, once the remaining upload steps are closed.
-- Who edits the remaining upload steps under #6223, if not the Editorial session.
-
-### Safeguards tested only synthetically
-- Fallback-writer attribution guard (#6221): deployed code run on a synthetic draft only.
-- `qa-smoke-warnings`: the fail-closed path (unreadable state → every warning counts) and the dry-run no-write path — unit tests only. Its two firing rules are now observed live.
-- Charter cadence: computed on live data; no real entry has exercised it.
-- Everything in `regression_pack/candidates.py` (manifest check, removed-sentence check, forecast-history diff, provenance refusal, duplicate finding, context-case harness, dark-capability check): synthetic fixtures, not in the repo, not adopted.
-- The public-copy inventory script: a read-only prototype, run by hand three times.
-- From another session's report, unchecked by me: the #6214 experiment-overlap gate fails open on a read error.
-
-### Deferred on purpose
-| What | Why | Resume when |
-|---|---|---|
-| Moving regression-pack cases into owners' test suites | Owner: only after clean-case and real-path validation, by the owner of each area | Each fix lands and its owner adopts the case |
-| Binding the coach-context cases to real builders | Belongs to Coaching (#6226); the #6149 pilot stays off | Coaching takes #6226 |
-| Trimming 3.1 GB of preserved artifacts | Kept as remediation evidence | Remaining upload steps closed and the owner agrees |
-| Scorecard automation, a repo home for the script and registry | Owner: four manual weeks first | After week 4 (on or after 14 Dec) |
-| Repetition threshold | Classifier is coarse; owner: descriptive only | Recommendation ids and reasons exist |
-| Updating the alarm citation entry and script for #6231 | Kept the PR narrow; no owner named | An infrastructure owner picks it up |
-
-### One thing the next session will get wrong without being told
-**`qa-smoke-warnings` being red is now information, not noise — read the `[QA] PERSISTENT warn 3d <ids>` line before doing anything about it.** It is red today because three checks have warned on three consecutive days. The reflex from the last month (it is always red; cite it and move on) is exactly what the retune removed. And the reverse trap: `calibration-deadman` is red on purpose and must not be "fixed" by anything except the owner's real entries.
-
-
-
-## Research engine session — carried verbatim from its 2026-11-25 handover (private file, abridged for the public repo)
-
-Sections carried word for word: 1, 2, 3, 4, 6, 7, 8, 10. Omitted here and kept in the private file `~/Documents/Claude/closure-2026-11-23/handovers/research-engine.md`: the owner's rulings quoted verbatim, the working-state inventory of private folders, and anything that must not be public.
-
-### What this session was for
-A discovery spike, then a controlled build, for the owner's "understand me, research for me, learn what works" brief. It produced one assessment, five PRs under epic #6206, and the first research finding stored in production.
-
-### Shipped
-| Item | Status |
-|---|---|
-| #6220 findings store + `manage_research_finding` (squash `8060905d2`) | **VERIFIED IN REAL USE.** 2026-11-23T08:51Z: one finding written through the deployed tool and read back by the tool and by direct table query |
-| Finding `rf_20261123_45fa9263` (4 rows) | **VERIFIED IN REAL USE** as a stored record. Not a completed loop: no coach review, no scan, no outcome |
-| #6217 lift outcome metrics, baseline snapshot, public-analysis allowlist (squash `d6f95cf9d`) | **DEPLOYED BUT NOT YET EXERCISED.** Bundles read back 11-23 (site API 07:22Z, MCP 07:25Z). No experiment uses a lift metric |
-| #6214 experiment overlap rule, three-state result (squash `9707507d6`) | **DEPLOYED BUT NOT YET EXERCISED.** Bundle read back 11-23 06:52Z. No experiment created since |
-| #6213 optional `finding_id` on the recommendation head (squash `db6e66e19`) | **DEPLOYED BUT NOT YET EXERCISED.** Bundle read back 11-23 18:11Z; live `list` answers, 0 recommendations |
-| #6215 qualified coach-context facts | **Not shipped.** Open draft, unwired |
-| Issues filed: epic #6206, stories #6208–#6212 | #6208 closed on live proof. Others open |
-
-### Still open
-- **PR #6215** (draft, branch `issue-6212-grounded-intake-facts`, head `157eb9ee1`). Not restacked since 11-23; mergeability unverified. Next action: Coaching owner includes it in the next #6149 pilot; the wiring PR must delete its unwired guard and its entry in the dead-code guard's allowlist.
-- **Lane worktree still LOCKED:** `~/dev/worktrees/life-platform/issue-6212-grounded-intake-facts`. Do not release until #6215 merges or closes.
-- **Lane worktrees released, still on disk** (reaper retires them): issue-6208, 6209, 6210, 6211.
-- **Issues open on a live-proof condition:** #6209 (a live design naming a lift metric), #6210 (a live `create_experiment` response with an overlap block), #6211 (a recorded recommendation carrying a finding id), #6212, epic #6206.
-- **Coach review of the finding:** not done. Next action is the owner's (item 6).
-- **Background jobs / scheduled checks:** none running. No subagent is live.
-- **Not started:** the two manual monthly research reviews; any analysis of journal text.
-
-### Shared state changed
-- **DynamoDB, manual writes through the deployed tool** (not visible in git): 4 rows under `USER#matthew#SOURCE#research_findings`, all `FINDING#rf_20261123_45fa9263…` (head, decision, state change, one correction). Conditional puts only. Rollback: none built in; the store is append-only and has no delete. No other partition was written.
-- **New partition `research_findings`:** owner-only, cross-phase. The MCP role's existing table-wide grant covers it; scope is enforced in code, not IAM.
-- **MCP tool count +1** (`manage_research_finding`). Gate census pins moved by #6220.
-- **`config/evidence_source_allowlist.json` 2.0.0 → 2.1.0:** added `guideline_hosts` only.
-- **Public route `/api/experiments`:** `analysis` is now served through an allowlist (`PUBLIC_ANALYSIS_KEYS`). Output for existing rows unchanged.
-- **`create_experiment` default changed:** a caller passing no new argument is treated as behavioural and is refused on a same-metric overlap unless it passes `acknowledge_overlap`.
-- **Deploy-order rule (from #6217):** site API ships before or with the MCP code; never roll the site API back alone after a lift experiment has closed.
-- **No switch, flag, schedule, secret, IAM or CDK change.** No file or object quarantined or deleted in AWS.
-- **Deleted locally 11-22:** 38 MB of private DynamoDB extracts in the session's `data/` folder (owner ruling).
-- **GitHub:** comments on #6208, #6209, #6210, #6211; #6208 closed.
-- **Memory files this session already wrote** (before this instruction): `project_research_engine_spike_2026_11_22.md` and its one line in `MEMORY.md`. Not touched since.
-
-### Waiting on the owner
-- Send the drafted question in the Telegram training-coach thread.
-- Book the scan; choose an interval for a second scan.
-- Arrange the clinician and dietitian review he said was warranted.
-- Decide whether to obtain three closed-access papers.
-- Decide when to run the first manual monthly research review.
-
-### Safeguards tested only synthetically
-- #6214: three-state overlap result, pagination, malformed-row handling, closing caveat. Fake tables only.
-- #6217: snapshot write-once and immutability, late-capture marking, exercise identity, the public allowlist (fake rows; the live route has no stored analysis).
-- #6220: lifecycle table, tighten-only risk, clinician hold, tier-5 blocks, risk-word tripwire, verifier redirect refusal, invalid-event replay. Real use covers one path only: record, decide, `observation_planned`, one correction.
-- #6220: `publishable()` is called by nothing.
-- #6213: id format check. #6215: everything.
-
-### Deferred on purpose
-- **#6215 wiring:** the context pilot failed its evaluation and is off. Resume when the next #6149 pilot passes.
-- **Automated research review:** resume after two manual reviews are judged.
-- **Journal-text analysis:** journal is too sparse (4 entries since the phase start; Notion search found no more). Resume when there is material.
-- **A private script to get a coach reply:** the Coaching owner did not want a session-made path. Resume only on an owner ruling.
-- **Three closed-access papers:** abstract-only until access is obtained.
-- **Weekly-correlation detrending and a causal-wording rule:** outside this lane; raised by Platform Integrity.
-
-### The one thing the next session will get wrong
-It will read "merged, deployed, verified" for #6214, #6217 and #6213 as "works". Only the findings store has been used for real. The other three have never run against a real experiment or recommendation, and the finding itself has informed nothing yet: no coach has seen it.
-
-
-
-## Token rotation session — carried verbatim from its 2026-11-25 handover (private file, abridged for the public repo)
-
-Sections carried word for word: 1, 2, 3, 6. Omitted here and kept in the private file `~/Documents/Claude/closure-2026-11-23/handovers/pat-rotation.md`: the owner's rulings quoted verbatim, the working-state inventory of private folders, and anything that must not be public.
-
-### What this session was for
-The owner asked whether to renew the expiring `reconcile-push` fine-grained PAT. The session renewed it: the owner regenerated it, and the session stored it as the repo secret `RECONCILE_PUSH_TOKEN` and recorded the rotation date in `docs/SECURITY.md`. Along the way it answered two coordination messages from Editorial Overhaul.
-
-### Shipped
-- **Repo secret `RECONCILE_PUSH_TOKEN`, rotated 2026-11-23T19:14Z.** VERIFIED IN REAL USE: post-merge reconcile commits have landed on main since then (`01f10499d` 2026-11-23 22:02 PT, `877009e22`, `95a9ffe09` 2026-11-24 22:07 PT). The ci-cd reconcile runs were green on 11-24 and 11-25. The reconcile job checks out with that secret, so those pushes used the new token. I did not inspect the run logs to confirm which identity pushed.
-- **PR #6256** (`docs/security-token-row`), which updates the `RECONCILE_PUSH_TOKEN` row date in `docs/SECURITY.md` to 2026-11-23. NOT MERGED; open.
-- **PR #6252**: closed unmerged and its branch deleted (superseded by #6256; see §4).
-
-### Still open
-- **PR #6256**, open and one commit (`5251ce526`), doc-only. Next action: the owner or the wrap session merges it once CI is green.
-- **Worktree** `~/dev/worktrees/life-platform/security-token-row` on branch `docs/security-token-row`, which is pushed and clean. Next action: retire it after #6256 merges. It is listed here, not removed.
-- No locks, deploy leases, background jobs or scheduled checks are held.
-
-### Waiting on me
-- Merge #6256 (doc-only date change).
-- Optional: open the `reconcile-push` token's settings page on GitHub to confirm its scope is still this repo only, Contents read-and-write, and nothing more.
-- Whether and when to compact MEMORY.md. A hook warned at 21.5KB against the 24.4KB limit; I left it alone because other sessions were editing it.
-
 
 ## Residual / next picks
-All five sessions' queues, merged. Each line cites its issue or is tagged not-work.
+This session's lines first; then the 25 Nov queue, verbatim. Each line cites its issue or is tagged not-work.
+- #6329 — the private recompute tool cannot resume or re-apply after a write; fix it before any further attempt.
+- #6224 — OPEN on purpose: scores suppressed, the history not migrated; by owner ruling the nightly compute keeps running, so days from 28 Nov are under the new method on old-method history until the recompute rewrites them.
+- #6311 — `swallowed-permission-denial` entered a new ALARM episode on 27 Nov and its citation is stale (written 31 Oct, pointing at closed #5220 and #5476); the live cause was not re-derived at this wrap. A denied private probe in the recompute lane that day is the likely cause, unverified.
+- #6195 — three computed switches still off; each needs its before-and-after read first.
+- #6271 — `site-api-p95-latency-sustained` fired and cleared inside the last 72 h; the uncached reads above are the standing cause.
+- #6320 — `www/src/pages/index.astro` still computes the portrait dimensions for the Life card's count; the tile markup is gone. Cosmetic. `www/README.md` has no row for The Days yet: add it with the next `www/` change, since a commit there triggers a root deploy.
+- #6291 — the shared-context switch is off; its activation is the owner's, after the private render.
+- not-work — the date-boundary fixture in `tests/test_site_api_derived_phase_4088.py` has no tracker yet; file one if it reds again.
+- not-work — the owner's own actions: approve two fresh plan identifiers once #6329 is fixed; run the reader test; judge The Days from real use.
+
 - #6240 — confirm the compact brief over the observation period (reading burden, repetition, accuracy, quiet days); the homepage of the release measures 7.61 phone screens on live data against the 7.5 budget.
 - #6245 — verify Saturday 28 Nov's short Nutrition Review: three-minute format, menu and shopping list intact, complete-day count in the subject; then the Monthly Coach's Letter.
 - #6243 — keep open until the send log shows the Sunday "what changed" email and no Weekly Report on 29 Nov and again on 13 Dec; first real QA failure should land in the digest with no email.
@@ -317,14 +113,14 @@ All five sessions' queues, merged. Each line cites its issue or is tagged not-wo
 - not-work — observation-period notes are due on 30 Nov and 7 Dec; routine progress otherwise on request.
 - not-work — the reconcile token's scope has not been checked on its settings page (an owner look); its settings are recorded privately and are not restated in public text.
 
-**Build beat:** none — the owner called an observation period on 24 Nov; no further public copy without his approval, and the release itself is the public record of this work.
-**Docs:** `docs/DECISIONS.md` (ADR-172, ADR-173, ADR-174 + index) · `docs/INCIDENT_LOG.md` (12 rows + patterns) · `docs/alarm_citations.json` (six entries re-derived, one added) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` (15 rows) · `docs/OPERATING_DISCIPLINE.md` §3a.7 · `docs/PROPORTIONALITY.md` (7 rows + a note) · `docs/RUNBOOK.md` (legacy chapter redirects) · `docs/SITE_AUTHORING.md`, `docs/SITE_MAP_AND_INTENT.md` (`/next/` retirement) · `docs/CONVENTIONS.md` §9a · lane and skill rules under `.claude/` (worktree-implementer, worktree, land, new-machinery, review).
-**Decisions:** ADR-172, ADR-173, ADR-174 filed.
-**Main:** green (1ebae0ab) — two root site builds on 25 Nov ~06:33–07:10Z were red on the public-copies guard for non-privacy causes (incident row); the next scheduled build was green.
-**Incidents:** 12 rows added — a lane-run deploy path, correction text breaking site builds, a frozen rollback baseline (~8.7 h), the verifier crash on live data, the forecast route's 500, restricted wording in unguarded copies, a grandfathered disclosure, the subscriber email around the gate, a test-order red on main, two guard reds, a branch in the shared checkout, and a combined process row.
-**Stash/hooks:** clean · worktree-reap removed 73 and released 42 merged locks; lanes with open or draft PRs stay locked (#6132, #6040, #6096, #6215), and `issue-6158-context-fixes` is kept.
-**Closures:** #6144, #6162 commented · DoD: scanned 5, hits 0 after commenting (one unhomed residual homed on #1348).
-**Backlog:** Now live at 6/25/5 (fable/opus/sonnet); no refill needed; no stale Later issues; filing-contract violations on this week's issues fixed (0 blocking).
-**Alarms:** 5 red >72h, all cited (calibration-deadman #5907, chronicle-delivery-heartbeat #4531, field-notes-missing #6270, freshness-interior-gap self-clearing by 2026-11-29, qa-smoke-failures #6268/#6269/#5928); also lit under 72 h and cited: qa-smoke-warnings, site-api-p95-latency-high (#6271).
-**CI warnings:** none.
-**Ledger:** seven rows added (compact-brief safeguards, public-claim screen and restraint withholding, edition fingerprint checks, between-chapters hold, the dark recommendation writer, the qa-smoke persistence rule, the attended legacy-redirect tool) and a dated note on the public-copies guard row.
+**Build beat:** none — the owner asked for no further reports on The Days; its feedback comes from readers.
+**Docs:** `docs/INCIDENT_LOG.md` (one row + patterns) · `.claude/skills/land/SKILL.md` (the smoke-assertion rule) · `docs/OPERATING_DISCIPLINE.md` §3a.8 (times told to the owner are Seattle time) · `docs/OPERATING_KNOWLEDGE_LEDGER.md` (seven rows).
+**Decisions:** none needed — a figure inside the existing site architecture, under ADR-104 and ADR-105 as they stand.
+**Main:** green (a6a708a8) — the run on `6e7ddc82a` (#6327, gate code only) was still in progress at this wrap; read it before relying on it.
+**Incidents:** 1 row added — the first root publish of The Days rolled back on a stale smoke assertion.
+**Stash/hooks:** clean · worktree-reap removed 30 and released 24 merged locks; the recompute lanes' worktrees were left in place and are releasable.
+**Closures:** #6320, #6290 commented · DoD: scanned 64, hits 1 after commenting — #6320's post-close comment is the release evidence and the owner's acceptance, not-work.
+**Backlog:** not refilled here — an owner-approved portfolio reset the same day left `Now` at 11 stories and 3 epics (172 → 115 open); no Later sweep at this wrap.
+**Alarms:** 2 uncited — named: swallowed-permission-denial (new episode 27 Nov, stale citation, cause not re-derived), site-api-p95-latency-sustained (a flap, #6271).
+**CI warnings:** 6 — one identical annotation six times: a Playwright test skipped where the job has no Chromium (#3640, closed as designed); no action.
+**Ledger:** none — a check added inside the existing build gate; no new standing subsystem.
