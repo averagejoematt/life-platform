@@ -290,19 +290,19 @@ const standing: Standing[] = [
           <a class="ed-btn" href={href(PATH[0].to)}>Start with one week: The Rate Flag{rateFlagMin ? ` · ${rateFlagMin} min` : ""}{"\u00a0→"}</a>
           <div class="ed-links"><a href={href(PATH[1].to)}>How it started</a><a href={href("/system/coaches/")}>Meet the coaches</a></div>
           <p class="ed-tagline">Can an ordinary person engineer an extraordinary life?</p>
-          <div class="ed-how" data-how-checked>
-            <b>How the coaches are checked</b>
-            <p>Every night the data lands in one place and each coach reads one slice of it. Each prediction they make carries a date; when the date arrives, a separate program checks it, and the result is published, right or wrong.</p>
-            {
-              ed.checked && (
-                <p data-coaches-checked>
-                  As of {dayInWords(ed.checked.asOf)}: of {ed.checked.eligible} coach predictions graded right or wrong so far, {ed.checked.n} could be checked fairly. On those {ed.checked.n} the coaches were right {ed.checked.k} times and a guess that nothing changes {ed.checked.baseline} times{ed.checked.words ? `: ${ed.checked.words}` : ""}. Predictions still open are not counted. <a href={href("/system/calibration/")}>How the grading works →</a>
-                </p>
-              )
-            }
-          </div>
         </div>
       </div>
+        <div class="ed-how" data-how-checked>
+          <b>How the coaches are checked</b>
+          <p>Every night the data lands in one place and each coach reads one slice of it. Each prediction they make carries a date; when the date arrives, a separate program checks it, and the result is published, right or wrong.</p>
+          {
+            ed.checked && (
+              <p data-coaches-checked>
+                As of {dayInWords(ed.checked.asOf)}: of {ed.checked.eligible} coach predictions graded right or wrong so far, {ed.checked.n} could be checked fairly. On those {ed.checked.n} the coaches were right {ed.checked.k} times and a guess that nothing changes {ed.checked.baseline} times{ed.checked.words ? `: ${ed.checked.words}` : ""}. Predictions still open are not counted. <a href={href("/system/calibration/")}>How the grading works →</a>
+              </p>
+            )
+          }
+        </div>
       <div class="standing" data-standing>
         <div class="between standing-head">
           <p class="label">Where the experiment stands{edition?.day_n != null && ` · day ${edition.day_n}`}</p>

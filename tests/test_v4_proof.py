@@ -119,7 +119,8 @@ class TestCockpitBlock:
         # Body = mean(movement, nutrition, sleep, metabolic); Mind = mean(mind, relationships).
         html = v4_proof.cockpit_block_html(self.CH)
         assert "Body 42" in html  # (25.8+1.6+82.9+59.4)/4 = 42.4 → 42
-        assert "Mind 33" in html  # (15.9+50.0)/2 = 32.95 → 33
+        # #6285: Mind is not scored in public - no Mind rollup or row, even when handed a mind score.
+        assert "Mind" not in html and "16" not in html and "Relationships 50" in html
 
     def test_missing_pillar_is_omitted_never_zeroed(self):
         ch = {"level": 8, "tier": "Foundation", "as_of": "2026-07-06", "pillars": {"sleep": {"raw_score": 70.0, "tier": ""}}}
@@ -203,6 +204,54 @@ class TestCockpitBlock:
         monkeypatch.setattr(v4_proof, "_snapshot", lambda: {"cockpit": {"level": 9, "as_of": "2026-07-01", "pillars": {}}})
         assert v4_proof.load_character() == {"level": 9, "as_of": "2026-07-01", "pillars": {}}
 
+    # ---- #6285: the recalculating state ----
+    RECALC = {
+        "character": {"level": None, "status": "recalculating", "pending_note": "Being recalculated: x.", "as_of_date": "2026-11-25"},
+        "pillars": [{"name": "sleep", "raw_score": 84.2}, {"name": "mind", "raw_score": None, "not_scored": True}],
+    }
+
+    def test_recalculating_api_outranks_snapshot_6285(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: self.RECALC)
+        monkeypatch.setattr(
+            v4_proof, "_snapshot", lambda: {"cockpit": {"level": 12, "as_of": "2026-07-06", "pillars": {"mind": {"raw_score": 15.9}}}}
+        )
+        out = v4_proof.load_character()
+        assert out["status"] == "recalculating" and "level" not in out and out["pillars"] == {}
+
+    def test_recalculating_block_and_og_carry_no_level_score_or_stamp_6285(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: self.RECALC)
+        ch = v4_proof.load_character()
+        html = v4_proof.cockpit_block_html(ch)
+        og = " ".join(v4_proof.cockpit_og(ch).values())
+        assert "being recalculated" in html and "being recalculated" in og
+        for text in (html, og):
+            assert "as of" not in text.lower() and "level 1" not in text and "84" not in text and "Mind" not in text.replace("Mind is", "")
+            assert "Sleep" not in text and "Character level" not in text
+
+    def test_scored_api_drops_not_scored_mind_6285(self, monkeypatch):
+        monkeypatch.setattr(
+            v4_proof,
+            "_fetch_json",
+            lambda path, timeout=8: {
+                "character": {"level": 10, "tier": "", "as_of_date": "2026-11-26"},
+                "pillars": [{"name": "sleep", "raw_score": 80.0}, {"name": "mind", "raw_score": 40.0, "not_scored": True}],
+            },
+        )
+        out = v4_proof.load_character()
+        assert "mind" not in out["pillars"] and "Mind" not in v4_proof.cockpit_block_html(out)
+
+    def test_snapshot_fallback_never_bakes_mind_6285(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: None)
+        monkeypatch.setattr(
+            v4_proof,
+            "_snapshot",
+            lambda: {
+                "cockpit": {"level": 9, "as_of": "2026-07-01", "pillars": {"mind": {"raw_score": 15.9}, "sleep": {"raw_score": 70.0}}}
+            },
+        )
+        out = v4_proof.load_character()
+        assert "mind" not in out["pillars"] and "Mind" not in v4_proof.cockpit_block_html(out)
+
 
 class TestCockpitInjection:
     """#788 — v4_build_cockpit_proof.inject(): sentinel-delimited, idempotent."""
@@ -248,8 +297,8 @@ class TestCockpitInjection:
         html = (Path(__file__).resolve().parent.parent / "site" / "cockpit" / "index.html").read_text(encoding="utf-8")
         assert "cockpit-proof:start" in html
         assert "<noscript>" in html
-        assert "Character level" in html
-        assert "as of 20" in html  # a dated honesty stamp
+        # #6285: either a scored block (level + dated stamp) or the honest recalculating one.
+        assert "Character level" in html or "Scores are being recalculated" in html
 
     def test_committed_now_page_keys_the_level_in_plain_words(self):
         # #807 shipped a dismiss-once "1–100 score of Matthew's whole day" hint beside the
