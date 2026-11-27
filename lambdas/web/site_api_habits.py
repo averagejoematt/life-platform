@@ -345,13 +345,16 @@ def habits(*, _g) -> dict:
 
     # ── Also pull by_group from habitify partition (group data lives there, not in habit_scores)
     hab_pk = f"{USER_PREFIX}habitify"
-    hab_resp = table.query(
+    # #6271: every page. A Habitify row is ~14 KB, so the window passes DynamoDB's 1 MB page and a single query dropped
+    # its NEWEST days (the read is oldest-first). A failed page raises: the route errors, never serves a partial window.
+    hab_resp = query_pages(
+        table,
         **with_phase_filter(
             {  # ADR-058: hide pilot habitify records
                 "KeyConditionExpression": Key("pk").eq(hab_pk) & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
                 "ScanIndexForward": True,
             }
-        )
+        ),
     )
     habitify_by_date = {}
     _habit_agg: dict = {}  # P0.5: per-habit window adherence for the state taxonomy
