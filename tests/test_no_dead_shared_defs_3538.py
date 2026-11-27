@@ -93,6 +93,9 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/research/hypotheses.py:prompt_interpretations": (
+        "#6292 (owner ruling 2026-11-26, 'Later, explicitly reviewed hypotheses may be made available as attributed, uncertain interpretations - not facts'): the default-off prompt seam. NOTHING may call it until that ruling gets its own reviewed change; tests/test_personal_hypotheses_6292.py asserts it returns [] and that no module in lambdas/, mcp/ or scripts/ calls it. Delete this entry when that change wires a caller."
+    ),
     "lambdas/content/private_call_check.py:ledger_findings": (
         "#6199 G2 (owner ruling 2026-11-22 §1): the live invariant tying the ledger's withheld_paths annotation to the private-call detector, run read-only by the driver after the annotation data step (no Lambda calls it until the qa-smoke dead-man leg the PROPORTIONALITY row names); pinned by tests/test_story_ledger_public_view_6199.py. Delete this entry when that leg calls it."
     ),

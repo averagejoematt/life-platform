@@ -142,6 +142,10 @@ def _target_precheck_error(target_tool: str, target_args: dict) -> str | None:
         from mcp.tools_memory import queued_write_precheck
 
         return queued_write_precheck(target_args)
+    if target_tool == "manage_personal_hypothesis":  # #6292: every write of it is queue-only
+        from mcp.tools_personal_hypotheses import queued_write_precheck as hypothesis_precheck
+
+        return hypothesis_precheck(target_args)
     return None
 
 
