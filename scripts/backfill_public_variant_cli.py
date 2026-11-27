@@ -796,6 +796,10 @@ def main(argv: list) -> int:
         run_ts[:10],
         character_privacy.PUBLIC_METHOD_VERSION,
     )
+    if private_plan is not None:  # #6224: which named change moves each public number (order-dependent, stated)
+        import recompute_character_attribution as ATT
+
+        manifest["attribution"] = ATT.public_attribution(sys.modules[__name__], snap, config, run_ts, args.plan_in, char)
     manifest["correlations_and_what_changed"] = correlation_aggregates(table, snap, grades)
     manifest["latest_surfaces"] = latest_surfaces(snap, char)
     h_rows = R.habit_pct_rows(snap["habitify"], snap["profile"].get("habit_registry") or {})

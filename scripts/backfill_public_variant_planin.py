@@ -59,17 +59,17 @@ def load_private_plan(path: str) -> dict:
         raise PlanInError(f"--plan-in {path}: the private plan fails its integrity check ({exc})") from exc
 
 
-def planned_items(plan: dict, pk: str) -> dict:
-    """{date: planned item, every number a float} for one partition — the private tool's own codec (``as_float``)."""
+def planned_rows(path: str) -> tuple:
+    """({date: planned sheet}, {date: planned receipt}), every number a float — the private tool's own supported readers
+    (``planned_sheets`` / ``planned_receipts``: an unchanged row's planned item is the stored item, integrity-checked)."""
     import recompute_character_private_apply as A
 
-    return {r["date"]: A.as_float(r["planned_item"]) for r in plan["rows"] if r["pk"] == pk and r.get("planned_item") is not None}
+    return A.planned_sheets(path), A.planned_receipts(path)
 
 
-def check_coverage(plan: dict, stored_sheet_dates: list) -> None:
+def check_coverage(plan: dict, planned: set, stored_sheet_dates: list) -> None:
     """Refuse unless the plan covers the public window: every stored sheet date has a planned row, and the plan's window
     reaches the newest stored sheet."""
-    planned = set(planned_items(plan, B.SHEET_PK))
     missing = sorted(d for d in stored_sheet_dates if d not in planned)
     if missing:
         raise PlanInError(
@@ -83,12 +83,11 @@ def check_coverage(plan: dict, stored_sheet_dates: list) -> None:
         raise PlanInError(f"the private plan's window starts {window.get('start')}, after the first stored sheet {min(stored_sheet_dates)}")
 
 
-def apply_to_snapshot(snap: dict, plan: dict) -> dict:
+def apply_to_snapshot(snap: dict, plan: dict, path: str) -> dict:
     """Replace the snapshot's method-1 sheets (and receipts) with the PLANNED private rows, in place, after the coverage
     check. Returns {(pk, sk): expected method-1 fingerprint} — the planned row's, which the public apply requires."""
-    check_coverage(plan, sorted(snap["sheets"]))
-    sheets = planned_items(plan, B.SHEET_PK)
-    receipts = planned_items(plan, B.RECEIPT_PK)
+    sheets, receipts = planned_rows(path)
+    check_coverage(plan, set(sheets), sorted(snap["sheets"]))
     snap["stored_sheets"] = snap["sheets"]
     snap["sheets"] = {d: item for d, item in sheets.items() if d in snap["stored_sheets"] and B.visible(item)}
     snap["receipts"] = {d: receipts.get(d, item) for d, item in snap["receipts"].items()}
@@ -137,7 +136,7 @@ def load_into_snapshot(path: Optional[str], snap: dict) -> tuple:
     if not path:
         return None, {}
     plan = load_private_plan(path)
-    return plan, apply_to_snapshot(snap, plan)
+    return plan, apply_to_snapshot(snap, plan, path)
 
 
 def apply_refusal(private_plan: Optional[dict], approved_id: Optional[str], public_id: str, table: Any, phase_plan: list) -> Optional[str]:

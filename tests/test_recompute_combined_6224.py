@@ -96,7 +96,7 @@ def _snapshot(store) -> dict:
 def public_plan(store, plan_path) -> tuple:
     """The public dry run's plan on the PLANNED private rows (the CLI's own steps: replay, receipts, narrow, expected)."""
     snap = _snapshot(store)
-    expected = PI.apply_to_snapshot(snap, PI.load_private_plan(plan_path))
+    expected = PI.apply_to_snapshot(snap, PI.load_private_plan(plan_path), plan_path)
     char = B.replay_character(snap["sheets"], {}, {}, CONFIG, TS)
     receipts = {}
     for d, r in char.items():
@@ -165,9 +165,9 @@ def test_plan_in_refuses_the_wrong_schema_and_a_window_gap(private, tmp_path):
     later = dict(next(iter(snap["sheets"].values())), date="2099-01-01", sk="DATE#2099-01-01")
     snap["sheets"]["2099-01-01"] = later  # a stored sheet the plan does not cover
     with pytest.raises(PI.PlanInError, match="does not cover"):
-        PI.apply_to_snapshot(snap, plan)
+        PI.apply_to_snapshot(snap, plan, plan_path)
     ok = _snapshot(_fresh(base))
-    assert PI.apply_to_snapshot(ok, plan)  # control: the covered window is accepted
+    assert PI.apply_to_snapshot(ok, plan, plan_path)  # control: the covered window is accepted
 
 
 def test_an_edited_private_plan_is_refused(private, tmp_path):
@@ -180,21 +180,73 @@ def test_an_edited_private_plan_is_refused(private, tmp_path):
         PI.load_private_plan(str(path))
 
 
-def test_the_combined_summary_fails_on_an_unattributed_public_change():
-    import recompute_character_combined as C
+def _st(level, xp=10.0, comp=50.0, events=()):
+    return {"character_level": level, "character_xp": xp, "composite": comp, "pillars": {}, "events": list(events)}
 
-    plan = {"rows": [{"pk": B.SHEET_PK, "date": "2026-10-01", "causes": ["method_version_stamp"], "planned_item": None}]}
-    man = {"character": [{"date": "2026-10-01", "character_level": [5, 4], "level_changed": True}]}
-    assert C.attribute(plan, man)["unattributed"] == ["2026-10-01"]
-    plan["rows"][0]["causes"] = ["missing_data", "recompute_provenance"]
-    out = C.attribute(plan, man)  # control: a named method cause attributes it
-    assert out["unattributed"] == [] and out["by_cause"] == {"missing_data": 1}
+
+def test_layer1_credits_the_first_changing_step_and_fails_a_moving_control():
+    import recompute_character_attribution as ATT
+
+    stored = {"2026-10-01": _st(5), "2026-10-02": _st(5)}
+    states = {
+        "replay_residual": {"2026-10-01": _st(5), "2026-10-02": _st(5)},
+        "journal_frequency": {"2026-10-01": _st(4), "2026-10-02": _st(5)},
+        "tree_switch_residual": {"2026-10-01": _st(4), "2026-10-02": _st(5)},
+        "missing_data": {"2026-10-01": _st(3), "2026-10-02": _st(6)},
+    }
+    out = ATT.method_layer(states, stored, states["missing_data"])
+    assert out["first_cause"]["character_level"] == {"journal_frequency": 1, "missing_data": 1}  # first step only
+    assert out["control_differs"] == [] and out["last_step_differs_from_plan"] == []
+    states["tree_switch_residual"]["2026-10-02"] = _st(9)  # must-fail: the control step moves
+    assert ATT.failures({"method": ATT.method_layer(states, stored, states["missing_data"]), "public": {}})
+    assert ATT.failures({"method": ATT.method_layer(states, stored, {"2026-10-01": _st(1)}), "public": {}})  # last != plan
+
+
+def test_layer2_fails_on_a_public_change_no_ladder_step_produces():
+    import recompute_character_attribution as ATT
+
+    q = lambda lv: {"character_level": lv, "character_xp": 1.0, "character_xp_debt": 0.0, "composite": 40.0}  # noqa: E731
+    before = {"2026-10-01": q(5), "2026-10-02": q(5)}
+    parts = [("privacy", {"2026-10-01": q(4), "2026-10-02": q(5)}), ("habit_timing", {"2026-10-01": q(4), "2026-10-02": q(5)})]
+    final = {"2026-10-01": q(4), "2026-10-02": q(7)}  # planted: the method part moves 10-02
+    planted = ATT.public_layer(before, parts + [("method", final)], final, {})
+    assert planted["unattributed"] == ["2026-10-02 character_level"] and ATT.failures({"method": {}, "public": planted})
+    ok = ATT.public_layer(before, parts + [("method", final)], final, {"2026-10-02": ["missing_data"]})  # control
+    assert ok["unattributed"] == [] and ok["by_part"]["privacy"]["character_level"]["dates"] == 1
+    assert ok["by_part"]["method"]["character_level"] == {"dates": 1, "range": [2, 2, 2]} and ok["residual"] == {}
+
+
+def test_method_events_name_the_first_step_and_the_served_state():
+    import recompute_character_attribution as ATT
+
+    ev = {"who": "nutrition", "type": "level_up", "old": 1, "new": 2}
+    stored = {"2026-10-02": _st(5, events=[ev])}
+    states = {"stress_days": {"2026-10-02": _st(5, events=[ev])}, "missing_data": {"2026-10-02": _st(5)}}
+    rows = ATT.method_events(states, stored, {("2026-10-02", "nutrition", "2")})
+    assert rows == [
+        {
+            "date": "2026-10-02",
+            "who": "nutrition",
+            "event": "level_up",
+            "level": "2",
+            "change": "REMOVED",
+            "first_cause": "missing_data",
+            "served_before": True,
+            "protected_pillar": False,
+        }
+    ]
+
+
+def test_the_plan_carries_ladder_states_the_attribution_reads(private):
+    _base, plan_path = private
+    states = A.ladder_states(plan_path)
+    assert list(states)[-1] == "missing_data" and "tree_switch_residual" in states
 
 
 def test_floats_to_decimal_round_trip_keeps_the_fingerprint(private):
     """The expected fingerprint is taken on the planned float item; the live row holds Decimals after the apply."""
     _base, plan_path = private
-    item = next(iter(PI.planned_items(PI.load_private_plan(plan_path), B.SHEET_PK).values()))
+    item = next(iter(PI.planned_rows(plan_path)[0].values()))
     assert B.item_digest(item) == B.item_digest(P._normalise(floats_to_decimal(item, precision=None)))
 
 
