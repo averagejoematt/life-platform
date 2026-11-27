@@ -121,7 +121,7 @@ _V9_INTENTS = {
     # owner ruling 2026-11-15 (#6067): the weight is the catalyst; the purpose is the broader experiment
     "/": (
         "The front page: an experiment in engineering a better life with AI coaches. The weight loss is measured; "
-        "the rest is open. The portrait, the latest chapter and three doors."
+        "the rest is open. The days, the latest chapter and three doors."
     ),
     "/story/": (
         "The narration: weekly chapters of an experiment in changing a life, not only a weight; "
