@@ -3322,6 +3322,13 @@
     {
       "direction": "read",
       "lambda": null,
+      "module": "lambdas/health/character_rest.py",
+      "partition": "travel",
+      "via": "pk"
+    },
+    {
+      "direction": "read",
+      "lambda": null,
       "module": "lambdas/health/checkin_intake_pairs.py",
       "partition": "checkin_intake_pairs",
       "via": "pk"
@@ -8415,7 +8422,7 @@
       "contracts_enrolled": 16,
       "contracts_known": 15,
       "contracts_ratchet": 16,
-      "edges": 802,
+      "edges": 803,
       "lambdas": 108,
       "mcp_tool_modules": 46,
       "mcp_tools": 97,
@@ -8430,8 +8437,8 @@
     "coverage": {
       "edge_sites": {
         "sites_dynamic": 396,
-        "sites_resolved": 1005,
-        "sites_total": 1401
+        "sites_resolved": 1006,
+        "sites_total": 1402
       },
       "schedule_resolution": {
         "dynamic": 0,
