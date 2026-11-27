@@ -44,6 +44,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Mapping, Optional
 
+from common import outbound_trial
+
 try:  # the worker's own logger: a handler of its own at INFO, so these lines reach CloudWatch (#3283 / #5203)
     from common.platform_logger import get_logger
 
@@ -64,14 +66,16 @@ def message(row: Mapping[str, Any]) -> str:
     return PREFIX + cc.deadman_alert(row)
 
 
-def due(block: Optional[Mapping[str, Any]]) -> list[dict[str, str]]:
-    """[{kind, event_id, text}] for every kind at the dead-man. Pure."""
+def due(block: Optional[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """[{kind, event_id, text, own_alert}] for every kind at the dead-man. Pure."""
     from training import calibration_cadence as cc
 
     out = []
     for kind in cc.deadman_kinds(block or {}):
         row = (block or {})["kinds"][kind]
-        out.append({"kind": kind, "event_id": cc.deadman_key(kind, row["cycle_start"]), "text": message(row)})
+        out.append(
+            {"kind": kind, "event_id": cc.deadman_key(kind, row["cycle_start"]), "text": message(row), "own_alert": bool(row.get("alert"))}
+        )
     return out
 
 
@@ -112,6 +116,23 @@ def run(
         logger.warning("[calib-deadman] %s cadence read failed (%s)", FAILED_TOKEN, type(e).__name__)
         _summary("read_failed", [])
         return {"reason": "read_failed", "sent": []}
+    # #6302 (owner ruling 2026-11-26): a missed-LOG nudge (tape / photos / battery) is held before the seat and the claim, so
+    # nothing is consumed and the one-line restore still sends; the `calibration-deadman` email alarm is untouched. A row that
+    # names its own alert (the titration's missed run: the platform's own failure) is not a nudge and still sends.
+    held = outbound_trial.is_on(outbound_trial.TELEGRAM_CALIBRATION_DEADMAN_TEXT_HELD)
+    if held:
+        held_kinds = [a["kind"] for a in alerts if not a["own_alert"]]
+        alerts = [a for a in alerts if a["own_alert"]]
+        if held_kinds:
+            outbound_trial.suppressed(
+                outbound_trial.TELEGRAM_CALIBRATION_DEADMAN_TEXT_HELD,
+                "telegram-coach-worker#EventOutbound",
+                log=logger.info,
+                kinds=held_kinds,
+            )
+            if not alerts:
+                _summary("held by owner ruling, not sent", held_kinds)
+                return {"reason": "held by owner ruling, not sent", "sent": [], "due": held_kinds, "held": held_kinds}
     kinds = [a["kind"] for a in alerts]
     if not alerts:
         _summary("none due", kinds)
