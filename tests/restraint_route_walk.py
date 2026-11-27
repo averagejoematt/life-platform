@@ -107,6 +107,8 @@ def tokens() -> list:
     out += [k.lower() for k in CP.PLANNED_REST_KEYS]
     if TOMBSTONED["plant"]:  # the tombstoned old-method blocks' own canary name
         out += [TOMB_CANARY.lower(), TOMB_XP]
+    if OLDER["plant"]:
+        out += [OLDER_XP]
     return out
 
 
@@ -160,6 +162,35 @@ def _tomb_day() -> str:
     from common.pacific_time import PACIFIC
 
     return (jw.FROZEN.astimezone(PACIFIC).date() + timedelta(days=1)).isoformat()
+
+
+OLDER: dict = {"plant": False}  # #6224: --older-method plants the newest sheets as v1 and v2 blocks (not tombstoned)
+OLDER_XP = "8888.5"  # the older-method sheets' sentinel XP (and level 88, debt 44): no public route may carry them
+
+
+def _older_rows() -> list:
+    from datetime import timedelta
+
+    from common.pacific_time import PACIFIC
+    from health import character_privacy as CP
+
+    user, base = "USER#matthew", jw.FROZEN.astimezone(PACIFIC).date()
+    rows = []
+    for k, version in ((2, CP.PUBLIC_METHOD_V1), (1, CP.PUBLIC_METHOD_V2)):
+        d = (base + timedelta(days=k)).isoformat()
+        pv = {
+            "public_method_version": version,
+            "origin": "live",
+            "character_level": Decimal("88"),
+            "character_tier": "Mastery",
+            "character_xp": Decimal(OLDER_XP),
+            "character_xp_debt": Decimal("44"),
+            "character_mood": "fading",
+            "level_events": [{"type": "character_level_up", "old_level": Decimal("87"), "new_level": Decimal("88")}],
+            "pillar_sleep": {"level": Decimal("88"), "raw_score": Decimal("70"), "tier": "Mastery", "xp_total": Decimal(OLDER_XP)},
+        }
+        rows.append({"pk": f"{user}#SOURCE#character_sheet", "sk": f"DATE#{d}", "date": d, "phase": "experiment", "public": pv})
+    return rows
 
 
 def _tombstoned_rows() -> list:
@@ -217,6 +248,12 @@ def _plant_character(r: dict) -> None:
     pv = r.get("public")
     if not isinstance(pv, dict):
         return
+    from health import character_privacy as CP
+
+    # #6224 (2026-11-27): an older-method block is always "being recalculated" (the per-block rule), so the walk's
+    # stored variant is a CURRENT-method one — its numbers reach the routes when the switch is off, and every scrub
+    # (restraint, Mind, Relationships, provenance) is exercised on what is actually served.
+    pv["public_method_version"] = CP.PUBLIC_METHOD_VERSION
     if PROVENANCE["plant"]:
         _plant_provenance(pv)
         return
@@ -305,6 +342,8 @@ def _augment(rows: list) -> list:
                 reg[ORDINARY] = {"status": "active", "tier": 0}
     if TOMBSTONED["plant"]:
         rows += _tombstoned_rows()
+    if OLDER["plant"]:
+        rows += _older_rows()
     rows.append(
         {
             "pk": f"{user}#SOURCE#protocols",
@@ -465,6 +504,10 @@ def walk(
     if scores_live:
         _scores_live()
     L = jw._wire("gaps")
+    if OLDER.get("leak"):  # after the wiring (it re-imports the readers): the per-block rule off
+        from health import character_privacy as _cp
+
+        _cp.older_method = lambda _v: False
     import boto3
 
     boto3.client = lambda *a, **k: _ConfigS3()  # type: ignore[assignment]
@@ -593,6 +636,8 @@ if __name__ == "__main__":
         jw._freeze(sys.argv[sys.argv.index("--now") + 1])  # one instant for both states (before any handler import)
     PROVENANCE["plant"] = "--provenance" in sys.argv
     TOMBSTONED["plant"] = "--tombstoned" in sys.argv
+    OLDER["plant"] = "--older-method" in sys.argv
+    OLDER["leak"] = "--older-method-leak" in sys.argv  # the control: the per-block rule off (applied after the wiring)
     if "--tombstone-leak" in sys.argv:  # the control: the visibility predicate off — the tombstoned blocks are served
         from experiment import phase_filter as _pf
 

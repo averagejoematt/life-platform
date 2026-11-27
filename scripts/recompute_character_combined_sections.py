@@ -218,6 +218,19 @@ def operations_lines(c: dict) -> list:
     pc = p["counts"]
     silent = c.get("silent_tests")
     lines = [
+        "**When a public score is served — two independent conditions.** A public character number (overall level, tier, "
+        "XP, XP debt, composite, mood, effects, level events, pillar levels) is served only when (1) the stored block is "
+        "CURRENT-method (`character_privacy.older_method` is false: v3) AND (2) the global containment switch "
+        '`PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE` is off. Either one alone serves "being recalculated"; an '
+        "older-method block also credits no level, badge, milestone or event. So a sheet the recompute missed, or a "
+        'ROLLBACK of the public apply (which restores the older blocks), returns every affected date to "being '
+        'recalculated", never to the old numbers — tested with the switch forced off '
+        "(tests/test_recompute_combined_6224.py end-to-end; tests/test_tombstoned_public_blocks_6224.py, incl. the route "
+        "walk's `--older-method` case).",
+        "",
+        "**Not changed (flagged):** `web/site_api_rollups.py` reads a method-1 field (`overall_score`) from raw sheets; "
+        "no stored sheet carries it (0 of 177), so it serves nothing from the character partition.",
+        "",
         "**Write counts (exact).** Private plan `"
         + str(p["plan_id"])
         + "`: "

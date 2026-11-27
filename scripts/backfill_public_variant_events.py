@@ -32,16 +32,17 @@ VERBATIM = ("sleep", "movement", "nutrition", "metabolic")
 def _serving(old_rule: bool, keep_mind: bool) -> Iterator[None]:
     """The scores live (the state the comparison describes); ``old_rule``: the 2026-11-06 event rule for every variant
     (the code before this change); ``keep_mind``: Mind's stored events not scrubbed (so a removed one is named)."""
-    saved = (CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE, CP.is_corrected_chain, CP.scrub_unscored)
+    saved = (CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE, CP.is_corrected_chain, CP.scrub_unscored, CP.older_method)
     CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = False
     if old_rule:
         CP.is_corrected_chain = lambda _v: False  # type: ignore[assignment]
+        CP.older_method = lambda _v: False  # type: ignore[assignment]  # the code before #6224's per-block rule
     if keep_mind:
         CP.scrub_unscored = lambda view: view  # type: ignore[assignment]
     try:
         yield
     finally:
-        CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE, CP.is_corrected_chain, CP.scrub_unscored = saved
+        CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE, CP.is_corrected_chain, CP.scrub_unscored, CP.older_method = saved
 
 
 def _norm(v: Any) -> Any:

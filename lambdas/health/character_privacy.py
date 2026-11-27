@@ -194,6 +194,16 @@ def scores_pending() -> bool:
     return bool(PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE)
 
 
+def older_method(view: Any) -> bool:
+    """#6224 (2026-11-27): a public block computed under an OLDER public method than ``PUBLIC_METHOD_VERSION``. Its
+    chain-carried values (overall level, tier, XP, XP debt, composite, mood, effects, level events, pillar levels) were
+    computed with inputs the current method withholds, so they are ALWAYS served "being recalculated" — independently of
+    the global switch: a public score is served only when the block is current-method AND the switch is off. A sheet
+    missed by the recompute, or a rollback of the public apply after the switch is off, therefore never serves the old
+    numbers. An older-method block credits no level, badge, milestone or event either (``event_level_series``)."""
+    return isinstance(view, dict) and view.get("public_method_version") != PUBLIC_METHOD_VERSION
+
+
 def pending_pillar(name: str) -> dict[str, Any]:
     """A pillar whose every public value is carried through the contaminated chain, while the scores are pending: the
     reason and the held flags, no number."""
@@ -541,6 +551,8 @@ def event_level_series(records: Any) -> list[tuple[str, int]]:
             continue
         d = str(rec.get("date") or str(rec.get("sk", "")).replace("DATE#", ""))[:10]
         pv = public_variant(rec)
+        if pv is not None and older_method(pv):
+            continue  # #6224: an older-method block credits no level (no badge, no milestone)
         if pv is not None and is_corrected_chain(pv):  # #6224: the corrected public chain's level on every date (badges, milestones)
             out.append((d, _level(pv.get("character_level"))))
         elif pv is None or _origin(pv) != "live":
@@ -581,7 +593,9 @@ def public_sheet(record: Any, pending: Optional[bool] = None, internal: bool = F
         for key in ("level_events", "recalculated_level_events"):
             if isinstance(out.get(key), list):
                 out[key] = [without_provenance(e) for e in out[key] if not is_reconstructed(e)]
-    if scores_pending() if pending is None else pending:  # #6224 containment: the chain values are being recalculated
+    # #6224: the chain values are being recalculated — globally (the containment switch) OR for this block (an older
+    # public method: two independent conditions, ``older_method``)
+    if (scores_pending() if pending is None else pending) or older_method(out):
         suppress_pending(out)
     return out
 

@@ -207,7 +207,10 @@ def _v1_variant() -> dict:
     return {"sk": "DATE#2026-11-20", "date": "2026-11-20", "public": pv}
 
 
-def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed():
+def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed(monkeypatch):
+    # The scrub is its own layer: here it is held with the per-block rule off (an older-method block is otherwise
+    # always "being recalculated" — tests/test_tombstoned_public_blocks_6224.py), so it is exercised on a served view.
+    monkeypatch.setattr(character_privacy, "older_method", lambda _v: False)
     record = _v1_variant()
     before = copy.deepcopy(record)
     view = character_privacy.public_sheet(record, pending=False)  # the Mind scrub, apart from the containment switch
@@ -223,6 +226,7 @@ def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed():
 
 
 def test_must_fail_control_without_the_scrub_the_v1_mind_numbers_are_served(monkeypatch):
+    monkeypatch.setattr(character_privacy, "older_method", lambda _v: False)
     monkeypatch.setattr(character_privacy, "scrub_unscored", lambda view: view)
     view = character_privacy.public_sheet(_v1_variant(), pending=False)
     assert RW.mind_numbers(view), "the detector must see a v1 Mind served as stored"
@@ -607,7 +611,7 @@ def _ask_prompt(monkeypatch, pending: bool) -> tuple:
     from web import site_api_ai_context as AC, site_api_ai_lambda as AI
 
     block = {
-        "public_method_version": character_privacy.PUBLIC_METHOD_V1,
+        "public_method_version": character_privacy.PUBLIC_METHOD_VERSION,  # a current-method block (an older one never serves a level)
         "origin": "live",
         "character_level": 27,
         "character_tier": "Momentum",

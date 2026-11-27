@@ -108,7 +108,13 @@ def _walk(*args) -> dict:
 
 @pytest.fixture(scope="module")
 def tomb_walks():
-    return {"pending": _walk(), "live": _walk("--scores-live"), "control": _walk("--scores-live", "--tombstone-leak")}
+    return {
+        "pending": _walk(),
+        "live": _walk("--scores-live"),
+        # each safeguard alone holds a tombstoned OLD-method block back: the tombstone predicate, and the per-block rule
+        "predicate_off": _walk("--scores-live", "--tombstone-leak"),
+        "control": _walk("--scores-live", "--tombstone-leak", "--older-method-leak"),
+    }
 
 
 def test_no_public_route_serves_a_tombstoned_old_method_block_with_the_switch_on_or_off(tomb_walks):
@@ -118,7 +124,11 @@ def test_no_public_route_serves_a_tombstoned_old_method_block_with_the_switch_on
         assert "/api/character_receipt?date" not in w["raised"] and "/api/character?date" not in w["raised"]
 
 
-def test_must_fail_control_with_the_predicate_off_the_tombstoned_numbers_are_served(tomb_walks):
+def test_with_only_the_predicate_off_the_per_block_rule_still_holds_the_old_numbers_back(tomb_walks):
+    assert not tomb_walks["predicate_off"]["leaks"], tomb_walks["predicate_off"]["leaks"]
+
+
+def test_must_fail_control_with_both_safeguards_off_the_tombstoned_numbers_are_served(tomb_walks):
     leaks = tomb_walks["control"]["leaks"]
     assert {"/api/character", "/api/character?date"} <= set(leaks), leaks
 
@@ -138,3 +148,67 @@ def test_the_combined_accounting_fails_on_a_servable_block_outside_both_plans():
     loud = S.unplanned_public_items(items, accounted=set())
     assert loud["servable"] == 1 and any("outside both plans" in f for f in S.failures({"unplanned_public": loud}, preliminary=True))
     assert S.unplanned_public_items(items, accounted={("character_receipt", "DATE#2026-11-14")})["count"] == 0
+
+
+# ── #6224 (2026-11-27): an OLDER-method sheet block is "being recalculated" whatever the global switch says ─────────────
+
+
+def _older(version):
+    pv = {
+        "public_method_version": version,
+        "origin": "live",
+        "character_level": 9,
+        "character_tier": "Foundation",
+        "character_xp": 120,
+        "character_xp_debt": 14,
+        "character_mood": "fading",
+        "level_events": [{"type": "character_level_up", "old_level": 8, "new_level": 9}],
+        "pillar_sleep": {"level": 9, "raw_score": 70.0, "tier": "Foundation"},
+    }
+    return {"sk": "DATE#2026-11-20", "date": "2026-11-20", "phase": "experiment", "character_level": 9, CP.PUBLIC_KEY: pv}
+
+
+OVERALL = ("character_level", "character_tier", "character_xp", "character_xp_debt", "composite_score", "character_mood")
+
+
+def test_with_the_switch_off_an_older_method_sheet_serves_no_overall_number_no_debt_and_credits_nothing():
+    assert not CP.scores_pending()
+    for version in (CP.PUBLIC_METHOD_V1, CP.PUBLIC_METHOD_V2):
+        view = CP.public_sheet(_older(version))
+        assert view["scores_pending"] is True and not any(view.get(k) is not None for k in OVERALL), version
+        assert view["level_events"] == [] and view["pillar_sleep"].get("level") is None, version
+        assert CP.event_level_series([_older(version)]) == [], version  # no level, so no badge and no milestone
+        assert CP.public_headline(_older(version))["level"] is None, version
+    v3 = CP.public_sheet(_older(CP.PUBLIC_METHOD_VERSION))  # control: a current-method block serves its numbers
+    assert v3["character_level"] == 9 and v3["character_xp_debt"] == 14 and not v3.get("scores_pending")
+    assert CP.event_level_series([_older(CP.PUBLIC_METHOD_VERSION)]) == [("2026-11-20", 9)]
+
+
+def test_must_fail_control_without_the_per_block_rule_the_v1_numbers_appear(monkeypatch):
+    monkeypatch.setattr(CP, "older_method", lambda _v: False)
+    view = CP.public_sheet(_older(CP.PUBLIC_METHOD_V1))
+    assert view["character_level"] == 9 and view["character_xp_debt"] == 14
+
+
+@pytest.fixture(scope="module")
+def older_walks():
+    def run(*args):
+        proc = subprocess.run(
+            [sys.executable, os.path.join(ROOT, "tests", "restraint_route_walk.py"), "--older-method", *args],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=ROOT,
+        )
+        return json.loads(proc.stdout.strip().splitlines()[-1])
+
+    return {"live": run("--scores-live"), "control": run("--scores-live", "--older-method-leak")}
+
+
+def test_no_public_route_carries_an_older_method_sheets_numbers_with_the_scores_live(older_walks):
+    w = older_walks["live"]
+    assert w["answered"] > 100 and not w["leaks"], w["leaks"]
+
+
+def test_must_fail_control_the_walk_sees_the_older_numbers_without_the_rule(older_walks):
+    assert "/api/character" in older_walks["control"]["leaks"], older_walks["control"]["leaks"]

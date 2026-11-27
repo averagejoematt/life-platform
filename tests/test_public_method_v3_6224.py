@@ -94,7 +94,9 @@ def test_the_labels_and_the_notice_per_version():
     assert CP.PUBLIC_CORRECTION_NOTICE.endswith("Previous character scores are superseded by the corrected values.")
 
 
-def test_a_v2_block_is_served_with_relationships_not_scored_and_no_relationships_number():
+def test_a_v2_block_is_served_with_relationships_not_scored_and_no_relationships_number(monkeypatch):
+    # the scrub is its own layer: held here with the per-block rule off (an older block is otherwise always pending)
+    monkeypatch.setattr(CP, "older_method", lambda _v: False)
     view = CP.public_sheet(_rec(V2, origin="live"))
     assert view["pillar_relationships"] == CP.not_scored_pillar("relationships")
     assert RW.unscored_numbers(view) == []
@@ -106,6 +108,7 @@ def test_a_v2_block_is_served_with_relationships_not_scored_and_no_relationships
 
 
 def test_must_fail_control_without_the_scrub_a_v2_relationships_number_is_seen(monkeypatch):
+    monkeypatch.setattr(CP, "older_method", lambda _v: False)
     monkeypatch.setattr(CP, "scrub_unscored", lambda view: view)
     assert RW.unscored_numbers(CP.public_sheet(_rec(V2, origin="live")))
 
