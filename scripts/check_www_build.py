@@ -67,6 +67,7 @@ sys.path.insert(0, os.path.join(REPO, "scripts"))
 import www_editorial_checks  # noqa: E402 — the editorial release (owner review 14): feature fingerprint, first-person pin, one progress figure
 import www_label_contract  # noqa: E402 — #5953: each tile/series/Day label names the number printed beside it, fixture AND live
 import www_launch_switch  # noqa: E402 — the committed go-live constants (LAB_LIVE, STORY_LIVE): a live feature is not a leak
+import www_smoke_pins  # noqa: E402 — #6320: the root smoke's page assertions, held to the built pages before the publish
 import www_verbatim  # noqa: E402 — dates in words, quote-aware (owner ruling 2026-11-02); a page-universal rule, fixture AND live
 from content.public_text_rules import SENTINELS  # noqa: E402 — #6177: one list for the gate and the corrections proposal
 
@@ -1032,6 +1033,16 @@ def main() -> int:
         log(f"  ✗ {i}")
     if issues:
         return 1
+    # #6320: the root smoke's page assertions, held to the built pages before the publish (scripts/www_smoke_pins.py)
+    pin_issues, pins_held = www_smoke_pins.smoke_pin_misses(args.dist)
+    for i in pin_issues:
+        log(f"  ✗ {i}")
+    if pin_issues:
+        return 1
+    if not pins_held:
+        log("  ✗ BLIND: no root-smoke row was held to a built page — the smoke script's rows or the build's routes moved")
+        return 2
+    log(f"  ✓ {pins_held} root-smoke assertions hold on the built pages")
     pages = sum(1 for _d, _s, f in os.walk(args.dist) for n in f if n.endswith(".html"))
     log(
         f"  ✓ {pages} pages: no sentinel, no inline script, dates in words outside verbatim quotations{', noindex everywhere' if preview else ''}"

@@ -36,6 +36,8 @@ SCOPE = (
     "scripts/check_www_build.py",
     "scripts/www_verbatim.py",  # the dates-in-words rule both www gates call (#5609)
     "deploy/www_owned_paths.py",
+    "deploy/smoke_test_site.sh",  # its page assertions are held to the built pages (scripts/www_smoke_pins.py, #6320)
+    "scripts/www_smoke_pins.py",
     "tests/web_preview_gate.py",
     ".github/workflows/web-gate.yml",
     "scripts/check_web_gate_required.py",
