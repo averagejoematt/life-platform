@@ -13,6 +13,7 @@ from datetime import date as _date_cls
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
 from common.habit_pause import count_scheduled  # #5007: a paused habit is not scheduled
 from common.habit_registry import habit_tier  # #5232
+from common.inferred_fields import resolved_summary  # #6286
 from common.metric_truth import resolve_steps, steps_series  # #4630: the ONE steps resolver
 from common.pacific_time import pacific_now  # #2811: THE Pacific frame — journey days are PT days
 from health.calorie_target import target_kcal, target_phrase  # #5095: the ONE calorie target
@@ -1223,10 +1224,6 @@ def _build_mind_data(data):
     entries = [e for e in journal if isinstance(e, dict)]
     som = data.get("state_of_mind") or data.get("som") or {}
 
-    def _mean(field):
-        vals = [v for v in (_safe_float(e, field) for e in entries) if v is not None]
-        return round(sum(vals) / len(vals), 1) if vals else None
-
     def _union(field, cap):
         out = []
         for e in entries:
@@ -1238,12 +1235,10 @@ def _build_mind_data(data):
     sentiments = [e.get("enriched_sentiment") for e in entries if e.get("enriched_sentiment")]
     return {
         "journal_entry_count": len(entries),
-        "enriched_mood": _mean("enriched_mood"),
-        "enriched_energy": _mean("enriched_energy"),
-        "enriched_stress": _mean("enriched_stress"),
+        **resolved_summary(entries),  # #6286: mood/energy/stress self-report first, provenance counted
         "enriched_sentiment": sentiments[-1] if sentiments else None,
         "enriched_themes": _union("enriched_themes", 6),
-        "enriched_avoidance_flags": _union("enriched_avoidance_flags", 4),
+        # #6286: model-inferred avoidance/defense/cognitive labels are withheld (common.inferred_fields).
         "enriched_growth_signals": _union("enriched_growth_signals", 4),
         "som_avg_valence": _safe_float(som, "som_avg_valence"),
         "som_check_in_count": _safe_float(som, "som_check_in_count"),

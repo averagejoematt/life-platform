@@ -47,11 +47,85 @@ from mcp.layer_status import DERIVED_LAYERS, LAYER_DEGRADED, LAYER_OK, counted, 
 try:
     # Shared, bundled module (#781) — staged at zip root in the Lambda.
     from ai import platform_memory as _pm
+    from coach import pending_writes as _pw
     from common.numeric import floats_to_decimal as _floats_to_decimal
 except ImportError:  # pragma: no cover — MCP bundle always ships lambdas/ at root
     if not TYPE_CHECKING:
         from lambdas import platform_memory as _pm
+        from lambdas.coach import pending_writes as _pw
         from lambdas.common.numeric import floats_to_decimal as _floats_to_decimal
+
+WRITE_TOOL = "write_platform_memory"
+QUEUE_TOOL = "manage_pending_writes"
+#: #6287 provenance arguments — accepted (and validated) only for a provenance_required category.
+PROVENANCE_ARGS = ("evidence_kind", "event_date", "event_date_precision", "source_ref")
+
+
+# The write tool's input schema (lifted out of mcp/registry.py, which is at its size
+# ceiling, when #6287 added the provenance arguments). The enums equal
+# platform_memory.EVIDENCE_KINDS / DATE_PRECISIONS — tests/test_personal_record_review_6287.py.
+WRITE_PLATFORM_MEMORY_INPUT = {
+    "type": "object",
+    "properties": {
+        "category": {
+            "type": "string",
+            "description": (
+                "Sanctioned memory category (e.g. 'life_context', 'constraints_preferences', "
+                "'failure_patterns', 'what_worked', 'coaching_calibration'). Aliases accepted: "
+                "'episodic_wins' → what_worked, 'failure_pattern' → failure_patterns."
+            ),
+        },
+        "content": {"type": "object", "description": 'Key-value dict; put the readable core in "summary" — what coaches read.'},
+        "date": {"type": "string", "description": "Date for the record (YYYY-MM-DD). Defaults to today."},
+        "replace_key": {"type": "string", "description": "Exact sk of the one row to rewrite; default adds a new row (#4171)"},
+        "privacy_tier": {
+            "type": "string",
+            "enum": ["public_ok", "coach_context", "private"],
+            "description": (
+                "Optional per-record privacy override — may only TIGHTEN the category default. "
+                "'private' never reaches any generation prompt."
+            ),
+        },
+        "domains": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "Optional bare coach ids this memory is relevant to (sleep, training, nutrition, mind, "
+                "physical, glucose, labs, explorer). Default: the category's rule (usually all coaches)."
+            ),
+        },
+        # #6287: provenance — personal_record only (queue-only; see the description)
+        "evidence_kind": {
+            "type": "string",
+            "enum": [
+                "owner_statement",
+                "confirmed_event",
+                "recollection",
+                "self_report",
+                "observed_pattern",
+                "ai_interpretation",
+                "competing_hypothesis",
+                "confirmed_insight",
+                "rejected_interpretation",
+            ],  # == platform_memory.EVIDENCE_KINDS (tests/test_personal_record_review_6287.py)
+            "description": "personal_record only (required there): what kind of evidence the record is.",
+        },
+        "event_date": {
+            "type": "string",
+            "description": "personal_record only: when the event happened — YYYY, YYYY-MM, YYYY-<season> or YYYY-MM-DD.",
+        },
+        "event_date_precision": {
+            "type": "string",
+            "enum": ["day", "month", "season", "year", "unknown"],  # == platform_memory.DATE_PRECISIONS
+            "description": "personal_record only: precision of event_date (inferred from its shape if omitted; 'unknown' = no date).",
+        },
+        "source_ref": {
+            "type": "string",
+            "description": "personal_record only: opaque reference to where it came from (e.g. a Notion page id); never fetched.",
+        },
+    },
+    "required": ["category", "content"],
+}
 
 
 def _get_table():
@@ -117,14 +191,82 @@ def _sk(category, date_str):
 _NOTE_HASH_LEN = 10
 
 
-def _note_hash(content: dict, privacy_tier, domains) -> str:
+def _note_hash(content: dict, privacy_tier, domains, provenance: dict | None = None) -> str:
     payload = {"content": content, "privacy_tier": privacy_tier, "domains": domains}
+    if provenance:  # #6287 — only a personal_record carries it, so every older key hashes as before
+        payload["provenance"] = provenance
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:_NOTE_HASH_LEN]
 
 
-def _note_sk(category, date_str, content, privacy_tier, domains) -> str:
-    return f"{_sk(category, date_str)}#{_note_hash(content, privacy_tier, domains)}"
+def _note_sk(category, date_str, content, privacy_tier, domains, provenance: dict | None = None) -> str:
+    return f"{_sk(category, date_str)}#{_note_hash(content, privacy_tier, domains, provenance)}"
+
+
+def _queue_pointer(category: str) -> dict:
+    return {
+        "error": (
+            f"'{category}' is QUEUE-ONLY (#6287): a personal record is written only when Matthew approves it. "
+            f"Nothing was written. Show him the draft, then call {QUEUE_TOOL}(action='enqueue', target_tool='{WRITE_TOOL}', "
+            "target_args=<these arguments>, summary=<one line>) and approve or discard it on his say-so."
+        ),
+        "queue_tool": QUEUE_TOOL,
+        "category": category,
+    }
+
+
+def _provenance_fields(category: str, args: dict, content: dict) -> tuple[str | None, dict, str | None]:
+    """(error, provenance, privacy_tier) for one write — #6287.
+
+    For a provenance_required category: the provenance fields (top-level args win, a copy
+    inside `content` goes through the same validation) are validated; the tier defaults to
+    PRIVATE, `coach_context` only when given, `public_ok` refused; an `owner_reviewed_at`
+    from the caller is refused (the approval path stamps it). For every other category the
+    provenance arguments are refused at the top level — they mean nothing there — and the
+    tier is whatever the caller gave (the existing tighten-only rule)."""
+    spec = _pm.MEMORY_CATEGORIES[category]
+    tier = args.get("privacy_tier")
+    if tier is None:
+        tier = content.get("privacy_tier")
+    if not spec.get("provenance_required"):
+        given = [k for k in PROVENANCE_ARGS + _pm.APPROVAL_STAMPED_FIELDS if args.get(k) is not None]
+        if given:
+            return f"{given} apply only to a provenance-carrying category ({_provenance_categories()}), not '{category}'", {}, None
+        return None, {}, tier
+    fields = {}
+    for key in PROVENANCE_ARGS + _pm.APPROVAL_STAMPED_FIELDS:
+        val = args.get(key)
+        if val is None:
+            val = content.get(key)
+        if val is not None:
+            fields[key] = val
+    err, provenance = _pm.validate_provenance(fields)
+    if err:
+        return err, {}, None
+    if tier is None:
+        tier = spec["privacy_tier"]
+    if tier == _pm.TIER_PUBLIC_OK:
+        return f"'{category}' can never be public_ok — it is private by default, coach_context only by explicit choice", {}, None
+    if tier not in _pm.PRIVACY_TIERS:
+        return f"privacy_tier must be one of {list(_pm.PRIVACY_TIERS)}", {}, None
+    return None, provenance, tier
+
+
+def _provenance_categories() -> list[str]:
+    return sorted(c for c, s in _pm.MEMORY_CATEGORIES.items() if s.get("provenance_required"))
+
+
+def queued_write_precheck(args: dict) -> str | None:
+    """#6287: what manage_pending_writes runs at enqueue (and re-runs at approve) for a queued
+    write_platform_memory — the same provenance/tier checks the tool applies, without writing.
+    None when the item can be performed."""
+    args = args or {}
+    category = _pm.canonical_category(args.get("category"))
+    content = args.get("content")
+    if category is None or not isinstance(content, dict):
+        return None  # the tool's own error is clearer; schema validation already ran
+    err, _prov, _tier = _provenance_fields(category, args, content)
+    return err
 
 
 def _sk_parts(sk: str) -> tuple[str | None, str | None]:
@@ -150,6 +292,58 @@ def _same_category_key(category: str, sk: str) -> bool:
 # ==============================================================================
 
 
+def _review_gate(category: str, args: dict, content: dict) -> tuple[dict | None, dict | None, dict, str | None]:
+    """#6287: (refusal, approval, provenance, tier) for one write.
+
+    A queue-only category is written ONLY inside manage_pending_writes' approve call. The
+    proof is the approval scope that call sets (a context variable, not an argument), so a
+    direct call — whatever arguments it carries — is refused before anything is read or written."""
+    approval = None
+    if _pm.is_queue_only(category):
+        approval = _pw.current_approval(WRITE_TOOL)
+        if approval is None:
+            return _queue_pointer(category), None, {}, None
+    err, provenance, tier = _provenance_fields(category, args, content)
+    if err:
+        return {"error": err, "category": category}, None, {}, None
+    return None, approval, provenance, tier
+
+
+def _tier_and_domains(privacy_tier, domains, content: dict) -> tuple[str | None, str | None, list | None]:
+    """(error, privacy_tier, domains). PR #1581 review (minor): content-supplied
+    domains/privacy_tier go through the SAME validation as the top-level args (args win) —
+    a domains list smuggled inside `content` can no longer silently exclude the record from
+    every coach, and an invalid tier is rejected instead of stored raw."""
+    if privacy_tier is None:
+        privacy_tier = content.get("privacy_tier")
+    if domains is None:
+        domains = content.get("domains")
+    if privacy_tier is not None and privacy_tier not in _pm.PRIVACY_TIERS:
+        return f"privacy_tier must be one of {list(_pm.PRIVACY_TIERS)}", None, None
+    if domains is not None:
+        if not isinstance(domains, list):
+            return "domains must be a list of bare coach ids", None, None
+        normalized = [_pm.normalize_domain(d) for d in domains]
+        if any(d is None for d in normalized):
+            return f"unknown coach domain in {domains} — valid: {sorted(_pm.COACH_DOMAINS)}", None, None
+        domains = normalized
+    return None, privacy_tier, domains
+
+
+def _stamp_review(item: dict, provenance: dict, approval: dict | None) -> dict:
+    """#6287: stamp validated provenance AFTER the content (a same-named content key can never
+    override it) and the approval instant as owner_reviewed_at (never the caller's). Returns
+    the fields a personal record's write result echoes ({} for every other category)."""
+    if provenance:
+        item.update(provenance)
+    if approval is not None:
+        item["owner_reviewed_at"] = approval["approved_at"]
+        item["reviewed_via"] = f"{QUEUE_TOOL}:{approval['pending_id']}"
+    if not provenance:
+        return {}
+    return {k: item[k] for k in (*PROVENANCE_ARGS, *_pm.APPROVAL_STAMPED_FIELDS, "privacy_tier") if k in item}
+
+
 def tool_write_platform_memory(args: dict) -> dict:
     """
     Store a structured memory record in the platform_memory partition — ADDITIVELY (#4171).
@@ -172,6 +366,8 @@ def tool_write_platform_memory(args: dict) -> dict:
                       | 'private') — may only TIGHTEN the category default.
         domains: Optional list of bare coach ids this memory is relevant to
                  (e.g. ["nutrition", "training"]); default = the category rule.
+        evidence_kind, event_date, event_date_precision, source_ref: #6287 provenance —
+                 personal_record only, queue-only (see _review_gate / _provenance_fields).
 
     `overwrite` was RETIRED by #4171 — its default (True) is what erased the 2026-09-25
     injury note. `overwrite=true` is refused with a pointer to `replace_key`;
@@ -202,6 +398,9 @@ def tool_write_platform_memory(args: dict) -> dict:
         }
     if not isinstance(content, dict):
         return {"error": "content must be a dict"}
+    refusal, approval, provenance, prov_tier = _review_gate(category, args, content)
+    if refusal:
+        return refusal
     if args.get("overwrite") is True:
         return {
             "error": (
@@ -211,23 +410,12 @@ def tool_write_platform_memory(args: dict) -> dict:
             ),
             "hint": "read_platform_memory(category=…) lists each record's sk — that is the handle replace_key takes",
         }
-    # PR #1581 review (minor): content-supplied domains/privacy_tier go through
-    # the SAME validation as the top-level args (args win) — a domains list
-    # smuggled inside `content` can no longer silently exclude the record from
-    # every coach, and an invalid tier is rejected instead of stored raw.
-    if privacy_tier is None:
-        privacy_tier = content.get("privacy_tier")
-    if domains is None:
-        domains = content.get("domains")
-    if privacy_tier is not None and privacy_tier not in _pm.PRIVACY_TIERS:
-        return {"error": f"privacy_tier must be one of {list(_pm.PRIVACY_TIERS)}"}
-    if domains is not None:
-        if not isinstance(domains, list):
-            return {"error": "domains must be a list of bare coach ids"}
-        normalized = [_pm.normalize_domain(d) for d in domains]
-        if any(d is None for d in normalized):
-            return {"error": f"unknown coach domain in {domains} — valid: {sorted(_pm.COACH_DOMAINS)}"}
-        domains = normalized
+    err, privacy_tier, domains = _tier_and_domains(privacy_tier, domains, content)
+    if err:
+        return {"error": err}
+    if _pm.MEMORY_CATEGORIES[category].get("provenance_required"):
+        # #6287: private unless coach_context was chosen for THIS item; never public_ok.
+        privacy_tier = prov_tier
 
     # #4171: the key. A named record is the ONLY thing a write may replace, and the name
     # must be one of this category's own rows — a replace_key naming another category (or
@@ -248,7 +436,7 @@ def tool_write_platform_memory(args: dict) -> dict:
         sk = replace_key
     else:
         date_str = date or today
-        sk = _note_sk(category, date_str, content, privacy_tier, domains)
+        sk = _note_sk(category, date_str, content, privacy_tier, domains, provenance)
 
     # Honest provenance (#1482): this tool is the CHAT surface — a write through
     # it is conversation-channel when the category sanctions conversation,
@@ -282,6 +470,7 @@ def tool_write_platform_memory(args: dict) -> dict:
         item["domains"] = domains
     if replace_key is not None:
         item["replaced_at"] = item["stored_at"]
+    stamped = _stamp_review(item, provenance, approval)
 
     # Decimal before DDB — the whole item, nested values included (common.numeric).
     item = _floats_to_decimal(item)
@@ -299,7 +488,15 @@ def tool_write_platform_memory(args: dict) -> dict:
                     "sk": sk,
                 }
             raise
-        return {"status": "replaced", "sk": sk, "replaced_key": sk, "category": category, "date": date_str, "channel": channel}
+        return {
+            "status": "replaced",
+            "sk": sk,
+            "replaced_key": sk,
+            "category": category,
+            "date": date_str,
+            "channel": channel,
+            **stamped,
+        }
 
     try:
         table.put_item(Item=item, ConditionExpression="attribute_not_exists(sk)")
@@ -316,7 +513,7 @@ def tool_write_platform_memory(args: dict) -> dict:
             }
         raise
 
-    return {"status": "stored", "sk": sk, "category": category, "date": date_str, "channel": channel}
+    return {"status": "stored", "sk": sk, "category": category, "date": date_str, "channel": channel, **stamped}
 
 
 def tool_read_platform_memory(args: dict) -> dict:

@@ -25,6 +25,7 @@ from common.digest_utils import (
     fmt,
     safe_float,
 )
+from common.inferred_fields import resolved_value  # #6286: self-report-first mood/energy/stress
 from common.metric_truth import resolve_steps  # #4630: the ONE steps resolver
 from health.calorie_target import target_kcal  # #5095: the ONE calorie target
 from health.protein_floor import met_floor  # #5098: THE protein hit predicate (strict, #5003)
@@ -443,7 +444,9 @@ def ex_journal(entries_by_date):
     if not entries_by_date:
         return None
     mood_scores, energy_scores, stress_scores = [], [], []
-    all_themes, all_emotions, all_avoidance, all_cognitive = [], [], [], []
+    # #6286: the model-inferred avoidance / cognitive-distortion labels are not extracted —
+    # they were printed as a red "Avoidance" row and fed the AI section as established fact.
+    all_themes, all_emotions = [], []
     notable_quotes = []
     templates_count = {}
     daily_mood = {}
@@ -453,41 +456,21 @@ def ex_journal(entries_by_date):
             total_entries += 1
             template = str(entry.get("template", ""))
             templates_count[template] = templates_count.get(template, 0) + 1
-            m = entry.get("enriched_mood")
-            e = entry.get("enriched_energy")
-            s = entry.get("enriched_stress")
+            # #6286: his own rating first; the enrichment model's score only when he gave none.
+            m = resolved_value(entry, "mood")
+            e = resolved_value(entry, "energy")
+            s = resolved_value(entry, "stress")
             if m is not None:
-                mood_scores.append(float(m))
-                daily_mood.setdefault(date_str, []).append(float(m))
+                mood_scores.append(m)
+                daily_mood.setdefault(date_str, []).append(m)
             if e is not None:
-                energy_scores.append(float(e))
+                energy_scores.append(e)
             if s is not None:
-                stress_scores.append(float(s))
-            if m is None:
-                for field in ("morning_mood", "day_rating"):
-                    val = entry.get(field)
-                    if val is not None:
-                        mood_scores.append(float(val))
-                        daily_mood.setdefault(date_str, []).append(float(val))
-                        break
-            if e is None:
-                for field in ("morning_energy", "energy_eod"):
-                    val = entry.get(field)
-                    if val is not None:
-                        energy_scores.append(float(val))
-                        break
-            if s is None:
-                val = entry.get("stress_level")
-                if val is not None:
-                    stress_scores.append(float(val))
+                stress_scores.append(s)
             for t in entry.get("enriched_themes") or []:
                 all_themes.append(str(t))
             for em in entry.get("enriched_emotions") or []:
                 all_emotions.append(str(em))
-            for av in entry.get("enriched_avoidance_flags") or []:
-                all_avoidance.append(str(av))
-            for cp in entry.get("enriched_cognitive_patterns") or []:
-                all_cognitive.append(str(cp))
             q = entry.get("enriched_notable_quote")
             if q:
                 notable_quotes.append({"date": date_str, "quote": str(q)})
@@ -510,8 +493,6 @@ def ex_journal(entries_by_date):
         "days_journaled": len(entries_by_date),
         "top_themes": sorted(theme_freq.items(), key=lambda x: -x[1])[:6],
         "top_emotions": sorted(emotion_freq.items(), key=lambda x: -x[1])[:6],
-        "avoidance_flags": list(dict.fromkeys(all_avoidance))[:5],
-        "cognitive_patterns": list(dict.fromkeys(all_cognitive))[:5],
         "notable_quotes": notable_quotes[:3],
         "best_mood_day": {"date": best_day[0], "score": best_day[1]} if best_day[0] else None,
         "worst_mood_day": {"date": worst_day[0], "score": worst_day[1]} if worst_day[0] else None,

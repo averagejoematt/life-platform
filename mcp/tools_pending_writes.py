@@ -134,6 +134,17 @@ def _args_error(target_tool: str, target_args: dict) -> str | None:
     return _validate_tool_args(target_tool, target_args)
 
 
+def _target_precheck_error(target_tool: str, target_args: dict) -> str | None:
+    """#6287: a target's own semantic checks beyond its JSON schema, run at enqueue so an
+    item that would be refused at approval is never queued (a personal_record without an
+    evidence_kind, with a public_ok tier, or with a caller-supplied owner_reviewed_at)."""
+    if target_tool == "write_platform_memory":
+        from mcp.tools_memory import queued_write_precheck
+
+        return queued_write_precheck(target_args)
+    return None
+
+
 def _is_conditional_failure(exc: Exception) -> bool:
     return "ConditionalCheckFailed" in type(exc).__name__ or "ConditionalCheckFailedException" in str(exc)
 
@@ -188,7 +199,7 @@ def _enqueue(table, args: dict) -> dict:
     err = _queueable_error(target_tool)
     if err:
         return {"error": err}
-    err = _args_error(target_tool, target_args)
+    err = _args_error(target_tool, target_args) or _target_precheck_error(target_tool, target_args)
     if err:
         return {"error": f"target_args would be rejected by {target_tool}: {err}. Nothing was queued."}
 
@@ -243,7 +254,7 @@ def _approve(table, args: dict) -> dict:
     target_args = json.loads(item.get("target_args_json") or "{}")
     # Re-check at approval: the target may have been renamed, pruned or re-schemaed since
     # the item was queued. A stale item is reported, never half-performed.
-    err = _queueable_error(target_tool) or _args_error(target_tool, target_args)
+    err = _queueable_error(target_tool) or _args_error(target_tool, target_args) or _target_precheck_error(target_tool, target_args)
     if err:
         return {
             "error": f"Cannot perform '{pending_id}' now: {err} It stays pending — discard it or re-queue.",
@@ -257,7 +268,10 @@ def _approve(table, args: dict) -> dict:
 
     t0 = time.time()
     try:
-        result = _registry()[target_tool]["fn"](target_args)
+        # #6287: the approval scope is what lets a queue-only target (a personal_record
+        # memory) write at all, and its instant becomes the record's owner_reviewed_at.
+        with pw.approval_scope(pending_id, target_tool, _now().isoformat()):
+            result = _registry()[target_tool]["fn"](target_args)
     except Exception as e:  # noqa: BLE001 — the row must not be left claiming success
         mcp_audit.record_mutation(target_tool, target_args, "error", (time.time() - t0) * 1000)
         _transition(table, item, {"status": pw.STATUS_PENDING, "last_error": f"{type(e).__name__}: {e}"[:500]}, pw.STATUS_APPROVING)

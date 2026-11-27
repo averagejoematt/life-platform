@@ -656,14 +656,23 @@ WRITE_PLATFORM_MEMORY_DESCRIPTION = (
     "ADDITIVE (#4171): every write is a new row keyed by content — a second note on the same day never "
     "erases the first, and an identical replay converges (status 'unchanged'). The ONLY way to overwrite is "
     "replace_key=<the exact sk read_platform_memory returned>, which rewrites that one row and refuses an "
-    "absent key. There is no overwrite flag."
+    "absent key. There is no overwrite flag. "
+    "#6287 personal_record (reviewed personal records — recollections, confirmed events, his statements, "
+    "interpretations) is QUEUE-ONLY: a direct call is refused and writes nothing. Show Matthew the draft, let him "
+    "correct it, then manage_pending_writes(action='enqueue', target_tool='write_platform_memory', target_args=...); "
+    "the approve call performs the write and stamps owner_reviewed_at. It requires evidence_kind, takes "
+    "event_date/event_date_precision/source_ref, is PRIVATE unless privacy_tier='coach_context' is set for that item, "
+    "and can never be public_ok. Interpretations, competing hypotheses and rejected interpretations are kept but "
+    "never reach a coach prompt."
 )
 
 READ_PLATFORM_MEMORY_DESCRIPTION = (
     "Retrieve recent memory records for a given category from the platform_memory partition. "
     "Use to pull coaching calibration, failure patterns, or episodic wins into context. "
     "Every same-day record is returned (newest stored first) and each carries its `sk` — the handle "
-    "write_platform_memory's replace_key and delete_platform_memory's key take (#4171)."
+    "write_platform_memory's replace_key and delete_platform_memory's key take (#4171). "
+    "personal_record rows also carry their provenance: evidence_kind, event_date, event_date_precision, "
+    "source_ref, owner_reviewed_at and privacy_tier (#6287)."
 )
 
 LIST_MEMORY_CATEGORIES_DESCRIPTION = (

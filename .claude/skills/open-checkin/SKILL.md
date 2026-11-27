@@ -34,10 +34,23 @@ mental note (or actual notes in your own scratch context) of anything that sound
 belongs in the table below, but don't interrupt to log it mid-thought unless it's a
 literal check-in answer he's clearly delivering in response to something you asked him.
 
-### 2. At the close: route everything
+### 2. At the close: propose, let him correct, then write
 
-Before ending the session, walk back through what was said and route each distinct
-takeaway to its tool, per the CHAT_MODES.md contract:
+Before ending the session, walk back through what was said and list, in the chat, each
+thing you propose to keep and where it would go (the table below). Use his words. He
+corrects the list, drops items, or says "keep none of it". **Nothing is written before he
+has seen the list and said yes to an item.**
+
+For each item he keeps, call `manage_pending_writes` (`action: "enqueue"`) with the target
+tool and arguments from the table, then `approve` it on his yes; `discard` anything he
+drops. Never tell him something is saved or queued unless the tool returned an id. The one
+exception is a check-in answer he gives verbatim to a question you asked from the queue,
+which is logged as he gives it.
+
+Personal context from a longer or more personal conversation is not routed from here: it
+goes through `reflect`'s reviewed record, where private is the default.
+
+The routes, per the CHAT_MODES.md contract:
 
 | What Matthew said (shape) | Route to |
 |---|---|
@@ -57,8 +70,8 @@ is a fine outcome, just say so.
 
 ### 3. Confirm what got logged
 
-Before ending, state plainly what you wrote (which tool, with what) so Matthew has a
-record of what's now durable versus what was just talk. If something he said was
+Before ending, state plainly what you wrote (which tool, with what) and what you dropped, so
+Matthew has a record of what's now durable versus what was just talk. If something he said was
 ambiguous about which bucket it belongs in, ask him rather than guessing — a wrongly
 routed takeaway (e.g. a passing comment logged as a formal `log_decision`) is worse than
 asking one clarifying question.

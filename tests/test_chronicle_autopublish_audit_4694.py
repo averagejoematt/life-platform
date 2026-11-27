@@ -71,7 +71,7 @@ def _draft(findings, **extra):
         "sk": "DATE#2026-10-06",
         "date": "2026-10-06",
         "status": "draft",
-        "generated_at": _iso(75),
+        "generated_at": _iso(50),  # inside the one-notice window [48 h, 72 h) — owner ruling 2026-11-26
         "week_number": 5,
         "title": "The Rest Day He Took",
         "stats_line": "Day 31 to Day 37 · 6 training sessions",

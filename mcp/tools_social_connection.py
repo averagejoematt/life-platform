@@ -10,6 +10,7 @@ imports ``tool_get_social_connection_trend`` from here.
 
 from datetime import datetime, timedelta
 
+from common.inferred_fields import SOURCE_MODEL_INFERRED, SOURCE_SELF_REPORT, resolve_rating  # #6286
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 
 from mcp.core import query_source
@@ -151,6 +152,7 @@ def tool_get_social_connection_trend(args):
     daily_mood = {}
     daily_energy = {}
     daily_stress = {}
+    rating_src = {}  # (metric, date) -> provenance of the stored value (#6286)
     for item in journal_items:
         d = item.get("date")
         if not d:
@@ -160,10 +162,14 @@ def tool_get_social_connection_trend(args):
             score = QUALITY_MAP[sq]
             if d not in daily_social or score > daily_social[d]["score"]:
                 daily_social[d] = {"quality": sq, "score": score}
-        for field, store in [("enriched_mood", daily_mood), ("enriched_energy", daily_energy), ("enriched_stress", daily_stress)]:
-            v = _sf(item.get(field))
-            if v is not None:
-                store[d] = v
+        # #6286: his own 1-5 rating first; the enrichment model's score only when he gave none,
+        # and never over a self-report another entry of the same day carried.
+        for metric, store in [("mood", daily_mood), ("energy", daily_energy), ("stress", daily_stress)]:
+            v, src = resolve_rating(item, metric)
+            if v is None or (src == SOURCE_MODEL_INFERRED and rating_src.get((metric, d)) == SOURCE_SELF_REPORT):
+                continue
+            store[d] = v
+            rating_src[(metric, d)] = src
 
     if not daily_social:
         return {"error": "No enriched_social_quality data found.", "entries_checked": len(journal_items)}
