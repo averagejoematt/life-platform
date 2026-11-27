@@ -79,10 +79,13 @@ MECHANICS_FUNCTIONS = (
     "day_is_held",
     "compute_ema_level_score",
     "compute_character_mood",
+    "planned_rest_in_window",
+    "lab_evidence_factor",
+    "data_completeness_pct",
     "_level_step",
     "evaluate_level_changes",
 )
-RECORDED_ENGINE_FINGERPRINT = "b75287942475"  # re-read 2026-11-26 (#6293 amendment: no XP decay/debt, shield on measured verdicts, held days, no neglect atrophy, only habits two-state); prior f1d96247c11a, re-read 2026-10-23 (#5129: owner-only components held out of _weighted_pillar_score — the table labels them); prior e56973e1c2ee, engine v1.7.0 + #1412, 2026-07-19
+RECORDED_ENGINE_FINGERPRINT = "9700bd64b55e"  # re-read 2026-11-26 (#6293 final amendments: planned rest, lab ageing as weight, rest-day completeness, mood 'unavailable'); prior b75287942475 (#6293 amendment: no XP decay/debt, shield on measured verdicts, held days, no neglect atrophy, only habits two-state); prior f1d96247c11a, re-read 2026-10-23 (#5129: owner-only components held out of _weighted_pillar_score — the table labels them); prior e56973e1c2ee, engine v1.7.0 + #1412, 2026-07-19
 
 
 def engine_fingerprint() -> str:
@@ -470,6 +473,13 @@ def _dark_section(config: dict) -> str:
         "or costs no XP. Thin days still show a value blended toward neutral, for display only.</li>"
         "<li><strong>No neglect decay.</strong> A quiet stretch — a planned rest, a trip, a week off logging — does not shrink any score "
         "and does not push a level down. A level falls only when measured days, sustained over the streak gate, say it should.</li>"
+        "<li><strong>Planned rest is not inactivity.</strong> A day recorded as a sick day or a travel day leaves Movement's weekly "
+        "windows: the week's session, strength, Zone 2 and variety targets shrink to the days that were not planned rest, and a week of "
+        "nothing but planned rest is unknown, not zero. An unplanned week off still counts as a week without training.</li>"
+        "<li><strong>A rest day is not missing data.</strong> The day's data completeness expects a Strava row only when another source "
+        "(Hevy, Whoop, the watch) shows a session that day.</li>"
+        "<li><strong>Old lab results fade as evidence, not as health.</strong> As a blood panel ages its weight in Metabolic tapers — "
+        "full for 30 days, half at 90, none at 180 — and the aged share is unknown; the markers' score itself never drops with age.</li>"
         f"<li><strong>An uninstrumented pillar is out, not a placeholder.</strong> {esc(uninstrumented)} has no defensible, approved "
         "assessment yet, so it is not scored: no number stands in for it anywhere — not in the headline, the consistency variance, the "
         "effects or the mood.</li>"
@@ -483,9 +493,10 @@ def _headline_section(config: dict) -> str:
         '<p class="rd-prose">The headline <strong>Character Level</strong> is the weight-averaged mean of the pillar levels, '
         "renormalized over the pillars that are instrumented and have earned a level, then <strong>floored</strong> — never rounded up. "
         "It understates by construction.</p>"
-        '<p class="rd-prose">The character\'s <strong>mood</strong> — dormant · fading · steady · thriving — is equally deterministic '
-        "(ADR-105): pure code over the presence signal and the 7-day composite raw-score trend. <em>Dormant</em> is a confirmed dark stretch; "
-        "<em>fading</em> is quiet logging or a trend of −5 or worse; <em>thriving</em> demands active logging, a trend of +3 or better, "
+        '<p class="rd-prose">The character\'s <strong>mood</strong> — unavailable · fading · steady · thriving — is equally deterministic '
+        "(ADR-105): pure code over the presence signal and the 7-day composite raw-score trend of the measured days. <em>Fading</em> "
+        "needs the measured days themselves to fall (a trend of −5 or worse); when logging has simply gone quiet the mood is "
+        "<em>unavailable</em> — not observed, never read as decline; <em>thriving</em> demands active logging, a trend of +3 or better, "
         "and a composite of at least 55; everything else is <em>steady</em>. No model ever decides how the character feels.</p>"
     )
     return _sec("headline", "The headline number — and the mood", prose)

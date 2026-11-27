@@ -364,13 +364,13 @@ def main():
     dormant_climbs = [
         (i + 1, ev["type"])
         for i, r in enumerate(recs_f)
-        if r["character_mood"] == "dormant"
+        if r["character_mood"] in ("dormant", "unavailable")
         for ev in r["level_events"]
         if ev["type"] == "level_up"
     ]
     print(
         f"  >> #957 invariant — 90 silent days: climbs {len(climbs)} (MUST be 0) | "
-        f"level_up on dormant days {len(dormant_climbs)} (MUST be 0) | final char level {recs_f[-1]['character_level']} (MUST be 1)"
+        f"level_up on unavailable-mood days {len(dormant_climbs)} (MUST be 0) | final char level {recs_f[-1]['character_level']} (MUST be 1)"
     )
 
     # focused probe: a NOT-INSTRUMENTED pillar (relationships) — #6293: out of the chain, no number at all

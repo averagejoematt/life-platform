@@ -376,6 +376,43 @@ def _safe_float(rec, field):
 # ==============================================================================
 
 
+def activity_elsewhere(data, day):
+    """#6293 rest_day_completeness: whether a source other than Strava (Hevy, Whoop, the Apple Watch) shows a training
+    session on ``day`` — THE session count (``training.session_count``) over the already-fetched 7-day rows."""
+    try:
+        from training import session_count
+
+        week = session_count.count(
+            hevy=data.get("hevy_7d"), whoop=data.get("whoop_7d"), apple=data.get("apple_7d"), start_date=day, end_date=day
+        )
+        return bool(week.get("sessions"))
+    except Exception as e:  # a count that cannot run is no evidence of activity: Strava stays not-expected
+        logger.warning(f"[character] activity_elsewhere({day}) failed (non-fatal): {e}")
+        return False
+
+
+def fetch_planned_rest_days(start_date, end_date):
+    """#6293 planned_rest: the dates in [start, end] that are a recorded planned pause — a sick-day record
+    (``SOURCE#sick_days``, not cleared, via ``sick_day_checker``) or a travel log (``SOURCE#travel``): the same set
+    ``engagement_core`` excuses as a planned pause. Owner-only; never written to the receipt's input rows."""
+    days = set()
+    try:
+        from health.sick_day_checker import get_sick_days_range
+
+        days |= {str(r.get("date"))[:10] for r in get_sick_days_range(table, USER_ID, start_date, end_date) if r.get("date")}
+    except Exception as e:
+        logger.warning(f"[character] planned-rest sick-day read failed (non-fatal): {e}")
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :s AND :e",
+            ExpressionAttributeValues={":pk": USER_PREFIX + "travel", ":s": "DATE#" + start_date, ":e": "DATE#" + end_date + "~"},
+        )
+        days |= {str(i.get("sk", "")).replace("DATE#", "")[:10] for i in resp.get("Items", [])}
+    except Exception as e:
+        logger.warning(f"[character] planned-rest travel read failed (non-fatal): {e}")
+    return sorted(d for d in days if start_date <= d <= end_date)
+
+
 def assemble_data(yesterday_str):
     """Build the data dict that character_engine.compute_character_sheet() expects.
 
@@ -460,6 +497,9 @@ def assemble_data(yesterday_str):
     # #965: hevy strength days (trailing 7) — movement's strength_sessions
     data["hevy_workout_days_7d"] = fetch_hevy_workout_days(strava_7d_start, yesterday_str)
 
+    # #6293 planned_rest: the window's recorded planned-pause days (sick / travel) — Movement's window targets prorate
+    data["planned_rest_days_7d"] = fetch_planned_rest_days(strava_7d_start, yesterday_str)
+
     # #965: reading-session days (trailing 7, ADR-097 GSI2) — mind's reading_practice
     data["reading_session_days_7d"] = fetch_reading_session_days(strava_7d_start, yesterday_str)
 
@@ -524,23 +564,18 @@ def assemble_data(yesterday_str):
             pass
     data["journal_14d_count"] = j14d_count
 
-    # Data completeness — use already-fetched data where possible
-    expected_count = 5  # whoop, macrofactor, apple_health, strava, habitify
-    present = 0
-    if data["whoop"]:
-        present += 1
-    if data["macrofactor"]:
-        present += 1
-    if data["apple"]:
-        present += 1
-    # Strava: check if yesterday is in our 7d window (avoids re-fetch)
+    # Data completeness — use already-fetched data where possible.
+    # Strava: check if yesterday is in our 7d window (avoids re-fetch); Habitify: a separate fetch (not queried elsewhere).
     strava_dates = {r.get("date") or r.get("sk", "").replace("DATE#", "") for r in data["strava_7d"]}
-    if yesterday_str in strava_dates:
-        present += 1
-    # Habitify: need a separate fetch (not queried elsewhere)
-    if fetch_date("habitify", yesterday_str):
-        present += 1
-    data["data_completeness_pct"] = round((present / expected_count) * 100, 1)
+    present = {
+        "whoop": bool(data["whoop"]),
+        "macrofactor": bool(data["macrofactor"]),
+        "apple": bool(data["apple"]),
+        "strava": yesterday_str in strava_dates,
+        "habitify": bool(fetch_date("habitify", yesterday_str)),
+    }
+    # #6293 rest_day_completeness: the Strava row is expected only when another source shows a session that day.
+    data["data_completeness_pct"] = character_engine.data_completeness_pct(present, activity_elsewhere(data, yesterday_str))
 
     elapsed = time.time() - t0
     logger.info(

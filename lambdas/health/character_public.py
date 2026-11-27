@@ -285,6 +285,20 @@ def without_private_modifiers(raw: Any, details: Any) -> tuple:
     pre-modifier values are the ones the engine recorded before it applied the multiplier; a record that carries a
     modifier without them cannot be restored exactly and raises (fail closed — never divided back out)."""
     d = copy.deepcopy(details or {})
+    rest = d.get("_planned_rest")
+    if isinstance(rest, dict):
+        # #6293 planned_rest: the proration reads the owner-only sick/travel record — the public method restores the
+        # day as scored without it (fail closed: a public number never depends on a private input).
+        mod_kept = d.get("_modifier")
+        if "pre_rest_details" not in rest or "pre_rest_raw" not in rest:
+            raise ValueError("a planned-rest day without its pre-rest values: the public day cannot be restored")
+        raw, d = rest["pre_rest_raw"], copy.deepcopy(rest["pre_rest_details"])
+        if isinstance(mod_kept, dict):
+            mult = float(mod_kept.get("multiplier", 1.0))
+            d["_modifier"] = dict(mod_kept, pre_modifier_raw=raw, pre_modifier_raw_unblended=d.get("_raw_unblended"))
+            raw = round(character_engine._clamp(raw * mult), 1)
+            if d.get("_raw_unblended") is not None:
+                d["_raw_unblended"] = round(character_engine._clamp(d["_raw_unblended"] * mult), 1)
     mod = d.get("_modifier")
     if not isinstance(mod, dict) or activity_publication.source_is_public(mod.get("source")):
         return raw, d
