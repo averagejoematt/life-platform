@@ -72,6 +72,16 @@ def ladder_states(plan_path: str) -> dict:
     return {c: states[c] for c in order if c in states}
 
 
+def stored_states(plan_path: str) -> dict:
+    """{date: state} of the STORED rows, in exactly the ``ladder_states`` state shape — the baseline ``replay_residual``
+    is compared against. Integrity-checked first; a plan written before the field existed is refused."""
+    plan = load_plan(plan_path)
+    states = plan.get("stored_states")
+    if not isinstance(states, dict):
+        raise PlanGuardError("this plan carries no stored_states — re-run the dry run with the current tool")
+    return dict(states)
+
+
 # ── apply, verify, rollback ─────────────────────────────────────────────────────────────────────────────────────────
 
 

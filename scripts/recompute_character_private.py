@@ -80,6 +80,10 @@ LADDER STATES (``ladder_states`` in the plan; additive, outside the plan id; rea
   {"raw_score": None, "level": None}. The first step at which a value differs from the previous step's (or, for
   replay_residual, from the stored row) is the step that produced the change.
 
+STORED STATES (``stored_states``; additive, outside the plan id; ``recompute_character_private_apply.stored_states``)
+— {date: state} of the STORED rows in the same state shape: the baseline the first step (replay_residual) is compared
+against.
+
 CAUSES (ladder order): replay_residual (not a method change) · stress_days · journal_frequency · model_values ·
 xp_debt · rest_decay · tree_switch_residual (control, must be 0) · relationships_exclusion · missing_data; stamps:
 method_version_stamp · recompute_provenance. Mind's two removals are attributed separately (journal_frequency, then
@@ -790,6 +794,7 @@ def dry_run(
         "rows": rows,
         "attribution": attribution,
         "ladder_states": R.ladder_states(ladder_f),
+        "stored_states": {d: R.chain_state(r) for d, r in sorted(stored_f.items())},
         "accounting": accounting,
         "counts": R.counts(rows, snap),
         "stress_days": {
