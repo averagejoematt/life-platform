@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": "1.7.0",
-    "description": "Character Sheet v1.7.0 (#6293, owner rulings 2026-11-26): journaling frequency (journal_consistency) and the model-counted values read (values_alignment) leave Mind, whose remaining component weights are renormalised by 1/0.8 (t0 0.30\u21920.375; t1, state of mind, stress, vice, reading 0.10\u21920.125); Relationships has no components and reads not instrumented until an owner-approved assessment exists. On v1.6.0 (#1411 fitted-not-authored, ADR-105): every cross-pillar effect declares fit_status='authored-prior' \u2014 the config can only declare the prior; 'fitted' is earned from data by the quarterly effect_fitter re-fit (lagged pairs, block-bootstrap CI, BH-FDR) and merged at compute/serve time, never hand-written here. On v1.5.0's #965 source wiring.",
+    "description": "Character Sheet v1.7.0 (#6293, owner rulings 2026-11-26): journaling frequency (journal_consistency) and the model-counted values read (values_alignment) leave Mind, whose remaining component weights are renormalised by 1/0.8 (t0 0.30\u21920.375; t1, state of mind, stress, vice, reading 0.10\u21920.125); Relationships has no components and reads not instrumented until an owner-approved assessment exists, and (#6293 amendment, owner ruling 2026-11-26) leaves every aggregate. Amendment: the XP bands are the NET verdict of a measured day (+2/+1/0/-1/-2, the old bands less the retired daily_xp_decay); XP credits only the positive part (no decay, no debt, xp_debt_cap removed); the negative part drains only the demotion shield (xp_buffer). leveling.neglect_decay (presence atrophy + dark down-streak persistence) is removed. Only the T0/T1 habit components score 0 when absent; every other absent component is unknown. On v1.6.0 (#1411 fitted-not-authored, ADR-105): every cross-pillar effect declares fit_status='authored-prior' \u2014 the config can only declare the prior; 'fitted' is earned from data by the quarterly effect_fitter re-fit (lagged pairs, block-bootstrap CI, BH-FDR) and merged at compute/serve time, never hand-written here. On v1.5.0's #965 source wiring.",
     "last_updated": "2026-11-26",
     "review_ref": "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md"
   },
@@ -213,17 +213,8 @@
       }
     ],
     "xp_per_level": 100,
-    "daily_xp_decay": 1,
     "xp_buffer_threshold": 20,
     "xp_buffer_cap": 40,
-    "xp_debt_cap": 100,
-    "neglect_decay": {
-      "n_grace_days": 3,
-      "rate": 0.98,
-      "floor": 0,
-      "min_behavioral_share": 0.3,
-      "persistent_down_streak": true
-    },
     "tier_streak_overrides": {
       "Foundation": {
         "up": 3,
@@ -260,23 +251,23 @@
   "xp_bands": [
     {
       "min_raw_score": 80,
-      "xp": 3
-    },
-    {
-      "min_raw_score": 60,
       "xp": 2
     },
     {
-      "min_raw_score": 40,
+      "min_raw_score": 60,
       "xp": 1
     },
     {
-      "min_raw_score": 20,
+      "min_raw_score": 40,
       "xp": 0
     },
     {
-      "min_raw_score": 0,
+      "min_raw_score": 20,
       "xp": -1
+    },
+    {
+      "min_raw_score": 0,
+      "xp": -2
     }
   ],
   "tiers": [

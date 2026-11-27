@@ -252,14 +252,22 @@ def _character_block(record, pending, date_str, composite, composite_delta_1d, c
     }
 
 
+def _reason_clause(pillar: dict) -> str:
+    """A not-scored pillar's reason as a clause: its note, first letter lowered, no full stop."""
+    note = str(pillar.get("not_scored_note") or character_privacy.UNSCORED_PUBLIC_PILLARS.get(str(pillar.get("name")), "not scored"))
+    note = note.strip().rstrip(".")
+    return note[:1].lower() + note[1:]
+
+
 def _composite_note(pillars: list, count: int, total: int) -> "str | None":
     """DIL-049 D4: what the composite averages over, said as a sentence — and since #6224, WHY a pillar is out: one the
     public method does not score (its inputs are private) is named as such, not called uninstrumented."""
     if count >= total:
         return None
-    unscored = [str(p["name"]).capitalize() for p in pillars if p.get("not_scored")]
+    unscored = [p for p in pillars if p.get("not_scored")]
     held = total - count - len(unscored)
-    parts = [f"{n} (not scored in public: its inputs are private)" for n in unscored]
+    # #6293: each with its OWN reason (Mind: its inputs are private; Relationships: not instrumented).
+    parts = [f"{str(p['name']).capitalize()} ({_reason_clause(p)})" for p in unscored]
     if held:
         parts.append(f"{held} not yet instrumented pillar(s)")
     verb = "is" if total - count == 1 else "are"

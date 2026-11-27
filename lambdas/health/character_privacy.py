@@ -109,7 +109,13 @@ HELD_PILLAR: dict[str, Any] = {
 # public method does not score the pillar at all: no score, level, tier, XP, drivers or level events, and no place in the
 # composite, the headline level or the XP total. Public routes serve the shape below — no number in it — and name the
 # reason. Only an owner ruling reopens it.
-UNSCORED_PUBLIC_PILLARS: dict[str, str] = {"mind": "Not scored in public: its inputs are private."}
+# #6293 amendment (owner ruling 2026-11-26, "Amend the calculation so uninstrumented Relationships is excluded entirely
+# from consistency, variance and related aggregate calculations. Do not substitute a neutral value of 50 for missing
+# evidence."): Relationships is not instrumented in either method, so it is not scored in public either — with its own
+# reason, distinct from Mind's.
+MIND_NOT_SCORED_NOTE = "Not scored in public: its inputs are private."
+RELATIONSHIPS_NOT_INSTRUMENTED_NOTE = "Not instrumented: no defensible, approved relationship assessment exists yet."
+UNSCORED_PUBLIC_PILLARS: dict[str, str] = {"mind": MIND_NOT_SCORED_NOTE, "relationships": RELATIONSHIPS_NOT_INSTRUMENTED_NOTE}
 
 
 def pillar_scored_in_public(name: Any) -> bool:

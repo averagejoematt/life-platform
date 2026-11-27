@@ -587,12 +587,17 @@ def load_raw_score_histories(yesterday_str, window=21):
     records = fetch_range("character_sheet", start, end)
 
     histories = {p: [] for p in PILLAR_ORDER}
-    # Records come back sorted by sk (DATE#...) which is chronological
+    # Records come back sorted by sk (DATE#...) which is chronological.
+    # #6293 amendment (owner ruling 2026-11-26: no neutral value stands in for missing evidence): a held pillar-day — not
+    # instrumented, below the coverage floor, or absent — is left out of the history, never filled (it used to be 40.0
+    # when absent, and the stored 50 placeholder when not instrumented). Silence never moves the EMA.
     for rec in records:
         for p in PILLAR_ORDER:
             pdata = rec.get(f"pillar_{p}") or {}
             raw = pdata.get("raw_score")
-            histories[p].append(float(raw) if raw is not None else 40.0)
+            if raw is None or character_engine.day_is_held(pdata):
+                continue
+            histories[p].append(float(raw))
 
     return histories, records
 

@@ -303,12 +303,15 @@ def _mind_scored() -> None:
 
 # #6224: the keys that carry a Mind score, level, tier or XP on a served body.
 MIND_SCORE_KEYS = frozenset({"level", "raw_score", "score", "level_score", "tier", "xp_total", "xp_delta", "xp_earned", "xp_debt"})
-MIND_KEYS = frozenset({"mind", "pillar_mind", "mind_pillar"})
+# #6293 amendment: Relationships is not scored in public either (not instrumented), so the detector covers it too.
+UNSCORED_NAMES = ("mind", "relationships")
+MIND_KEYS = frozenset({k for n in UNSCORED_NAMES for k in (n, f"pillar_{n}", f"{n}_pillar")})
 
 
 def mind_numbers(body) -> list:
-    """Every place a served body carries a Mind score/level/tier/XP value (#6224: Mind is not scored in public) — a
-    pillar row named "mind", or the value under a Mind key — as sorted key paths. None is not a value."""
+    """Every place a served body carries a Mind (#6224) or Relationships (#6293) score/level/tier/XP value — neither is
+    scored in public — a pillar row named for one, or the value under its key — as sorted key paths. None is not a
+    value. (The name is historical; ``unscored_numbers`` is the same function.)"""
     if isinstance(body, str):
         try:
             body = json.loads(body)
@@ -321,7 +324,7 @@ def mind_numbers(body) -> list:
 
     def walk_(node, path):
         if isinstance(node, dict):
-            if str(node.get("name") or "").lower() == "mind" or str(node.get("pillar") or "").lower() == "mind":
+            if str(node.get("name") or "").lower() in UNSCORED_NAMES or str(node.get("pillar") or "").lower() in UNSCORED_NAMES:
                 found.update(f"{path}.{k}" for k in MIND_SCORE_KEYS | {"old_level", "new_level"} if value(node.get(k)))
             for k, v in node.items():
                 if k in MIND_KEYS:
@@ -336,6 +339,9 @@ def mind_numbers(body) -> list:
 
     walk_(body, "")
     return sorted(found)
+
+
+unscored_numbers = mind_numbers
 
 
 # #6224 (containment, owner ruling 2026-11-26): while the character scores are pending a recompute no public body carries

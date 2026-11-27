@@ -141,7 +141,8 @@ def test_relationships_is_not_instrumented_whatever_the_journal_says():
 
 
 def test_relationships_holds_xp_and_level_and_stays_out_of_the_headline():
-    """The existing not-instrumented state end to end: neutral, flagged, XP held, level frozen, out of the mean."""
+    """#6293 amendment: Relationships is out of the whole chain — stored as its reason with NO number (no neutral 50, no
+    level, no XP), out of the headline mean, and no transition is captured for it."""
     import json as _json
 
     config = _json.load(open(os.path.join(os.path.dirname(__file__), "..", "config", "character_sheet.json")))
@@ -154,10 +155,11 @@ def test_relationships_holds_xp_and_level_and_stays_out_of_the_headline():
     prev = {"character_level": 5, "pillar_relationships": {"level": 1, "xp_total": 0, "xp_debt": 0}}
     rec = compute_character_sheet(data, prev, {}, config)
     rel = rec["pillar_relationships"]
-    assert rel["not_instrumented"] is True and rel["raw_score"] == 50.0
-    assert rel["xp_delta"] == 0 and rel["xp_total"] == 0 and rel["xp_debt"] == 0
-    assert rel["level"] == 1 and rel["coverage_hold"] is True
+    assert rel["not_instrumented"] is True and rel["coverage_hold"] is True
+    assert not {"raw_score", "level_score", "level", "tier", "xp_total", "xp_delta", "xp_debt"} & set(rel)
     assert "relationships" in rec["headline_excluded_pillars"]
+    assert rec["uninstrumented_pillars"] == ["relationships"]
+    assert "relationships" not in rec["progression_transitions"]["pillars"]
     assert rel["not_instrumented_note"] == config["pillars"]["relationships"]["not_instrumented_note"]
 
 
@@ -191,44 +193,49 @@ def test_compute_character_sheet_propagates_not_instrumented_and_note():
     assert sleep_p["not_instrumented_note"] is None
 
 
-# ── F-02: XP decay ──
+# ── F-02 / #6293: XP never falls — no decay, no debt ──
 
 
-def test_xp_decays_on_mediocre_day():
-    """Score 40 earns +1 XP but decay -2 -> net -1."""
-    config = {
-        "xp_bands": [{"min_raw_score": 40, "xp": 1}, {"min_raw_score": 0, "xp": -1}],
-        "leveling": {"daily_xp_decay": 2},
+def test_xp_mediocre_day_nets_zero():
+    """Raw 45 sits at the zero-point (net band 0): no credit, no loss."""
+    config = {"xp_bands": [{"min_raw_score": 40, "xp": 0}, {"min_raw_score": 0, "xp": -2}], "leveling": {}}
+    assert _compute_xp(45, 100, config) == (0, 0, 100, 0)
+
+
+def test_xp_low_measured_day_earns_zero_and_no_debt():
+    """#6293: a genuinely low measured day earns zero — XP never drops and no debt accrues."""
+    config = {"xp_bands": [{"min_raw_score": 0, "xp": -2}], "leveling": {}}
+    assert _compute_xp(10, 1, config) == (0, 0, 1, 0)
+
+
+def test_xp_legacy_gross_bands_with_decay_give_the_same_credit():
+    """A stale S3 config (gross bands +3..-1 with daily_xp_decay 1) credits exactly what the net v1.7.0 bands do."""
+    gross = {
+        "xp_bands": [
+            {"min_raw_score": 80, "xp": 3},
+            {"min_raw_score": 60, "xp": 2},
+            {"min_raw_score": 40, "xp": 1},
+            {"min_raw_score": 0, "xp": -1},
+        ],
+        "leveling": {"daily_xp_decay": 1},
     }
-    earned, delta, new_xp, debt = _compute_xp(45, 100, config)
-    assert earned == 1
-    assert delta == -1  # 1 earned - 2 decay
-    assert new_xp == 99  # 100 + 1 - 2
-    assert debt == 0  # positive balance -> no debt
-
-
-def test_xp_floors_at_zero_with_visible_debt():
-    """#913: xp_total still floors at 0 (downstream % consumers untouched),
-    but the shortfall is now a visible xp_debt instead of vanishing."""
-    config = {
-        "xp_bands": [{"min_raw_score": 0, "xp": -1}],
-        "leveling": {"daily_xp_decay": 2},
+    net = {
+        "xp_bands": [
+            {"min_raw_score": 80, "xp": 2},
+            {"min_raw_score": 60, "xp": 1},
+            {"min_raw_score": 40, "xp": 0},
+            {"min_raw_score": 0, "xp": -2},
+        ],
+        "leveling": {},
     }
-    _, _, new_xp, debt = _compute_xp(10, 1, config)
-    assert new_xp == 0  # Can't go negative
-    assert debt == 2  # 1 - 3 = -2 -> the bleed is visible, not silent
+    for raw in (5, 25, 45, 65, 85):
+        assert _compute_xp(raw, 100, gross) == _compute_xp(raw, 100, net)
 
 
 def test_xp_grows_on_good_day():
-    config = {
-        "xp_bands": [{"min_raw_score": 80, "xp": 3}, {"min_raw_score": 0, "xp": -1}],
-        "leveling": {"daily_xp_decay": 2},
-    }
+    config = {"xp_bands": [{"min_raw_score": 80, "xp": 2}, {"min_raw_score": 0, "xp": -2}], "leveling": {}}
     earned, delta, new_xp, debt = _compute_xp(85, 100, config)
-    assert earned == 3
-    assert delta == 1  # 3 earned - 2 decay
-    assert new_xp == 101
-    assert debt == 0
+    assert (earned, delta, new_xp, debt) == (2, 2, 102, 0)
 
 
 # ── F-04: Body comp sigmoid ──
@@ -578,18 +585,29 @@ def test_steady_76_with_active_boost_levels_up_end_to_end():
 
 
 def test_behavioral_absent_scores_zero():
-    """An unlogged behavior is a miss (0 at full weight), not dropped-to-neutral."""
-    scores = {"journal_consistency": None, "state_of_mind_valence": 60}
+    """An unlogged HABIT is a miss (0 at full weight), not dropped-to-neutral — the two-state habit rule."""
+    scores = {"t0_habit_compliance": None, "state_of_mind_valence": 60}
     config = {
-        "journal_consistency": {"weight": 0.5, "behavioral": True},
+        "t0_habit_compliance": {"weight": 0.5, "behavioral": True},
         "state_of_mind_valence": {"weight": 0.5},
     }
     score, details = _weighted_pillar_score(scores, config)
     # Both components count: (0*0.5 + 60*0.5) / 1.0 = 30, full coverage, no blend
     assert score == 30.0
     assert details["_data_coverage"] == 1.0
-    assert details["_absent_behaviors"] == ["journal_consistency"]
-    assert details["journal_consistency"] == {"score": 0.0, "weight": 0.5, "absent": True}
+    assert details["_absent_behaviors"] == ["t0_habit_compliance"]
+    assert details["t0_habit_compliance"] == {"score": 0.0, "weight": 0.5, "absent": True}
+
+
+def test_non_habit_behavioral_absent_is_unknown():
+    """#6293 amendment: any other behavioral component with no input (a reading log) is unknown — out of the sum, lowering
+    the coverage — never a zero."""
+    scores = {"reading_practice": None, "state_of_mind_valence": 60}
+    config = {"reading_practice": {"weight": 0.5, "behavioral": True}, "state_of_mind_valence": {"weight": 0.5}}
+    score, details = _weighted_pillar_score(scores, config)
+    assert details["_absent_behaviors"] == []
+    assert details["_data_coverage"] == 0.5
+    assert details["_raw_unblended"] == 60.0
 
 
 def test_measured_absent_still_neutral_blended():
@@ -602,16 +620,20 @@ def test_measured_absent_still_neutral_blended():
 
 
 def test_fully_absent_behavioral_pillar_scores_low_not_neutral():
-    """The level-13 bug: a pillar of unlogged behaviors must read ~0, not ~50."""
-    scores = {"a": None, "b": None, "c": None}
-    config = {
-        "a": {"weight": 0.4, "behavioral": True},
-        "b": {"weight": 0.3, "behavioral": True},
-        "c": {"weight": 0.3, "behavioral": True},
-    }
+    """The level-13 bug: a pillar of unlogged HABITS must read ~0, not ~50 (the two-state habit rule)."""
+    scores = {"t0_habit_compliance": None, "t1_habit_compliance": None}
+    config = {"t0_habit_compliance": {"weight": 0.6, "behavioral": True}, "t1_habit_compliance": {"weight": 0.4, "behavioral": True}}
     score, details = _weighted_pillar_score(scores, config)
     assert score == 0.0
     assert details["_data_coverage"] == 1.0  # absence IS information here
+
+
+def test_fully_absent_non_habit_pillar_is_not_instrumented():
+    """#6293: a pillar whose only inputs are absent non-habit logs has no signal at all — not a zero."""
+    scores = {"a": None, "b": None}
+    config = {"a": {"weight": 0.5, "behavioral": True}, "b": {"weight": 0.5, "behavioral": True}}
+    _score, details = _weighted_pillar_score(scores, config)
+    assert details["_not_instrumented"] is True and details["_raw_unblended"] is None
 
 
 # ── ADR-104: coverage gate — no-signal days can't move levels ──
@@ -834,14 +856,23 @@ def _scenario_day(day_index):
     return data
 
 
+def _append_judged(histories, record, config):
+    """The loader's rule (#6293): only judged pillar-days enter a history."""
+    from health.character_engine import day_is_held
+
+    for p in config["pillars"]:
+        pd = record.get(f"pillar_{p}") or {}
+        if pd.get("raw_score") is not None and not day_is_held(pd):
+            histories[p].append(pd["raw_score"])
+
+
 def test_reported_scenario_mind_lags_and_movement_sinks():
     config = _scenario_config()
     prev_state = None
     histories = {p: [] for p in config["pillars"]}
     for day in range(20):
         record = compute_character_sheet(_scenario_day(day), prev_state, histories, config)
-        for p in config["pillars"]:
-            histories[p].append(record[f"pillar_{p}"]["raw_score"])
+        _append_judged(histories, record, config)
         prev_state = record
 
     sleep_p = record["pillar_sleep"]
@@ -863,7 +894,7 @@ def test_reported_scenario_mind_lags_and_movement_sinks():
     assert mind_p["level"] < sleep_p["level"]
     assert move_p["level"] < sleep_p["level"]
     # And the sheet differentiates: pillar levels spread, not one shared number
-    levels = [record[f"pillar_{p}"]["level"] for p in config["pillars"]]
+    levels = [record[f"pillar_{p}"]["level"] for p in config["pillars"] if p != "relationships"]
     assert max(levels) - min(levels) >= 6
     # Overall level sits below the best pillar — it's a weighted floor of a mixed story
     assert record["character_level"] < sleep_p["level"]
@@ -877,8 +908,7 @@ def test_reported_scenario_down_levels_after_stop():
     peak_move_level = 1
     for day in range(35):  # extend past the stop to let the EMA + shield drain
         record = compute_character_sheet(_scenario_day(day), prev_state, histories, config)
-        for p in config["pillars"]:
-            histories[p].append(record[f"pillar_{p}"]["raw_score"])
+        _append_judged(histories, record, config)
         if day == 12:
             peak_move_level = record["pillar_movement"]["level"]
         prev_state = record
@@ -936,7 +966,7 @@ def test_character_level_up_event_persists_drivers():
     # Exactly the record's own top raw scores, highest first — persisted and
     # read-time attribution agree on the day the event fires.
     expected = sorted(
-        ((k.replace("pillar_", ""), rec[k]["raw_score"]) for k in rec if k.startswith("pillar_") and (rec[k]["raw_score"] or 0) > 0),
+        ((k.replace("pillar_", ""), rec[k]["raw_score"]) for k in rec if k.startswith("pillar_") and (rec[k].get("raw_score") or 0) > 0),
         key=lambda t: -t[1],
     )[:3]
     assert [(d["pillar"], d["raw_score"]) for d in drivers] == [(n, round(float(s), 1)) for n, s in expected]

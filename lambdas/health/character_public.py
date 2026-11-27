@@ -30,8 +30,12 @@ streaks, buffers, effects, the mood and the headline level never carry a private
   the coverage (the journal components' treatment, so the public Mind is a function of public inputs only and moves by
   nothing when a restraint streak does), and no cross-pillar effect whose condition reads a restraint streak is
   evaluated. The engine receives no restraint streaks at all. Both reopen only with ``RESTRAINT_DATA_PUBLISHED``.
-* **Relationships** — every input is the journal or its enrichment, so the public method has no reading at all: the
-  never-instrumented shape every day (no XP, out of the headline mean), and public routes serve it held.
+* **Relationships — NOT INSTRUMENTED (#6293 amendment, owner ruling 2026-11-26: "Amend the calculation so uninstrumented
+  Relationships is excluded entirely from consistency, variance and related aggregate calculations. Do not substitute a
+  neutral value of 50 for missing evidence.")** — in ``UNSCORED_PUBLIC_PILLARS`` with its own reason: out of the whole
+  chain like Mind (the engine's ``UNINSTRUMENTED_PILLARS`` does the same in method 1). It used to run as the engine's
+  never-instrumented shape, whose neutral 50 sat in the consistency variance, the Alignment Bonus's all-pillars
+  condition and the mood's composite.
 * **Consistency** — its own inputs are public (data completeness, the task queue); its cross-pillar variance, its
   all-pillars streak and its weekend/weekday composite are recomputed from the public pillars and public history.
 * **Challenge XP** enters only when ``challenges`` is a public source (it is unclassified today, so it does not).
@@ -201,12 +205,17 @@ def consistency_inputs(method1_details: Optional[dict[str, Any]], public_history
 
 
 def public_histories(public_history: list) -> dict[str, list]:
-    """The 21-day raw-score histories, from the public views — the shape ``load_raw_score_histories`` builds."""
+    """The 21-day raw-score histories, from the public views — the shape ``load_raw_score_histories`` builds, by the same
+    rule (#6293 amendment): a held pillar-day (not instrumented, below the coverage floor, absent) is left out, never
+    filled with a stand-in value."""
     out: dict[str, list] = {p: [] for p in PILLARS}
     for rec in public_history or []:
         for p in PILLARS:
-            raw = (rec.get(f"pillar_{p}") or {}).get("raw_score")
-            out[p].append(float(raw) if raw is not None else 40.0)
+            pd = rec.get(f"pillar_{p}") or {}
+            raw = pd.get("raw_score")
+            if raw is None or character_engine.day_is_held(pd):
+                continue
+            out[p].append(float(raw))
     return out
 
 
@@ -323,7 +332,8 @@ def compute_public_variant(
         pre[p] = without_private_modifiers(pd.get("raw_score"), pd.get("components") or {})
     if "mind" not in UNSCORED_PILLARS:  # pragma: no cover — v1's arithmetic, kept for an owner ruling that reopens it
         pre["mind"] = public_mind((m1.get("pillar_mind") or {}).get("components"), habit_method, cfg)
-    pre["relationships"] = public_relationships(cfg)
+    if "relationships" not in UNSCORED_PILLARS:  # pragma: no cover — #6293: not instrumented, so never scored
+        pre["relationships"] = public_relationships(cfg)
     hist = [character_engine._from_decimal(h) for h in public_history or []]
     # #6224: an unscored pillar's history (a v1 variant's Mind) never reaches the consistency streak or its ratio.
     hist = [{k: v for k, v in h.items() if k not in {f"pillar_{u}" for u in UNSCORED_PILLARS}} for h in hist]

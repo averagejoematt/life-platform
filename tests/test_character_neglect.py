@@ -1,6 +1,6 @@
 """
 tests/test_character_neglect.py — #913: the character sheet responds honestly
-to neglect.
+to neglect — WITHOUT punishing silence (#6293 amendment, owner ruling 2026-11-26).
 
 The audit story this file guards against: during 14 days of total manual-
 logging silence (2026-06-26..07-09, /api/presence dark, gap_days 15) the
@@ -10,10 +10,9 @@ scores crashed (movement 54→9, mind 64→15). Four fixes:
   1. Up-gate scale bug — ``raw_score >= current_level + 1`` compared a 0-100
      daily score to a still-converging 1-100 level; now the day must perform
      at the TARGET level.
-  2. Presence-driven atrophy — sustained dark presence decays behavioral-heavy
-     pillars' level scores (leveling.neglect_decay), floored at the raw score.
-  3. Visible XP bleed — the sub-zero shortfall accumulates as xp_debt instead
-     of vanishing under the 0-floor.
+  2. Presence-driven atrophy — RETIRED by #6293: silence, inactivity or rest
+     never lowers a level or its EMA (sections 2 and 3 below now guard that).
+  3. Visible XP bleed (xp_debt) — RETIRED by #6293: XP never falls, debt is 0.
   4. Deterministic character_mood — thriving/steady/fading/dormant, pure code.
 
 Run with:   python3 -m pytest tests/test_character_neglect.py -v
@@ -26,14 +25,13 @@ import sys
 LAMBDAS_DIR = os.path.join(os.path.dirname(__file__), "..", "lambdas")
 sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 
+from health import character_engine as ce
 from health.character_engine import (
-    _behavioral_weight_share,
     _compute_xp,
     compute_character_mood,
     compute_character_sheet,
     compute_ema_level_score,
     evaluate_level_changes,
-    neglect_decay_state,
 )
 
 # A realistic slice of the live config: Foundation streak gates, the graduated
@@ -231,7 +229,7 @@ def test_up_gate_still_allows_honest_climbs():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 2 · P0 engagement-driven atrophy
+# 2 · #6293: engagement-driven atrophy is retired
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -239,19 +237,10 @@ def _dark(gap_days, planned=False):
     return {"presence_class": "dark", "gap_days": gap_days, "planned_pause": planned}
 
 
-def test_neglect_decay_state_grace_and_planned_pause():
-    assert neglect_decay_state(None, CONFIG) is None
-    assert neglect_decay_state({"presence_class": "present", "gap_days": 0}, CONFIG) is None
-    assert neglect_decay_state(_dark(3), CONFIG) is None  # within grace
-    assert neglect_decay_state(_dark(10, planned=True), CONFIG) is None  # sick/travel never decays
-    d = neglect_decay_state(_dark(10), CONFIG)
-    assert d is not None
-    assert abs(d["multiplier"] - 0.98**7) < 1e-3  # rate ** (gap - grace)
-
-
-def test_behavioral_weight_share():
-    assert _behavioral_weight_share(CONFIG["pillars"]["movement"]) > 0.5
-    assert _behavioral_weight_share(CONFIG["pillars"]["sleep"]) == 0.0
+def test_neglect_atrophy_is_retired():
+    """#6293: no neglect machinery remains in the engine."""
+    assert not hasattr(ce, "neglect_decay_state")
+    assert not hasattr(ce, "_behavioral_weight_share")
 
 
 def _sheet_for_gap(gap_days, histories=None):
@@ -266,72 +255,60 @@ def _sheet_for_gap(gap_days, histories=None):
     return compute_character_sheet(data, None, histories, CONFIG)
 
 
-def test_ten_dark_days_level_score_strictly_decreasing_on_behavioral_pillar():
-    """With raw-score histories held constant, the only moving part is the
-    atrophy multiplier — 10 deepening dark days must drag the behavioral
-    pillar's level_score strictly down, day over day."""
+def test_dark_days_never_move_a_level_score():
+    """#6293 (inverts the #913 atrophy test): deepening dark days leave the behavioral pillar's level score where its
+    measured history put it — silence is not evidence of decline."""
     level_scores = [_sheet_for_gap(g)["pillar_movement"]["level_score"] for g in range(4, 14)]
-    assert all(b < a for a, b in zip(level_scores, level_scores[1:])), level_scores
+    assert len(set(level_scores)) == 1, level_scores
+    engaged = compute_character_sheet(
+        {"date": "2026-07-08", "sleep": {"sleep_duration_hours": 7.4, "sleep_performance": 88}, "engagement_state": None},
+        None,
+        {"movement": [55.0] * 21, "sleep": [70.0] * 21},
+        CONFIG,
+    )
+    assert level_scores[0] == engaged["pillar_movement"]["level_score"]  # the presence signal moves nothing
 
 
-def test_atrophy_tagged_on_pillar_and_floored_at_raw():
+def test_no_atrophy_tag_dark_or_engaged():
     rec = _sheet_for_gap(12)
-    mv = rec["pillar_movement"]
-    assert mv["neglect_decay"] is not None
-    assert mv["neglect_decay"]["applied"] is True
-    assert mv["level_score"] >= mv["raw_score"]  # the day itself is the floor
-    # sleep is device-measured — never atrophies
-    assert rec["pillar_sleep"]["neglect_decay"] is None
-
-
-def test_no_atrophy_when_engaged():
-    data = {
-        "date": "2026-07-08",
-        "sleep": {"sleep_duration_hours": 7.4, "sleep_performance": 88},
-        "engagement_state": {"presence_class": "present", "gap_days": 0},
-    }
-    rec = compute_character_sheet(data, None, {"movement": [55.0] * 21, "sleep": [70.0] * 21}, CONFIG)
     assert rec["pillar_movement"]["neglect_decay"] is None
+    assert rec["pillar_sleep"]["neglect_decay"] is None
     assert rec["neglect_decay"] is None
 
 
+def test_dark_presence_neither_bypasses_the_shield_nor_persists_the_down_streak():
+    """#6293: the #959 dark rules are gone — evaluate_level_changes takes no presence input at all."""
+    import inspect
+
+    assert "presence_dark" not in inspect.signature(evaluate_level_changes).parameters
+    prev = {"level": 30, "tier": "Momentum", "streak_above": 0, "streak_below": 6, "xp_total": 0, "xp_buffer": 30}
+    held = evaluate_level_changes("movement", 10.0, prev, CONFIG, data_coverage=1.0, raw_score=5.0)
+    assert held["level"] == 30  # the shield (30 >= 20) absorbs measured pressure, dark or not
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# 3 · P1 visible XP bleed
+# 3 · #6293: no XP debt, no decay
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def test_xp_debt_accumulates_across_dark_days():
-    """Once xp_total hits 0, further bad days deepen a VISIBLE debt."""
-    xp, debt = 0, 0
-    debts = []
-    for _ in range(5):  # raw 10 → band -1, decay 2 → -3/day
-        _, _, xp, debt = _compute_xp(10, xp, CONFIG, previous_debt=debt)
-        debts.append(debt)
-    assert debts == [3, 6, 9, 12, 15]
-    assert xp == 0
+def test_low_measured_days_earn_zero_never_debt():
+    xp, debt = 40, 0
+    for _ in range(5):
+        earned, delta, xp, debt = _compute_xp(10, xp, CONFIG, previous_debt=debt)
+        assert (earned, delta, debt) == (0, 0, 0)
+    assert xp == 40
 
 
-def test_good_days_pay_debt_before_growing_xp():
-    _, _, xp, debt = _compute_xp(85, 0, CONFIG, previous_debt=6)  # +3 - 2 = +1
-    assert (xp, debt) == (0, 5)
-    _, _, xp, debt = _compute_xp(85, 0, CONFIG, previous_debt=1)
-    assert (xp, debt) == (0, 0)
-    _, _, xp, debt = _compute_xp(85, 0, CONFIG, previous_debt=0)
-    assert (xp, debt) == (1, 0)
+def test_a_pre_amendment_debt_is_forgiven_not_collected():
+    _, _, xp, debt = _compute_xp(85, 0, CONFIG, previous_debt=60)
+    assert debt == 0
+    assert xp == 1  # gross band 3 less the legacy decay 2 this config carries: the day's own credit, nothing owed
 
 
-def test_xp_debt_capped():
-    _, _, xp, debt = _compute_xp(10, 0, CONFIG, previous_debt=99)
-    assert debt == 100  # leveling.xp_debt_cap — the hole stays climbable
-    assert xp == 0
-
-
-def test_xp_debt_surfaces_in_record_payload():
+def test_xp_debt_is_zero_in_the_record_payload():
     rec = _sheet_for_gap(10)
-    assert "xp_debt" in rec["pillar_movement"]
-    assert "character_xp_debt" in rec
-    # day 1 from zero prior state: raw ~0-ish behavioral pillar bleeds
-    assert rec["character_xp_debt"] >= 0
+    assert rec["pillar_movement"]["xp_debt"] == 0
+    assert rec["character_xp_debt"] == 0
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -154,7 +154,7 @@ def test_the_public_variant_carries_no_mind_number_and_says_why(histories):
     _, _, pub, _ = histories
     for d, block in pub.items():
         assert block["pillar_mind"] == character_privacy.not_scored_pillar("mind"), d
-        assert "mind" in block["headline_excluded_pillars"] and block["unscored_pillars"] == ["mind"], d
+        assert "mind" in block["headline_excluded_pillars"] and block["unscored_pillars"] == ["mind", "relationships"], d
         assert RW.mind_numbers(block) == [], d
         assert not [e for e in block.get("level_events") or [] if e.get("pillar") == "mind"], d
         for ev in block.get("level_events") or []:
@@ -217,7 +217,7 @@ def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed():
     assert view["active_effects"][0]["targets"] == {"movement": {"value": -0.08}}
     assert [e["type"] for e in view["level_events"]] == ["character_level_up"]
     assert view["level_events"][0]["drivers"] == [{"pillar": "sleep"}]
-    assert view["headline_excluded_pillars"] == ["relationships", "mind"]
+    assert view["headline_excluded_pillars"] == ["mind", "relationships"]  # #6293: both not scored in public
     assert RW.mind_numbers(view) == []
     assert view["pillar_sleep"] == record["public"]["pillar_sleep"]
 

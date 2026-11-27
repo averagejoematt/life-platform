@@ -174,10 +174,9 @@ def _replay_pillar(pillar: str, transition: dict, config: dict, day_number, engi
         raw_score=ins.get("raw_score"),
         unadjusted_level_score=ins.get("unadjusted_level_score"),
         raw_score_unblended=ins.get("raw_score_unblended"),
-        presence_dark=bool(ins.get("presence_dark")),
     )
     prev_xp = (prev or {}).get("xp_total", 0) or 0
-    prev_debt = (prev or {}).get("xp_debt", 0) or 0
+    prev_debt = 0  # #6293: XP debt is retired
     bonus_xp = ins.get("bonus_xp", 0) or 0
     xp_hold = bool(level_state.get("coverage_hold")) or bool(ins.get("not_instrumented"))
     xp_earned, xp_delta, new_xp, new_debt = engine.pillar_xp_transition(
@@ -187,7 +186,7 @@ def _replay_pillar(pillar: str, transition: dict, config: dict, day_number, engi
     xp_buffer = engine._roll_xp_buffer(
         (prev or {}).get("xp_buffer"),
         prev_xp,
-        new_xp,
+        prev_xp + engine.xp_shield_delta(ins.get("raw_score"), xp_hold, bonus_xp, config),  # #6293: the measured verdict
         leveling.get("xp_per_level", engine.DEFAULT_XP_PER_LEVEL),
         buffer_cap=leveling.get("xp_buffer_cap"),
     )
