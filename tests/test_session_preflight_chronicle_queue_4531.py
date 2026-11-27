@@ -65,3 +65,23 @@ def test_the_hook_prints_an_unverified_chronicle_line_when_inert():
     proc = subprocess.run([sys.executable, str(HOOK)], capture_output=True, text=True, timeout=60, env=env, cwd=ROOT)
     assert proc.returncode == 0, proc.stderr
     assert "  chronicle   UNVERIFIED (hook inert" in proc.stdout, proc.stdout
+
+
+def test_the_queue_reads_every_page(monkeypatch):
+    """2026-11-26: the 1 MB page limit applies before the projection; page 1 ended at DATE#2026-11-17 and the week-12
+    draft on page 2 never reached the boot line. The read follows LastEvaluatedKey."""
+    from unittest import mock
+
+    mod = _load()
+    monkeypatch.delenv("CLAUDE_HOOK_INERT", raising=False)
+    now = dt.datetime.now(dt.timezone.utc)
+    page1 = {"Items": [{"sk": "DATE#2026-11-10", "status": "published"}], "LastEvaluatedKey": {"k": 1}}
+    page2 = {"Items": [{"sk": "DATE#2026-11-24", "status": "draft", "week_number": Decimal(12), "generated_at": now.isoformat()}]}
+    table = mock.MagicMock()
+    table.query.side_effect = [page1, page2]
+    fake_boto3 = mock.MagicMock()
+    fake_boto3.resource.return_value.Table.return_value = table
+    monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
+    lines = mod._chronicle_queue()
+    assert any("DATE#2026-11-24" in ln and "DRAFT" in ln for ln in lines), lines
+    assert table.query.call_args_list[1].kwargs["ExclusiveStartKey"] == {"k": 1}

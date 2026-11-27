@@ -556,9 +556,9 @@ def publish_side_effects(item: dict, date_str: str, *, decline: dict | None = No
 # STALE-DRAFT SWEEP (SS-01) — a reminder, never a publisher (owner ruling 2026-11-13).
 # Until 2026-11-13 a daily schedule published any draft older than the review window that passed the deterministic
 # audit (#4694), so a week could reach subscribers that nobody approved. The owner ruled that elapsed time is never
-# consent: the sweep now publishes NOTHING. Every draft still unapproved past the window is held loudly (HELD_TOKEN →
-# the `chronicle-autopublish-held` alarm) every day it waits, with the audit's verdict, so the page says what an
-# approval would still need. Publication takes the owner's approve click AND a passing audit (`approval_refusal`).
+# consent: the sweep now publishes NOTHING. Every draft still unapproved past the window is held; the hold is announced
+# ONCE (HELD_TOKEN → the `chronicle-autopublish-held` alarm, on the first sweep past the window — owner ruling
+# 2026-11-26: no repeating daily reminder), with the audit's verdict, so the page says what an approval would still need. Publication takes the owner's approve click AND a passing audit (`approval_refusal`).
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -573,12 +573,21 @@ def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
     stale_before = now - hours * 3600.0  # must be older than this
     too_old_before = now - max_days * 86400.0  # but newer than this
     out: list[dict[str, Any]] = []
+    # Every page: chronicle rows carry full text, so one Query page (1 MB) stops weeks short of the newest draft
+    # (2026-11-26: page 1 ended at DATE#2026-11-17 with the week-12 draft on page 2) and the sweep went quiet on it.
+    items: list[dict[str, Any]] = []
+    kw: dict[str, Any] = {"KeyConditionExpression": Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#")}
     try:
-        resp = table.query(KeyConditionExpression=Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#"))
+        while True:
+            resp = table.query(**kw)
+            items += resp.get("Items", [])
+            if not resp.get("LastEvaluatedKey"):
+                break
+            kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     except Exception as exc:
         logger.error("sweep: DDB query failed: %s", exc)
         return out
-    for it in resp.get("Items", []):
+    for it in items:
         if it.get("status") != "draft":
             continue  # a published, changes_requested or RETIRED (#6178) row is never swept
         if not _publishable(it):
@@ -628,8 +637,20 @@ def approval_refusal(item: dict) -> list[str]:
     return [b for b in _audit_refusal(item) if not b.startswith("craft hold")]
 
 
+def _first_notice(item: dict, hours: float, now: datetime | None = None) -> bool:
+    """True on the ONE daily sweep that first finds this draft past the review window: its age is in
+    [hours, hours + 24). Owner ruling 2026-11-26: no repeating daily approval reminder — one notification per draft,
+    then silence. The window is read from the draft's own `generated_at`, so the sweep still writes nothing."""
+    try:
+        ts = datetime.fromisoformat(str(item.get("generated_at") or "").replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    age_h = ((now or datetime.now(timezone.utc)) - ts).total_seconds() / 3600.0
+    return hours <= age_h < hours + 24.0
+
+
 def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = False) -> list[dict]:
-    """HOLD every draft unapproved past the review window, loudly; publish nothing (owner ruling 2026-11-13).
+    """HOLD every draft unapproved past the review window; publish nothing (owner ruling 2026-11-13). Notify ONCE.
 
     Returns the held weeks. ``dry_run`` is kept for the scheduled event's shape; the sweep writes nothing either way."""
     held = []
@@ -637,18 +658,23 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
         date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
         wk = item.get("week_number", "?")
         blocking = _audit_refusal(item)
-        # The token raises the `chronicle-autopublish-held` alarm (the daily digest) every day the week sits unapproved
-        # inside the window, and the line names the week and what the audit still finds (an approval needs those too).
-        logger.error(
-            "%s Week %s (%s) held: unapproved for %sh, and elapsed time never publishes a chronicle (owner ruling "
-            "2026-11-13); approve it from the preview email. The audit found %d blocking item(s). %s",
-            HELD_TOKEN,
-            wk,
-            date_str,
-            hours,
-            len(blocking),
-            blocking,
-        )
+        if _first_notice(item, hours):
+            # The token raises the `chronicle-autopublish-held` alarm (the daily digest) — on the first sweep past the
+            # window only (owner ruling 2026-11-26: a single non-repeating notification, never a daily reminder). The
+            # line names the week and what the audit still finds (an approval needs those too).
+            logger.error(
+                "%s Week %s (%s) held: unapproved for %sh, and elapsed time never publishes a chronicle (owner ruling "
+                "2026-11-13); approve it from the preview email. The audit found %d blocking item(s). %s",
+                HELD_TOKEN,
+                wk,
+                date_str,
+                hours,
+                len(blocking),
+                blocking,
+            )
+        else:
+            # Still held, already announced once: recorded without the alarm token, so nothing repeats.
+            logger.info("chronicle draft Week %s (%s) still held, unapproved; the one notice has been given", wk, date_str)
         held.append({"date": date_str, "week": wk, "blocking": len(blocking)})
     logger.info("chronicle stale-draft sweep: %d draft(s) held, none published (hours=%s, dry_run=%s)", len(held), hours, dry_run)
     return held
