@@ -731,7 +731,10 @@ def describe_event(view: dict[str, Any], row: dict[str, Any]) -> dict[str, Any]:
         text = f"Retired: {row['reason']}"
     else:
         text = f"Reopened by Matthew, in his own words: {row['words']}"
-    return {"recorded_at": at, "kind": kind, "text": text}
+    line = {"recorded_at": at, "kind": kind, "text": text}
+    if kind == EV_OWNER_VIEW:  # #6294: the development profile counts his views by kind, never by parsing this text
+        line["view"] = row["view"]
+    return line
 
 
 def retirement_proposed(view: dict[str, Any]) -> bool:

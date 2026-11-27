@@ -5357,3 +5357,32 @@ STRUCTURAL_HAND_PROOFS["structural::test_personal_hypotheses_6292.py"] = {
     ),
     "proved_on": "2026-11-26",
 }
+
+# #6294 — the private personal-development profile (owner rulings 2026-11-26, epic #6284): per-domain status with its
+# evidence and evidence kind, no roll-up, absence never reads harder, interpretations never evidence, own ratings only
+# (never the model's), sick/travel days excluded, the life-domain tags queue-only and closed, the tool read-only, no
+# coach/web reader.
+STRUCTURAL_HAND_PROOFS["structural::test_development_profile_6294.py"] = {
+    "gate_name": "test_development_profile_6294.py",
+    "command": "python3 -m pytest tests/test_development_profile_6294.py -q -p no:randomly -p no:warnings   # baseline 27 passed",
+    "mutation": (
+        "Eleven plants, ONE AT A TIME, each restored from a copy: M1 combine() reads an insufficient indicator as worse; "
+        "M2 a lower recent count returns worse; M3 _statements drops the evidence-kind filter; M4 _self_rating falls back "
+        "to the enriched_<metric> model score; M5 an overall_score key added to the profile; M6 sick/travel days no longer "
+        "excluded; M7 the tool performs a put_item; M8 platform_memory lets an interpretation kind carry life_domains; "
+        "M9 a failed read in gather_inputs becomes an empty list; M10 records without owner_reviewed_at count; M11 a "
+        "planted lambdas/coach module imports health.development_profile."
+    ),
+    "observed": (
+        "2026-11-27, #6294 lane. BASELINE 27 passed. M1 11 failed; M2 1 failed; M3 2 failed; M4 4 failed; M5 1 failed; "
+        "M6 1 failed; M7 1 failed; M8 1 failed; M9 1 failed; M10 1 failed; M11 1 failed. REVERTED 27 passed."
+    ),
+    "scope": (
+        "The pure assembly over synthetic inputs; the real tool against a table that refuses every write, with the "
+        "shared readers stubbed; the real write_platform_memory + manage_pending_writes enqueue/approve over an in-memory "
+        "table; the static import graph of lambdas/web, content, emails, coach, ai, intelligence and compute; lambdas/web "
+        "for a module naming the profile. NOT SEEN: the live readers' row shapes (exercised once by the private dry "
+        "render, not here); a dynamic import by string; a coach that reads the corrections ledger without a surface filter."
+    ),
+    "proved_on": "2026-11-27",
+}
