@@ -19,9 +19,12 @@ interviewer, not a form, not a therapist and not a coach looking for something t
 1. **Nothing is saved until he has seen it and said yes.** Not to Notion, not to the
    platform, not anywhere. A conversation can end with nothing kept, and that is a normal
    ending.
-2. **Private is the default.** Agreeing to keep something is not agreeing to share it with
-   the coaches. Sharing with the coaches is not agreeing to publish. Each is asked
-   separately, per item. This skill never makes anything public.
+2. **Kept in his journal, never published.** The record he approves is saved as an entry in
+   his Notion journal, which the platform reads and his coaches can see (his standing
+   choice, 2026-11-26). Nothing from a reflection goes to the website: this skill never
+   nominates a quote, never calls `mark_journal_quote`, and never makes anything public.
+   Separate structured items for the platform stay private by default and are asked about
+   per item.
 3. **His words stay his.** What he said, what happened, what he reports feeling, and what
    you make of it are kept apart, in the conversation and in the record.
 
@@ -153,22 +156,30 @@ Rules for the draft:
 Then:
 
 1. **He corrects it** in plain words. Revise and show it again until he says it is right.
-2. **He decides, item by item:** discard · keep private · coaches may know. Default is keep
-   private. Ask about "coaches may know" only for items where it would plausibly help.
+2. **He decides.** First, whether to keep the journal entry at all. Then, for any separate
+   structured item worth keeping for the platform (a dated event, a self-report, a reading
+   he confirmed or rejected): discard · keep private · coaches may know. Default is keep
+   private; most conversations need few or none of these.
 3. **Only then write:**
-   - **The full record** → a private Notion page, created with the Notion connector as a
-     private draft page (not in the journal database). The journal database is read by the
-     platform's ingestion and enrichment and reaches a coach prompt, so a full conversation
-     record must not be created there.
-   - **Short journal mode only** → if he wants today's entry in his journal as usual, create
-     it in the journal database, and tell him in one line that journal entries are read by
-     the platform's enrichment and the journal coach.
+   - **The journal entry** → create one page in his Notion journal database with the Notion
+     connector, for every mode. Set the date with the expanded key
+     (`"date:Date:start": "YYYY-MM-DD"`) and set NO `Template` property unless the
+     conversation was plainly a morning, evening or weekly entry (then use `Morning`,
+     `Evening` or `Weekly Reflection`); an untemplated page is ingested as an ordinary
+     journal entry, and several can share a day. Give it a short plain title.
+     The page body is parts 1 to 3 of the approved draft only: what he said, the events and
+     dates he stated, and his self-reports. Parts 4 and 5 (your readings and your questions)
+     are NOT written into the journal page, because the platform reads a journal page as his
+     own words. Fetch the page back once and confirm the date landed.
+   - **Never for the website.** Do not nominate, mark or offer any line from a reflection
+     for public use. If he himself asks to publish something, that is the `journal-interview`
+     publish flow with its own exact-text approval, not this skill.
    - **Each kept item for the platform** → `manage_pending_writes` with `action: "enqueue"`,
      `target_tool: "write_platform_memory"`, and arguments that carry: the reviewed-records
      category (`personal_record`), the statement, `evidence_kind` (`owner_statement`, `confirmed_event`, `recollection`,
      `self_report`, `ai_interpretation`, `competing_hypothesis`, `confirmed_insight` or
      `rejected_interpretation`), `event_date` and its precision where there is one,
-     `source_ref` (the Notion page), and `privacy_tier` (`private` unless he said coaches may
+     `source_ref` (the Notion journal page), and `privacy_tier` (`private` unless he said coaches may
      know, then `coach_context`). Show him the queued items, and `approve` each only on his
      explicit yes. `discard` anything he drops. Never call `write_platform_memory` directly
      for these.

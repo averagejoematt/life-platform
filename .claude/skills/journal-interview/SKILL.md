@@ -87,7 +87,8 @@ ending.
   keep his exact phrases where they carry the meaning.
 - Say once, the first time in a session: a page in the journal database is read by the
   platform's enrichment and can reach the journal coach. If he wants something kept out of
-  that, it belongs in a `reflect` conversation's private record, not in this entry.
+  that, leave it out of the entry. Nothing in the journal is published without his
+  separate, per-line approval.
 
 ### 4. Write the page — the date-key gotcha is load-bearing, don't skip it
 

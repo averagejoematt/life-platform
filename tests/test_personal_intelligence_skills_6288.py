@@ -86,9 +86,11 @@ def test_reflect_carries_every_mode_in_one_skill(mode):
 
 REFLECT = [
     ("nothing is saved until he has seen it and said yes", "review before save"),
-    ("private is the default", "private by default"),
-    ("sharing with the coaches is not agreeing to publish", "three separate permissions"),
     ("never makes anything public", "no public path from this skill"),
+    ("kept in his journal, never published", "owner ruling 2026-11-26: reflections go to the journal, coaches may see them"),
+    ("never calls `mark_journal_quote`", "nothing from a reflection is nominated for the website"),
+    ("parts 4 and 5 (your readings and your questions) are not written into the journal page", "the journal page holds only his words"),
+    ("stay private by default", "structured platform items remain private unless he says otherwise"),
     ("one question at a time", "not a questionnaire"),
     ("light, medium or deep", "he sets the depth"),
     ("never opened by you", "loss is his to raise"),
@@ -97,7 +99,6 @@ REFLECT = [
     ("rival", "an interpretation carries a rival reading"),
     ("never load the whole journal", "earlier material by excerpt only"),
     ("he has excluded", "owner exclusions are honoured"),
-    ("not in the journal database", "a full record must not enter the ingested journal database"),
     ("never call `write_platform_memory` directly", "platform records go through the queue"),
     ("rejected_interpretation", "a rejected reading is kept so it is not proposed again"),
     ("stop exploring", "distress stops the interview"),
