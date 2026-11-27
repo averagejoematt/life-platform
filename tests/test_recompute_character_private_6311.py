@@ -132,9 +132,13 @@ def _pillar(name: str, i: int, cfg: dict, stale_stress: bool = False) -> dict:
     return {"raw_score": raw, "components": det, "level": 1, "xp_total": 0, "xp_debt": 4 if i else 0}
 
 
+SICK_DAY = 7  # a sick-day freeze row: a verbatim copy of day 6, a stale-stress day (6 % 3 == 0)
+
+
 def seed_store(n: int = N_DAYS, receipts: bool = True, challenge_day: int = 3) -> StubStore:
     cfg = _cfg()
     st = StubStore()
+    prev_rec: dict = {}
     for i in range(n):
         d = _d(i)
         rec = {
@@ -158,6 +162,9 @@ def seed_store(n: int = N_DAYS, receipts: bool = True, challenge_day: int = 3) -
         rec["pillar_consistency"] = {"components": {"data_completeness": {"score": 80.0, "weight": 0.2}}, "level": 1}
         if i == challenge_day:
             rec["challenge_bonus_xp"] = {"movement": 5}
+        if i == SICK_DAY:  # the compute's freeze: the previous record copied, re-dated, flagged
+            rec = dict(copy.deepcopy(prev_rec), sk=f"DATE#{d}", date=d, sick_day=True, sick_day_reason="synthetic", frozen_from=_d(i - 1))
+        prev_rec = rec
         st.seed(floats_to_decimal(rec, precision=4))
         if receipts and i % 2 == 0:
             st.seed(
@@ -549,3 +556,19 @@ def test_planned_sheets_reader_gives_the_public_side_the_stored_shape(seeded, tm
     assert one["public"] == {"character_level": 1.0, "origin": "synthetic"}
     assert one["pillar_relationships"].get("not_instrumented") is True and "raw_score" not in one["pillar_relationships"]
     assert one[T.PROVENANCE]["kind"] == T.PROVENANCE_KIND
+
+
+def test_a_sick_day_freeze_copy_of_a_stale_stress_day_counts_and_is_rewritten(seeded):
+    _store, plan = seeded
+    sd = plan["stress_days"]
+    stale = sorted({_d(i) for i in range(N_DAYS) if i % 3 == 0} | {_d(SICK_DAY)})
+    assert sd["stored_with_stress"] == stale
+    assert sd["sick_day_frozen_copies"] == [_d(SICK_DAY)]
+    assert "sick-day freeze copy included" in sd["definition"]
+    row = next(r for r in plan["rows"] if r["pk"] == T.SHEET_PK and r["date"] == _d(SICK_DAY))
+    prev = next(r for r in plan["rows"] if r["pk"] == T.SHEET_PK and r["date"] == _d(SICK_DAY - 1))
+    assert row["action"] == "write"
+    planned, planned_prev = T.as_float(row["planned_item"]), T.as_float(prev["planned_item"])
+    assert planned["sick_day"] is True and planned["frozen_from"] == _d(SICK_DAY - 1)  # the freeze fields kept as stored
+    assert planned["pillar_mind"] == planned_prev["pillar_mind"]  # the copy follows the RECOMPUTED previous day
+    assert planned["pillar_mind"]["components"]["stress_management"].get("held_out") is True

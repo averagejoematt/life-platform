@@ -177,6 +177,10 @@ CAUSES_LEGEND = {
     "method_version_stamp": "engine_version / config_hash of the amended method",
     "recompute_provenance": "the recompute's own provenance attribute",
 }
+STRESS_DAY_DEFINITION = (
+    "a stored sheet whose Mind counts the evening-check-in stress score (stress_management carries a score and no "
+    "held_out flag), which today's method holds out (#5129) — every such row, a sick-day freeze copy included"
+)
 _IGNORE_STEP = ("computed_at", "engine_version")
 
 
@@ -779,6 +783,10 @@ def dry_run(
             "mind_raw_changed_by_stress_step": stress_direct,
             "same_set": sdays == stress_direct,
             "changed_only_through_the_chain": sorted(set(stress_changed) - set(stress_direct)),
+            # a sick-day freeze row copies the previous day's Mind verbatim: it carries the stale contribution too (and
+            # is rewritten from the recomputed previous day), but it is not an independently computed day
+            "sick_day_frozen_copies": sorted(d for d in sdays if snap["sheets"][d].get("sick_day")),
+            "definition": STRESS_DAY_DEFINITION,
         },
         "preserved_non_engine_attributes": R.preserved_attributes(rows),
         "receipts_self_replay_verified": sum(

@@ -318,6 +318,11 @@ def summary_md(plan: dict, preliminary: bool = False) -> str:
         f"## Stress days: stored with a counted stress score {len(sd['stored_with_stress'])}; Mind raw changed by the stress "
         f"step {len(sd['mind_raw_changed_by_stress_step'])} (same set: {sd['same_set']}); later dates moved only through the "
         f"chain {len(sd['changed_only_through_the_chain'])}",
+        f"   - definition: {sd['definition']}",
+        f"   - of these, independently computed days {len(sd['stored_with_stress']) - len(sd['sick_day_frozen_copies'])} and "
+        f"sick-day freeze copies {len(sd['sick_day_frozen_copies'])} ({', '.join(sd['sick_day_frozen_copies']) or 'none'}): a "
+        "freeze row copies the previous day's Mind verbatim, so it carries the stale contribution without being a computed day",
+        f"   - Mind raw changed by the stress step on exactly the stored set: {sd['same_set']}",
         f"## Receipts whose planned self-replay verifies: {plan['receipts_self_replay_verified']} of {c['character_receipt']['rows_read']}",
         "",
         "## Events (reported only; the #6283 reconciliation writes them)",
