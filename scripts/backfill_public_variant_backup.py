@@ -85,19 +85,23 @@ def content_digest(body: bytes) -> str:
 
 
 def backup_export(store: Any, export: dict, public_plan_id: str, phase: str, local_path: str) -> dict:
-    """Write and verify the pre-image backup (local + S3) BEFORE any write. Raises BackupError (no write) on any failure."""
+    """Write and verify the pre-image backup (local + S3) BEFORE any write. Raises BackupError (no write) on any failure.
+
+    The local copy is STAGED as ``<local_path>.pending`` (no ``.sha256`` beside it, so ``load_export`` refuses it) and
+    becomes ``<local_path>`` + ``.sha256`` only once the S3 copy is written and read back to its hash — a failed or
+    refused put never leaves a local file that looks like a completed backup (the same rule as the private tool's
+    ``put_verified_backup``)."""
     body = body_of(export)
     sha = hashlib.sha256(body).hexdigest()
+    pending = local_path + ".pending"
     try:
-        with open(local_path, "wb") as fh:
+        with open(pending, "wb") as fh:
             fh.write(body)
-        with open(local_path + ".sha256", "w", encoding="utf-8") as fh:
-            fh.write(sha + "\n")
-        with open(local_path, "rb") as fh:
+        with open(pending, "rb") as fh:
             if hashlib.sha256(fh.read()).hexdigest() != sha:
-                raise BackupError("the local export does not read back to its hash — no write made")
+                raise BackupError("the staged local export does not read back to its hash — no write made")
     except OSError as exc:
-        raise BackupError(f"the local export could not be written ({exc}) — no write made") from exc
+        raise BackupError(f"the local export could not be staged ({exc}) — no write made") from exc
     key = backup_key(public_plan_id, phase)
     resumed = False
     try:
@@ -107,10 +111,8 @@ def backup_export(store: Any, export: dict, public_plan_id: str, phase: str, loc
         if content_digest(existing) != content_digest(body):
             raise BackupError(f"a DIFFERENT backup already exists at {key} — stop (roll back from it, or re-plan) — no write made")
         resumed, body, sha = True, existing, hashlib.sha256(existing).hexdigest()
-        with open(local_path, "wb") as fh:  # the backup of record is the existing one: the local copy follows it
+        with open(pending, "wb") as fh:  # the backup of record is the existing one: the local copy follows it
             fh.write(body)
-        with open(local_path + ".sha256", "w", encoding="utf-8") as fh:
-            fh.write(sha + "\n")
     except Exception as exc:  # noqa: BLE001 — any put failure aborts
         raise BackupError(f"the S3 backup put failed ({exc}) — no write made") from exc
     try:
@@ -125,6 +127,9 @@ def backup_export(store: Any, export: dict, public_plan_id: str, phase: str, loc
         raise
     except Exception as exc:  # noqa: BLE001
         raise BackupError(f"the S3 backup could not be verified ({exc}) — no write made") from exc
+    os.replace(pending, local_path)  # the S3 copy verified: only now does the local file claim a backup
+    with open(local_path + ".sha256", "w", encoding="utf-8") as fh:
+        fh.write(sha + "\n")
     return {"key": key, "sha256": sha, "local": local_path, "resumed": resumed}
 
 

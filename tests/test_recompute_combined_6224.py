@@ -619,7 +619,33 @@ def test_the_backup_section_states_the_owners_four_points_in_order(tmp_path):
     assert "private path was not independently exercised against real S3 because permission was denied." in lines[2]
     assert lines[3].startswith("3. The operative safeguard") and "zero data writes" in lines[3]
     assert lines[4].startswith("4. The synthetic probe objects are retained")
-    assert "pending" not in text.lower() and "optional" not in text.lower() and "has not run" not in text.lower()
+    low = text.lower()  # no wording that a second probe is pending or optional
+    assert not any(w in low for w in ("second probe", "probe is pending", "probe pending", "optional", "has not run", "may be added"))
     for name in S.SAFEGUARD_TESTS["public"] + S.SAFEGUARD_TESTS["private"]:  # every cited test exists
         path, test = name.split("::")
         assert f"def {test}(" in open(os.path.join(ROOT, path), encoding="utf-8").read(), name
+
+
+def test_a_failed_or_refused_backup_put_leaves_no_local_export_claiming_a_backup(private, tmp_path):
+    """The same gap the private tool closed (#6311): a failed put, a refused put of a different export, or a read-back
+    mismatch leaves only a ``.pending`` staging file — no ``<export>.json`` and no ``.sha256`` — and ``load_export``
+    refuses the staging file. A verified backup renames it into place (control)."""
+    store, pub, pid = _applied_private(private, tmp_path)
+    table = PublicAdapter(store)
+    export = B.build_export(lambda k: table.get_item(Key=k).get("Item"), pub, TS)
+    local = tmp_path / "export_pre-merge.json"
+    with pytest.raises(BK.BackupError):
+        BK.backup_export(StubS3(fail_put=True), export, pid, "pre-merge", str(local))
+    assert not local.exists() and not (tmp_path / "export_pre-merge.json.sha256").exists()
+    assert (tmp_path / "export_pre-merge.json.pending").exists()
+    with pytest.raises(BK.BackupError, match="no recorded sha256"):
+        BK.load_export(str(tmp_path / "export_pre-merge.json.pending"), None)
+    mismatch = StubS3()
+    mismatch.get = lambda key: b"{}"  # the S3 copy does not read back
+    with pytest.raises(BK.BackupError, match="does not read back"):
+        BK.backup_export(mismatch, export, pid, "pre-merge", str(local))
+    assert not local.exists()
+    ok = BK.backup_export(StubS3(), export, pid, "pre-merge", str(local))  # control
+    assert local.exists() and (tmp_path / "export_pre-merge.json.sha256").exists() and ok["resumed"] is False
+    assert not (tmp_path / "export_pre-merge.json.pending").exists()
+    assert BK.load_export(str(local), None)["entries"] == json.loads(BK.body_of(export))["entries"]

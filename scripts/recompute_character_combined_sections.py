@@ -515,11 +515,15 @@ SAFEGUARD_TESTS = {
         "tests/test_recompute_combined_6224.py::test_the_backup_is_written_and_verified_before_the_first_write",
         "tests/test_recompute_combined_6224.py::test_a_failing_backup_put_aborts_with_zero_writes",
         "tests/test_recompute_combined_6224.py::test_an_existing_matching_backup_resumes_and_a_different_one_stops",
+        "tests/test_recompute_combined_6224.py::test_a_failed_or_refused_backup_put_leaves_no_local_export_claiming_a_backup",
     ),
     "private": (
         "tests/test_recompute_character_private_6311.py::test_backup_is_verified_before_the_first_write",
-        "tests/test_recompute_character_private_6311.py::test_a_resume_refuses_a_local_export_that_differs_from_the_s3_preimage",
-        "tests/test_recompute_character_private_6311.py::test_a_resume_after_an_outside_write_stops_and_directs_to_rollback",
+        "tests/test_recompute_character_private_6311.py::test_a_failed_backup_put_stops_the_apply_with_zero_writes_and_no_local_export",
+        "tests/test_recompute_character_private_6311.py::test_a_failed_backup_put_through_the_cli_exits_non_zero_with_zero_writes",
+        "tests/test_recompute_character_private_6311.py::test_a_412_on_the_first_backup_put_stops_with_zero_writes",
+        "tests/test_recompute_character_private_6311.py::test_an_existing_backup_of_a_different_export_stops_with_zero_writes",
+        "tests/test_recompute_character_private_6311.py::test_the_backup_put_and_read_back_precede_every_row_write",
     ),
 }
 
@@ -552,7 +556,8 @@ def probe_lines(c: dict) -> list:
         "bucket-default encryption) through its own function `put_verified_backup`, and has "
         f"{PRIVATE_BACKUP_TESTS} tests on stand-in storage.",
         "3. The operative safeguard, a rule BOTH tools satisfy: the backup is created and verified BEFORE any historical "
-        "scoring record is modified; a failed backup or a mismatch stops the migration with zero data writes. Proven on "
+        "scoring record is modified; a failed backup or a mismatch stops the migration with zero data writes, and leaves no "
+        "local export claiming a backup (staged as `.pending` until the S3 copy verifies). Proven on "
         "stubs — public: "
         + "; ".join(f"`{t}`" for t in SAFEGUARD_TESTS["public"])
         + "; private: "
