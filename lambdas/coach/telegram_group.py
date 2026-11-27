@@ -122,6 +122,19 @@ def who_speaks(*, mentions, reply_to_bot, my_username, is_chair) -> bool:
     return bool(is_chair)
 
 
+def safety_speaker(*, mentions, reply_to_bot, my_username, is_chair) -> bool:
+    """Whether THIS worker sends the room's fixed safety reply (#6303). Exactly one does.
+
+    ``who_speaks`` lets every mentioned coach answer; a fixed support reply sent by three bots
+    at once would read as an alarm going off. So the first roster mention wins, then the
+    replied-to coach, then the chair. Pure, and identical in every worker, like the room rule.
+    """
+    coach_mentions = [m for m in (mentions or []) if BOT_MENTION.match(m or "")]
+    if coach_mentions:
+        return bool(my_username) and my_username == coach_mentions[0]
+    return who_speaks(mentions=[], reply_to_bot=reply_to_bot, my_username=my_username, is_chair=is_chair)
+
+
 def first_private_chat_id(chat_ids) -> Optional[object]:
     """The first PRIVATE (positive) chat id — the only kind outbound may text.
 
@@ -174,12 +187,29 @@ def group_turn(order: dict, token: str) -> dict:
     coach_id = order["coach_id"]
     chat_id = order["chat_id"]
     me = bot_username(token)
-    speak = who_speaks(
-        mentions=order.get("mentions") or [],
-        reply_to_bot=order.get("reply_to_bot"),
-        my_username=me,
-        is_chair=(coach_id == CHAIR_ROUTE),
+    room = dict(
+        mentions=order.get("mentions") or [], reply_to_bot=order.get("reply_to_bot"), my_username=me, is_chair=(coach_id == CHAIR_ROUTE)
     )
+
+    # #6303: the owner-channel safety gate. Every worker classifies the same text identically;
+    # exactly one (``safety_speaker``) sends the fixed reply, every other one stays silent, and
+    # NO worker runs a coaching turn on it. Fails safe, like the 1:1 path.
+    from coach import owner_safety
+
+    gate = owner_safety.screen(order.get("text") or "", on_error=lambda: worker._emit_metric(owner_safety.METRIC_ERROR, coach_id))
+    if gate.hazard:
+        if not safety_speaker(**room):
+            return {"ok": True, "reason": "group_listener"}
+        return owner_safety.answer(
+            gate,
+            send=lambda reply: worker._send_text(token, chat_id, reply),
+            table=worker._table,
+            partition_id=ROOM_ID,
+            date_pt=worker._pacific_now().strftime("%Y-%m-%d"),
+            emit=lambda name: worker._emit_metric(name, coach_id),
+        )
+
+    speak = who_speaks(**room)
     if not speak:
         # The silent half of the room is invisible by design — the metric is the
         # only witness that N-1 workers each decided "not me" rather than died.

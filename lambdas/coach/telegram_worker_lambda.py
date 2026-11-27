@@ -1187,8 +1187,13 @@ def lambda_handler(event: dict, context: object) -> dict:  # noqa: ARG001 — La
     # a coach for a chatty reply instead.
     from privacy import progress_access
 
-    if progress_access.is_view_command(text):
-        return _progress_view(order)
+    from coach import owner_safety
+
+    # #6303: the owner-channel safety gate runs FIRST of these deterministic answers, before every path
+    # that could answer him otherwise (check-in capture, reaction, model turn). It returns None for a
+    # group order (the room gates in group_turn, after choosing its ONE speaker) and fails safe.
+    if answered := owner_safety.gate_direct(order, token) or (_progress_view(order) if progress_access.is_view_command(text) else None):
+        return answered
 
     # #5106: the evening check-in reply ("2 3 1 tired" / "/checkin ...") is captured, never sent to a coach turn.
     from coach.evening_checkin import capture_reply
