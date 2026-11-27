@@ -30,7 +30,8 @@ RUN (every path but --apply/--rollback --apply is read-only behind a proxy that 
   python3 scripts/recompute_character_private.py --out DIR                       # DRY RUN: the ladder + plan.json,
                                                                                  #   per_date.csv, SUMMARY.md
   python3 scripts/recompute_character_private.py --out DIR --verify              # 0 planned writes, or exit 1
-  python3 scripts/recompute_character_private.py --out DIR --apply --plan-in P [--phase sheets|receipts|all] [--limit N]
+  python3 scripts/recompute_character_private.py --out DIR --preflight --plan-in P         # read-only backup preconditions
+  python3 scripts/recompute_character_private.py --out DIR --apply --plan-in P --approved-plan-id ID [--phase ...] [--limit N]
   python3 scripts/recompute_character_private.py --out DIR --rollback EXPORT [--apply]
 
 ``--apply`` re-derives the plan and refuses unless it reproduces ``--plan-in`` exactly, exports and verifies the
@@ -79,6 +80,15 @@ LADDER STATES (``ladder_states`` in the plan; additive, outside the plan id; rea
   (``/api/character``'s composite rule); a pillar with no number (Relationships under the amended method) is
   {"raw_score": None, "level": None}. The first step at which a value differs from the previous step's (or, for
   replay_residual, from the stored row) is the step that produced the change.
+
+PLANNED STATES (``planned_states``; additive, outside the plan id; ``recompute_character_private_apply.planned_states``)
+— {date: state} computed FROM THE PLANNED ITEMS in the same state shape. The dry run refuses unless the last ladder step's
+states equal it on every field of every date, composite included (``check_final_state``).
+
+APPROVAL. ``--apply`` refuses (exit 4, before any backup or write) unless ``--approved-plan-id`` equals the plan file's
+id AND the id re-derived from the live rows. ``--preflight --plan-in P`` is read-only: ListObjectsV2 shows no backup
+exists yet under this plan id's prefix, GetBucketVersioning shows the bucket versioned; the conditional put itself
+cannot be verified without a write.
 
 STORED STATES (``stored_states``; additive, outside the plan id; ``recompute_character_private_apply.stored_states``)
 — {date: state} of the STORED rows in the same state shape: the baseline the first step (replay_residual) is compared
@@ -407,6 +417,15 @@ class LiveStore:
             if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
                 raise ConditionFailed(f"{item.get('pk')} {item.get('sk')}") from e
             raise
+
+    def list_backups(self, prefix: str) -> list:
+        """Keys under ``prefix`` (ListObjectsV2, a read)."""
+        resp = self.s3.list_objects_v2(Bucket=self.bucket, Prefix=prefix, MaxKeys=1000)
+        return [o["Key"] for o in resp.get("Contents", [])]
+
+    def bucket_versioning(self) -> Optional[str]:
+        """The bucket's versioning status (GetBucketVersioning, a read): "Enabled", "Suspended" or None."""
+        return self.s3.get_bucket_versioning(Bucket=self.bucket).get("Status")
 
     def put_backup(self, key: str, body: bytes) -> None:
         self.s3.put_object(Bucket=self.bucket, Key=key, Body=body, IfNoneMatch="*", ContentType="application/json")
@@ -795,6 +814,8 @@ def dry_run(
         "attribution": attribution,
         "ladder_states": R.ladder_states(ladder_f),
         "stored_states": {d: R.chain_state(r) for d, r in sorted(stored_f.items())},
+        # the planned items' own state, computed from the planned items (not copied from the ladder) — cross-checked below
+        "planned_states": {d: R.chain_state(r) for d, r in sorted(planned_f.items())},
         "accounting": accounting,
         "counts": R.counts(rows, snap),
         "stress_days": {
@@ -805,6 +826,7 @@ def dry_run(
             # a sick-day freeze row copies the previous day's Mind verbatim: it carries the stale contribution too (and
             # is rewritten from the recomputed previous day), but it is not an independently computed day
             "sick_day_frozen_copies": sorted(d for d in sdays if snap["sheets"][d].get("sick_day")),
+            "computed_days": sorted(d for d in sdays if not snap["sheets"][d].get("sick_day")),
             "definition": STRESS_DAY_DEFINITION,
         },
         "preserved_non_engine_attributes": R.preserved_attributes(rows),
@@ -817,6 +839,8 @@ def dry_run(
         "notes": {n: results[n].get("notes") for n, _c, _s in ladder[-1:]},
         "invisible_sheets_in_window": snap["invisible_sheets"],
     }
+    R.check_final_state(plan["ladder_states"], plan["planned_states"])  # every field, composite included; else refuse
+    plan["stress_days"]["accounting"] = R.check_stress_days(plan["stress_days"], rows)  # distinct, 46 + 1, all written
     return plan
 
 
@@ -854,6 +878,8 @@ def main(argv: list) -> int:
     ap.add_argument("--limit", type=int, help="write at most N rows this run (resumable)")
     ap.add_argument("--rollback", help="an export file: restore its pre-images (dry run unless --apply)")
     ap.add_argument("--preliminary", action="store_true", help="head the summary as preliminary (not the dry run for approval)")
+    ap.add_argument("--approved-plan-id", help="--apply only: the plan id the owner approved (must equal the file's and the live one)")
+    ap.add_argument("--preflight", action="store_true", help="read-only: with --plan-in, check the backup preconditions")
     args = ap.parse_args(argv)
     out_dir = refuse_in_repo(args.out)
     os.makedirs(out_dir, exist_ok=True)
@@ -870,13 +896,27 @@ def main(argv: list) -> int:
         result = A.verify(live_store(writable=False), out_dir, args.start, args.end)
         print(json.dumps({"rows": result["rows"], "planned_writes": result["planned_writes"]}))
         return 0 if result["planned_writes"] == 0 else 1
+    if args.preflight:
+        if not args.plan_in:
+            ap.error("--preflight needs --plan-in")
+        result = A.preflight(live_store(writable=False), A.load_plan(args.plan_in))
+        print(json.dumps(result, indent=1))
+        return 0 if result["ok"] else 1
     if args.apply:
         if not args.plan_in:
             ap.error("--apply needs --plan-in (the approved plan)")
         plan = A.load_plan(args.plan_in)
+        refusal = A.check_approval(args.approved_plan_id, plan)  # before any read-back, backup or write
+        if refusal:
+            print(f"REFUSED: {refusal}", file=sys.stderr)
+            return 4
         fresh = dry_run(
             live_store(writable=False), out_dir, plan["window"]["start"], plan["window"]["end"], planned_at=plan["generated_at"]
         )
+        refusal = A.check_approval(args.approved_plan_id, plan, fresh["plan_id"])
+        if refusal:
+            print(f"REFUSED: {refusal}", file=sys.stderr)
+            return 4
         if fresh["plan_id"] != plan["plan_id"] or any(
             a.get("planned_digest") != b.get("planned_digest") for a, b in zip(fresh["rows"], plan["rows"])
         ):
@@ -886,7 +926,9 @@ def main(argv: list) -> int:
         if later:
             print(f"REFUSED: stored sheets exist after the plan's window ({later[:3]}…) — re-plan to include them", file=sys.stderr)
             return 3
-        result = A.apply_plan(live_store(writable=True), plan, out_dir, args.phase, now, args.from_date, args.limit)
+        result = A.apply_plan(
+            live_store(writable=True), plan, out_dir, args.phase, now, args.from_date, args.limit, approved_plan_id=args.approved_plan_id
+        )
         print(json.dumps({"written": len(result["written"]), "aborted": len(result["aborted"]), "export": result["export"]}, indent=1))
         return 0 if not result["aborted"] and all(w["verified"] for w in result["written"]) else 2
     plan = dry_run(live_store(writable=False), out_dir, args.start, args.end, planned_at=now)

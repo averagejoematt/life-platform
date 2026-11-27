@@ -19,6 +19,7 @@ from recompute_character_private import (  # noqa: E402
     ROOT,
     SHEET_PK,
     WRITTEN_PARTITIONS,
+    PlanGuardError,
     as_float,
     canonical,
     digest,
@@ -323,6 +324,9 @@ def summary_md(plan: dict, preliminary: bool = False) -> str:
         f"sick-day freeze copies {len(sd['sick_day_frozen_copies'])} ({', '.join(sd['sick_day_frozen_copies']) or 'none'}): a "
         "freeze row copies the previous day's Mind verbatim, so it carries the stale contribution without being a computed day",
         f"   - Mind raw changed by the stress step on exactly the stored set: {sd['same_set']}",
+        f"   - asserted: distinct {sd['accounting']['distinct']} of {sd['accounting']['dates']} · computed "
+        f"{sd['accounting']['computed_days']} + freeze copies {sd['accounting']['sick_day_frozen_copies']} · planned writes "
+        f"{sd['accounting']['planned_writes']}",
         f"## Receipts whose planned self-replay verifies: {plan['receipts_self_replay_verified']} of {c['character_receipt']['rows_read']}",
         "",
         "## Events (reported only; the #6283 reconciliation writes them)",
@@ -386,3 +390,44 @@ def chain_state(rec: Optional[dict]) -> Optional[dict]:
 def ladder_states(ladder_f: list) -> dict:
     """{cause: {date: chain_state}} for every ladder step, in ladder order (each step's records, cumulative)."""
     return {cause: {d: chain_state(r) for d, r in sorted(recs.items())} for cause, recs in ladder_f}
+
+
+STATE_FIELDS = ("character_level", "character_xp", "composite", "pillars", "events")
+
+
+def check_final_state(ladder_states: dict, planned_states: dict) -> None:
+    """The last ladder step's states must equal the states computed from the planned items, on every field of every date
+    (composite included). Raises PlanGuardError naming the dates and fields that differ."""
+    last = ladder_states[list(ladder_states)[-1]] if ladder_states else {}
+    bad = []
+    for d in sorted(set(last) | set(planned_states)):
+        a, b = last.get(d) or {}, planned_states.get(d) or {}
+        fields = [f for f in STATE_FIELDS if a.get(f) != b.get(f)]
+        if fields or (d in last) != (d in planned_states):
+            bad.append(f"{d}: {', '.join(fields) or 'missing'}")
+    if bad:
+        raise PlanGuardError(f"the last ladder step does not equal the planned final state: {bad[:10]}")
+
+
+def check_stress_days(sd: dict, rows: list) -> dict:
+    """The stress-affected dates are distinct, number exactly computed days + sick-day freeze copies, and are each a
+    planned sheet write. Returns the numbers; raises PlanGuardError otherwise."""
+    dates, computed, frozen = list(sd["stored_with_stress"]), list(sd["computed_days"]), list(sd["sick_day_frozen_copies"])
+    writes = {r["date"] for r in rows if r["pk"] == SHEET_PK and r["action"] == "write"}
+    out = {
+        "dates": len(dates),
+        "distinct": len(set(dates)),
+        "computed_days": len(computed),
+        "sick_day_frozen_copies": len(frozen),
+        "planned_writes": len(set(dates) & writes),
+    }
+    problems = []
+    if out["distinct"] != out["dates"]:
+        problems.append("a date appears twice")
+    if set(computed) & set(frozen) or set(computed) | set(frozen) != set(dates) or len(computed) + len(frozen) != out["distinct"]:
+        problems.append("computed days + freeze copies do not make up the set")
+    if out["planned_writes"] != out["distinct"]:
+        problems.append(f"not a planned write: {sorted(set(dates) - writes)[:5]}")
+    if problems:
+        raise PlanGuardError(f"stress-day accounting fails: {'; '.join(problems)}")
+    return out

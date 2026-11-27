@@ -72,6 +72,49 @@ def ladder_states(plan_path: str) -> dict:
     return {c: states[c] for c in order if c in states}
 
 
+def planned_states(plan_path: str) -> dict:
+    """{date: state} computed FROM THE PLANNED ITEMS, in exactly the ``ladder_states`` state shape (the dry run asserts
+    the last ladder step equals it on every field). Integrity-checked first; a plan without the field is refused."""
+    plan = load_plan(plan_path)
+    states = plan.get("planned_states")
+    if not isinstance(states, dict):
+        raise PlanGuardError("this plan carries no planned_states — re-run the dry run with the current tool")
+    return dict(states)
+
+
+def check_approval(approved: Optional[str], plan: dict, live_plan_id: Optional[str] = None) -> Optional[str]:
+    """None when the owner's explicit approval names this exact plan (the file's id and, once re-derived, the live id);
+    otherwise the refusal. Called before any backup or write."""
+    if not approved:
+        return "--apply needs --approved-plan-id <the exact plan id the owner approved>"
+    if approved != plan.get("plan_id"):
+        return f"--approved-plan-id {approved} is not this plan file's id {plan.get('plan_id')}"
+    if live_plan_id is not None and approved != live_plan_id:
+        return f"the plan re-derived from the live rows is {live_plan_id}, not the approved {approved} — re-run and re-approve"
+    return None
+
+
+def preflight(store: Any, plan: dict) -> dict:
+    """Read-only backup preconditions: no backup exists yet under this plan id (ListObjectsV2) and the bucket is versioned
+    (GetBucketVersioning). Nothing is written; what a read cannot prove is named."""
+    prefix = f"{BACKUP_PREFIX}/{plan['plan_id']}/"
+    existing = store.list_backups(prefix)
+    versioning = store.bucket_versioning()
+    return {
+        "ok": not existing and versioning == "Enabled",
+        "verified_read_only": {
+            "backup_prefix": prefix,
+            "no_backup_under_prefix_yet": not existing,
+            "existing_keys": existing[:10],
+            "bucket_versioning": versioning,
+        },
+        "unverifiable_without_a_write": [
+            "the conditional put (IfNoneMatch='*') itself, and the role's s3:PutObject / dynamodb:PutItem at request time "
+            "(IAM simulation is evidence, not the request)"
+        ],
+    }
+
+
 def stored_states(plan_path: str) -> dict:
     """{date: state} of the STORED rows, in exactly the ``ladder_states`` state shape — the baseline ``replay_residual``
     is compared against. Integrity-checked first; a plan written before the field existed is refused."""
@@ -163,8 +206,19 @@ def export_and_verify(store: Any, plan: dict, rows: list, out_dir: str, phase: s
 
 
 def apply_plan(
-    store: Any, plan: dict, out_dir: str, phase: str, now: str, from_date: Optional[str] = None, limit: Optional[int] = None
+    store: Any,
+    plan: dict,
+    out_dir: str,
+    phase: str,
+    now: str,
+    from_date: Optional[str] = None,
+    limit: Optional[int] = None,
+    approved_plan_id: Optional[str] = None,
 ) -> dict:
+    """The conditional apply. The CLI always passes ``approved_plan_id`` (checked there against the file and the live id
+    first); when given here it is checked again, before the export."""
+    if approved_plan_id is not None and approved_plan_id != plan.get("plan_id"):
+        raise PlanGuardError(f"approved plan id {approved_plan_id} is not this plan's {plan.get('plan_id')} — nothing written")
     rows = rows_for(plan, phase, from_date, limit)
     export, path = export_and_verify(store, plan, rows, out_dir, phase, now)
     by_key = {(e["pk"], e["sk"]): e for e in export["entries"]}
