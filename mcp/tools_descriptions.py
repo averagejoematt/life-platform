@@ -663,7 +663,9 @@ WRITE_PLATFORM_MEMORY_DESCRIPTION = (
     "the approve call performs the write and stamps owner_reviewed_at. It requires evidence_kind, takes "
     "event_date/event_date_precision/source_ref, is PRIVATE unless privacy_tier='coach_context' is set for that item, "
     "and can never be public_ok. Interpretations, competing hypotheses and rejected interpretations are kept but "
-    "never reach a coach prompt."
+    "never reach a coach prompt. #6294: a personal_record in his own words or one he confirmed may carry "
+    "life_domains (the development-profile domains) and life_direction (better|same|harder|unclear — HIS reading); "
+    "only get_development_profile reads them."
 )
 
 READ_PLATFORM_MEMORY_DESCRIPTION = (

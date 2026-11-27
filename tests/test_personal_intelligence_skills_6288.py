@@ -64,6 +64,41 @@ def test_ask_hands_off_instead_of_absorbing_other_skills():
         assert other in b, f"ask must hand off to {other} rather than imitate it"
 
 
+# ── ask — the development profile (#6294, owner ruling 2026-11-26) ────────────
+def test_ask_reads_the_development_profile_for_developing_questions():
+    b = flat("ask")
+    for needle in (
+        "how am i developing beyond fitness",
+        "what have i improved at recently",
+        "know versus suspect",
+        "get_development_profile",
+    ):
+        assert needle in b, needle
+    assert "manage_personal_hypothesis" in b, "know-versus-suspect reads his open hypotheses"
+
+
+def test_ask_asks_at_most_one_question_and_never_a_questionnaire():
+    b = flat("ask")
+    assert "at most one question in the whole answer" in b
+    assert "never a list of questions, never a form or questionnaire" in b
+
+
+def test_ask_never_scores_the_profile():
+    assert "never produce a score, a total or a ranking of the domains" in flat("ask")
+
+
+def test_ask_separates_what_is_known_from_what_is_suspected():
+    b = flat("ask")
+    for part in ("measured or recorded", "what he has said himself", "open questions and readings"):
+        assert part in b, part
+    assert "never a finding" in b
+
+
+def test_ask_is_honest_when_there_is_not_enough_to_say():
+    b = flat("ask")
+    assert "not_enough_to_say" in b and "it reflects the platform's records, not his life" in b
+
+
 # ── reflect — varied conversations, reviewed before anything is saved ─────────
 REFLECT_MODES = [
     "life history and identity",
