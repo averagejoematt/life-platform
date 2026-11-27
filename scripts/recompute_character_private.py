@@ -41,6 +41,8 @@ RUN (every path but --apply/--rollback --apply is read-only behind a proxy that 
                                                                                  #   per_date.csv, SUMMARY.md
   python3 scripts/recompute_character_private.py --out DIR --verify              # 0 planned writes, or exit 1
   python3 scripts/recompute_character_private.py --out DIR --preflight --plan-in P         # read-only backup preconditions
+  python3 scripts/recompute_character_private.py --out DIR --probe-conditional-put         # ONE synthetic object under
+                                                                                 #   backups/_probe/ (owner-authorized)
   python3 scripts/recompute_character_private.py --out DIR --apply --plan-in P --approved-plan-id ID [--phase ...] [--limit N]
   python3 scripts/recompute_character_private.py --out DIR --rollback EXPORT [--apply]
 
@@ -273,6 +275,10 @@ class ConditionFailed(RuntimeError):
     """A conditional write's pre-image condition did not hold."""
 
 
+class BackupExists(ConditionFailed):
+    """S3 refused a conditional put (IfNoneMatch="*"): an object already exists at the key (HTTP 412)."""
+
+
 # ── typed JSON, canonical form, digests ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -437,9 +443,9 @@ def ddb_condition(cond: list) -> dict:
 class LiveStore:
     """DynamoDB + S3 through the minimal interface the tool uses. Read-only unless ``writable`` (``--apply`` paths)."""
 
-    def __init__(self, table: Any, s3: Any, bucket: str, writable: bool = False):
+    def __init__(self, table: Any, s3: Any, bucket: str, writable: bool = False, s3_writable: bool = False):
         self.table = table if writable else ReadOnlyProxy(table, WRITE_VERBS)
-        self.s3 = s3 if writable else ReadOnlyProxy(s3, S3_WRITE_VERBS)
+        self.s3 = s3 if (writable or s3_writable) else ReadOnlyProxy(s3, S3_WRITE_VERBS)
         self.bucket = bucket
         self.reads: dict = {}
 
@@ -481,8 +487,23 @@ class LiveStore:
         """The bucket's versioning status (GetBucketVersioning, a read): "Enabled", "Suspended" or None."""
         return self.s3.get_bucket_versioning(Bucket=self.bucket).get("Status")
 
-    def put_backup(self, key: str, body: bytes) -> None:
-        self.s3.put_object(Bucket=self.bucket, Key=key, Body=body, IfNoneMatch="*", ContentType="application/json")
+    def put_backup(self, key: str, body: bytes) -> dict:
+        """A conditional put (IfNoneMatch="*"): never over an existing object. A refusal raises BackupExists."""
+        from botocore.exceptions import ClientError
+
+        try:
+            resp = self.s3.put_object(Bucket=self.bucket, Key=key, Body=body, IfNoneMatch="*", ContentType="application/json")
+        except ClientError as e:
+            err = e.response.get("Error", {})
+            status = e.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            if err.get("Code") == "PreconditionFailed" or status == 412:
+                raise BackupExists(f"s3://{self.bucket}/{key}: {err.get('Code')} (HTTP {status})") from e
+            raise
+        return {"http_status": resp.get("ResponseMetadata", {}).get("HTTPStatusCode"), "version_id": resp.get("VersionId")}
+
+    def object_version(self, key: str) -> Optional[str]:
+        """The object's current version id (HeadObject, a read)."""
+        return self.s3.head_object(Bucket=self.bucket, Key=key).get("VersionId")
 
     def get_backup(self, key: str) -> bytes:
         return self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read()
@@ -946,12 +967,12 @@ def write_outputs(plan: dict, out_dir: str, plan_out: Optional[str] = None, prel
 # ── CLI ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def live_store(writable: bool) -> LiveStore:
+def live_store(writable: bool, s3_writable: bool = False) -> LiveStore:
     import boto3
 
     region = os.environ["AWS_DEFAULT_REGION"]
     table = boto3.resource("dynamodb", region_name=region).Table(os.environ["TABLE_NAME"])
-    return LiveStore(table, boto3.client("s3", region_name=region), os.environ["S3_BUCKET"], writable=writable)
+    return LiveStore(table, boto3.client("s3", region_name=region), os.environ["S3_BUCKET"], writable=writable, s3_writable=s3_writable)
 
 
 def main(argv: list) -> int:
@@ -972,6 +993,11 @@ def main(argv: list) -> int:
     ap.add_argument("--preliminary", action="store_true", help="head the summary as preliminary (not the dry run for approval)")
     ap.add_argument("--approved-plan-id", help="--apply only: the plan id the owner approved (must equal the file's and the live one)")
     ap.add_argument("--preflight", action="store_true", help="read-only: with --plan-in, check the backup preconditions")
+    ap.add_argument(
+        "--probe-conditional-put",
+        action="store_true",
+        help="ONE synthetic S3 object under backups/_probe/: the backup put path's creation, read-back and overwrite refusal",
+    )
     args = ap.parse_args(argv)
     out_dir = refuse_in_repo(args.out)
     os.makedirs(out_dir, exist_ok=True)
@@ -988,6 +1014,12 @@ def main(argv: list) -> int:
         result = A.verify(live_store(writable=False), out_dir, args.start, args.end)
         print(json.dumps({"rows": result["rows"], "planned_writes": result["planned_writes"]}))
         return 0 if result["planned_writes"] == 0 else 1
+    if args.probe_conditional_put:  # S3 only (the table stays behind the read-only proxy); one synthetic scratch object
+        result = A.probe_conditional_put(live_store(writable=False, s3_writable=True))
+        with open(os.path.join(out_dir, f"probe_{now.replace(':', '')}.json"), "w", encoding="utf-8") as fh:
+            json.dump(result, fh, indent=1, default=str)
+        print(json.dumps(result, indent=1, default=str))
+        return 0 if result["ok"] else 1
     if args.preflight:
         if not args.plan_in:
             ap.error("--preflight needs --plan-in")

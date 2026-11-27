@@ -28,6 +28,7 @@ from recompute_character_private import (  # noqa: E402
     ROOT,
     SHEET_PK,
     WRITTEN_PARTITIONS,
+    BackupExists,
     ConditionFailed,
     PlanGuardError,
     as_float,
@@ -239,11 +240,97 @@ def ensure_preimage(store: Any, plan: dict, out_dir: str, now: str) -> dict:
         if hashlib.sha256(fh.read()).hexdigest() != sha:
             raise PlanGuardError("the local export does not read back to its hash — no write made")
     _verified_export(open(path, "rb").read(), plan)
-    store.put_backup(key, body)  # IfNoneMatch: never over an existing object
-    if hashlib.sha256(store.get_backup(key)).hexdigest() != sha:
-        raise PlanGuardError("the S3 backup does not read back to the export's hash — no write made")
+    put_verified_backup(store, key, body)
     export.update(_local_path=path, _s3_key=key, _sha256=sha, _aborted_before_export=aborted, _resumed=False)
     return export
+
+
+def put_verified_backup(store: Any, key: str, body: bytes) -> dict:
+    """THE backup write: a conditional put (IfNoneMatch, never over an existing object — a refusal raises BackupExists),
+    then a read-back whose sha256 must equal the body's (else PlanGuardError). Used by ``--apply`` and by the probe."""
+    sha = hashlib.sha256(body).hexdigest()
+    put = store.put_backup(key, body) or {}
+    back = hashlib.sha256(store.get_backup(key)).hexdigest()
+    if back != sha:
+        raise PlanGuardError("the S3 backup does not read back to the export's hash — no write made")
+    return {"sha256": sha, "read_back_sha256": back, **put}
+
+
+PROBE_PREFIX = "backups/_probe/"
+
+
+def probe_key(now: Optional[str] = None, token: Optional[str] = None) -> str:
+    """backups/_probe/character-private-recompute/<UTC timestamp>-<random8>/export.json"""
+    import secrets
+    from datetime import datetime, timezone
+
+    stamp = now or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"{PROBE_PREFIX}character-private-recompute/{stamp}-{token or secrets.token_hex(4)}/export.json"
+
+
+def probe_payload(variant: str, key: str) -> bytes:
+    """A SYNTHETIC export-shaped document: no real record, no private value, no personal date."""
+    doc = {
+        "schema": "character-private-recompute-probe-v1",
+        "probe": True,
+        "variant": variant,
+        "key": key,
+        "note": "Synthetic payload for the conditional-backup-write probe (#6311). Contains no real record.",
+        "entries": [
+            {
+                "pk": "USER#synthetic#SOURCE#character_sheet",
+                "sk": "DATE#2000-01-01",
+                "preimage": {"character_level": {"$N": "1" if variant == "first" else "2"}},
+            }
+        ],
+    }
+    return json.dumps(doc, sort_keys=True, indent=1).encode()
+
+
+def probe_conditional_put(store: Any, key: Optional[str] = None) -> dict:
+    """The backup put path against ONE synthetic scratch object (owner authorization 2026-11-27): (a) the key is absent,
+    (b) a conditional put succeeds, (c) the read-back sha256 equals the payload's, (d) a second conditional put with
+    DIFFERENT content is refused and the object still has the first sha, (e) the bucket's versioning and the object's
+    version id. Refuses any key not under ``backups/_probe/``. Never deletes the object."""
+    key = key or probe_key()
+    if not key.startswith(PROBE_PREFIX) or key.startswith(BACKUP_PREFIX + "/"):
+        raise PlanGuardError(f"the probe writes only under {PROBE_PREFIX}: refused {key}")
+    out: dict = {"key": key, "bucket": getattr(store, "bucket", None), "steps": {}}
+    existing = [k for k in store.list_backups(key) if k == key]
+    out["steps"]["a_absent_before"] = {"ok": not existing, "existing": existing}
+    if existing:
+        out["ok"] = False
+        return out
+    first, second = probe_payload("first", key), probe_payload("second", key)
+    try:
+        put = put_verified_backup(store, key, first)
+        out["steps"]["b_conditional_put"] = {"ok": True, "http_status": put.get("http_status"), "version_id": put.get("version_id")}
+        out["steps"]["c_read_back"] = {
+            "ok": put["read_back_sha256"] == put["sha256"],
+            "sha256": put["sha256"],
+            "read_back_sha256": put["read_back_sha256"],
+        }
+    except Exception as e:  # noqa: BLE001 — a failed first put is the finding; report it exactly
+        out["steps"]["b_conditional_put"] = {"ok": False, "error": f"{type(e).__name__}: {e}"}
+        out["ok"] = False
+        return out
+    refused = None
+    try:
+        store.put_backup(key, second)
+        refused = {"ok": False, "outcome": "ACCEPTED — the second conditional put was NOT refused"}
+    except BackupExists as e:
+        refused = {"ok": True, "outcome": "refused", "error": str(e)}
+    except Exception as e:  # noqa: BLE001 — any other error is reported, not taken for a refusal
+        refused = {"ok": False, "outcome": f"unexpected {type(e).__name__}: {e}"}
+    after = hashlib.sha256(store.get_backup(key)).hexdigest()
+    refused.update(after_sha256=after, still_first=after == hashlib.sha256(first).hexdigest())
+    refused["ok"] = refused["ok"] and refused["still_first"]
+    out["steps"]["d_second_put_refused"] = refused
+    version = getattr(store, "object_version", lambda _k: None)(key)
+    out["steps"]["e_versioning"] = {"bucket_versioning": store.bucket_versioning(), "version_id": version}
+    out["ok"] = all(step.get("ok", True) for step in out["steps"].values())
+    out["deleted"] = False
+    return out
 
 
 def resume_state(store: Any, export: dict) -> list:
