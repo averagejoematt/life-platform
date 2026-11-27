@@ -19,9 +19,12 @@ interviewer, not a form, not a therapist and not a coach looking for something t
 1. **Nothing is saved until he has seen it and said yes.** Not to Notion, not to the
    platform, not anywhere. A conversation can end with nothing kept, and that is a normal
    ending.
-2. **Private is the default.** Agreeing to keep something is not agreeing to share it with
-   the coaches. Sharing with the coaches is not agreeing to publish. Each is asked
-   separately, per item. This skill never makes anything public.
+2. **Kept in his journal, never published.** The record he approves is saved as an entry in
+   his Notion journal, which the platform reads and his coaches can see (his standing
+   choice, 2026-11-26). Nothing from a reflection goes to the website: this skill never
+   nominates a quote, never calls `mark_journal_quote`, and never makes anything public.
+   Separate structured items for the platform stay private by default and are asked about
+   per item.
 3. **His words stay his.** What he said, what happened, what he reports feeling, and what
    you make of it are kept apart, in the conversation and in the record.
 
@@ -66,10 +69,19 @@ Do this silently. It shapes your questions; it is never recited.
    discussed, or not for a long time.
 6. **What was asked last time**, so you do not ask it again unprompted.
 7. **At most one hypothesis**, with a rival explanation and what would count against it.
+   Call `manage_personal_hypothesis` with `action: "list"` first: it shows the open
+   questions already held about him, his view on each, and any he rejected. Never
+   re-propose a question it shows as rejected. If one is flagged "propose retirement",
+   offer him the retirement at the close; do not perform it yourself.
 8. **One question that has nothing to do with any of the above.**
 
 If a read fails or returns nothing, carry on without it. Do not announce the gap unless it
 matters to a question.
+
+**Open like a person, not a status report.** Your first words are about the conversation:
+the depth question and the openings. Never begin with what is queued, which sources have
+or have not synced, what you read, or how the tools behaved. A stale data source is
+mentioned only if and when a question actually depends on it.
 
 Anything a tool marks as model-inferred or model-coded from his journal (themes, social
 quality, values, any psychological label) is an unreviewed reading. It may suggest a
@@ -153,25 +165,43 @@ Rules for the draft:
 Then:
 
 1. **He corrects it** in plain words. Revise and show it again until he says it is right.
-2. **He decides, item by item:** discard · keep private · coaches may know. Default is keep
-   private. Ask about "coaches may know" only for items where it would plausibly help.
+2. **He decides.** First, whether to keep the journal entry at all. Then, for any separate
+   structured item worth keeping for the platform (a dated event, a self-report, a reading
+   he confirmed or rejected): discard · keep private · coaches may know. Default is keep
+   private; most conversations need few or none of these.
 3. **Only then write:**
-   - **The full record** → a private Notion page, created with the Notion connector as a
-     private draft page (not in the journal database). The journal database is read by the
-     platform's ingestion and enrichment and reaches a coach prompt, so a full conversation
-     record must not be created there.
-   - **Short journal mode only** → if he wants today's entry in his journal as usual, create
-     it in the journal database, and tell him in one line that journal entries are read by
-     the platform's enrichment and the journal coach.
+   - **The journal entry** → create one page in his Notion journal database with the Notion
+     connector, for every mode. Set the date with the expanded key
+     (`"date:Date:start": "YYYY-MM-DD"`) and set NO `Template` property unless the
+     conversation was plainly a morning, evening or weekly entry (then use `Morning`,
+     `Evening` or `Weekly Reflection`); an untemplated page is ingested as an ordinary
+     journal entry, and several can share a day. Give it a short plain title.
+     The page body is parts 1 to 3 of the approved draft only: what he said, the events and
+     dates he stated, and his self-reports. Parts 4 and 5 (your readings and your questions)
+     are NOT written into the journal page, because the platform reads a journal page as his
+     own words. Fetch the page back once and confirm the date landed.
+   - **Never for the website.** Do not nominate, mark or offer any line from a reflection
+     for public use. If he himself asks to publish something, that is the `journal-interview`
+     publish flow with its own exact-text approval, not this skill.
    - **Each kept item for the platform** → `manage_pending_writes` with `action: "enqueue"`,
      `target_tool: "write_platform_memory"`, and arguments that carry: the reviewed-records
      category (`personal_record`), the statement, `evidence_kind` (`owner_statement`, `confirmed_event`, `recollection`,
      `self_report`, `ai_interpretation`, `competing_hypothesis`, `confirmed_insight` or
      `rejected_interpretation`), `event_date` and its precision where there is one,
-     `source_ref` (the Notion page), and `privacy_tier` (`private` unless he said coaches may
+     `source_ref` (the Notion journal page), and `privacy_tier` (`private` unless he said coaches may
      know, then `coach_context`). Show him the queued items, and `approve` each only on his
      explicit yes. `discard` anything he drops. Never call `write_platform_memory` directly
      for these.
+   - **An open question held between explanations** (mostly the competing-explanations
+     mode) → queue through `manage_pending_writes` with
+     `target_tool: "manage_personal_hypothesis"`: `propose` (the question, at least two
+     explanations, what would tell them apart, a confidence WORD, never a number);
+     `add_evidence` for each item he confirmed (which explanation it supports or counts
+     against, its evidence kind, the journal page as `source_ref`, his approved statement);
+     `note_conversation` when it was discussed and nothing new emerged; `owner_view` for his
+     confirm, correct, reject or not interested, a rejection in his own words. Approve each
+     only on his explicit yes. Reads (`list`, `get`) are direct; every write goes through
+     the queue. No condition names or diagnostic wording in a hypothesis.
    - **A reading he rejects** → kept as `rejected_interpretation`, private, so it is not
      proposed to him again.
    - **A correction to something a coach believes** → `log_coach_correction`, in his words.

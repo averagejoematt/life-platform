@@ -14,7 +14,8 @@ had no recommendation of its own on record. So this module changes CONTEXT, not 
 conversation rules, and it does not carry the failed conversation-layer prompt.
 
 THE ORDER (the owner's, verbatim in intent):
-  1. his currently recorded priorities — his DECISION# rows, newest first, plus what he told his AI in
+  1. his recorded decisions — his DECISION# rows, newest first, each with the followed/overrode answer he logged
+     (#6291: a record of advice he answered, never restated as a priority he set), plus what he told his AI in
      conversation (platform memory, with its "(shared in confidence)" marker kept), placed AHEAD of the
      coach's own notes and chat history;
   2. today's planned training session when relevant (the lead and the Performance seat) — read through
@@ -46,6 +47,16 @@ about a due follow-up — ONE recommendation, once, inside a reply or a schedule
 exists. Specialists keep their voice and see their own. No orchestration, no new model call. This module
 shows no graded coach record; if it ever does, it reads it through `coach_record` (#6172), never a count
 of its own.
+
+ONE ASSEMBLY, TWO INTERFACES (#6291). `build_turn_context` is the single builder of what a coach knows about him:
+the Telegram worker (`for_turn`) and the Claude session packet (`packet_context`, which renders the SAME sections for
+the lead seat as `text`) both call it, so the phone and the Claude app cannot hold two different understandings of
+him. The known-answer cases in `tests/test_personal_context_cases_6291.py` bind every section to the real builders on
+a synthetic store; the switch is turned on only once they pass and the owner has seen a dry render. Sections added by
+#6291, each fail-soft on its own (`_safe`): the recorded decisions carry his followed/overrode answer and are never
+called priorities (1); the stored body-composition scan, dated and labelled (3b) and the logged-against-implied intake
+reconciliation with its window and caveats (3c) — both read by `coach.personal_context`; and his newest message, marked
+latest, ahead of the coach's own notes (4a).
 
 FOLLOW-UP, ASKED ONCE. When the lead's context carries a due follow-up, `record_extra` names it, and the
 worker stores that id on the coach's own CHAT# reply row (`follow_up_rec_id`) — the write it already
@@ -87,9 +98,9 @@ FOLLOW_UP_FIELD = "follow_up_rec_id"
 OMITTED_REPLY = "(an earlier reply of yours, left out here because a later message of yours already makes the same point)"
 
 PRIORITIES_HEADER = (
-    "1. WHAT MATTHEW HAS DECIDED — his recorded decisions, newest first. These are HIS priorities and they come "
-    "before anything in your own notes or in this chat's history: where they disagree, his recorded decision wins, "
-    "and a newer decision replaces an older one on the same subject."
+    "1. RECORDED DECISIONS — advice the platform gave him on a day and what he did with it, as he logged it at the time, "
+    "newest first. Each is a record of advice and HIS answer, not a goal he set and not his plan: describe it only as "
+    "advice he followed or overrode. Where he overrode it, his choice is what happened; never re-argue it unasked."
 )
 SESSION_HEADER = "2. TODAY'S PLANNED TRAINING SESSION"
 RECS_HEADER = (
@@ -114,6 +125,16 @@ CAPABILITY = (
     "Never state or imply that he did or did not do something because of his sensor, nutrition or training data "
     "(an average, a count, a logged workout or meal): only his own recorded answer says what he did. If he has not "
     "told you, say you do not know."
+)
+
+CAPABILITY_SESSION = (
+    "6. WHAT YOU CAN AND CANNOT REMEMBER. You do have a memory of him: your notes from earlier Telegram chats, his most "
+    "recent Telegram message, his recorded decisions, the recommendations on record with his answers, and his corrections, "
+    "all above. When he asks what you told him or what he decided, answer from them and name the day. Unlike the Telegram "
+    "chat, this Claude session can save: record a new recommendation or his answer with manage_coach_recommendation. "
+    "Never state or imply that he did or did not do something because of his sensor, nutrition or training data (an "
+    "average, a count, a logged workout or meal): only his own recorded answer says what he did. If he has not told you, "
+    "say you do not know."
 )
 
 STAMP_FIELD = "sent_at"
@@ -342,22 +363,38 @@ def recorded_decisions(table, day: str, user_id: str = USER_ID) -> list[dict[str
     rows = [r for r in table.query(**kwargs).get("Items") or [] if not r.get("tombstone")]
     rows = [r for r in rows if floor <= str(r.get("date") or "") <= day and str(r.get("decision") or "").strip()]
     return [
-        {"date": r.get("date"), "decision": _clip(r.get("decision"), 300), "note": _clip(r.get("note"), 200) if r.get("note") else None}
+        {
+            "date": r.get("date"),
+            "decision": _clip(r.get("decision"), 300),
+            "followed": r.get("followed") if isinstance(r.get("followed"), bool) else None,
+            "override_reason": _clip(r.get("override_reason"), 200) if r.get("override_reason") else None,
+            "note": _clip(r.get("note"), 200) if r.get("note") else None,
+        }
         for r in rows[:PRIORITY_MAX]
     ]
+
+
+def _decision_answer(d: dict[str, Any]) -> str:
+    """His answer at logging time, in words — the `followed` flag `log_decision` stores (True / False / absent)."""
+    if d.get("followed") is True:
+        return "he followed it"
+    if d.get("followed") is False:
+        why = f' (his reason: "{d["override_reason"]}")' if d.get("override_reason") else ""
+        return f"he overrode it{why}"
+    return "his answer was not recorded"
 
 
 def priorities_section(table, persona_id: str, day: str) -> str:
     lines = []
     for d in recorded_decisions(table, day):
-        words = f' — in his words: "{d["note"]}"' if d.get("note") else ""
-        lines.append(f"- [{_in_words(d['date'])}] {d['decision']}{words}")
+        words = f'; in his words: "{d["note"]}"' if d.get("note") else ""
+        lines.append(f'- [{_in_words(d["date"])} ({d["date"]})] advised: "{d["decision"]}" — {_decision_answer(d)}{words}')
     block = PRIORITIES_HEADER + "\n" + ("\n".join(lines) if lines else "- none recorded in the last 90 days")
     from ai.platform_memory import platform_memory_block
     from common.pacific_time import parse_day_key
 
     told = platform_memory_block(coach_id=persona_id, table=table, today=parse_day_key(day))
-    return f"{block}\n{told}" if told else block
+    return f"{block}\n\n{told}" if told else block
 
 
 # ── 2. today's planned session ──────────────────────────────────────────────────────────────
@@ -460,25 +497,62 @@ def recommendations_section(views: list[dict[str, Any]], persona_id: str, day: s
 # ── assembly ───────────────────────────────────────────────────────────────────────────────
 
 
-def build_turn_context(table, persona_id: str, day: str, *, memory: str = "", thread: Optional[list] = None) -> dict[str, Any]:
+def _safe(name: str, build) -> str:
+    """One section, fail-soft: a section whose read fails is left out (and logged by name), never the whole context."""
+    try:
+        return build() or ""
+    except Exception as e:  # noqa: BLE001 — a context read can never cost him a reply
+        logger.warning("[context_pilot] section %s unavailable: %s", name, type(e).__name__)
+        return ""
+
+
+def _note_days(notes: str) -> list[str]:
+    return _NOTE_DAY.findall(notes or "")
+
+
+def build_turn_context(
+    table, persona_id: str, day: str, *, memory: str = "", thread: Optional[list] = None, channel: str = "telegram"
+) -> dict[str, Any]:
     """The pilot context for one coach on one day. READS ONLY — it sends nothing and writes nothing,
     ignores the switch, and is what the private harness calls (with the worker's `_assemble` output).
 
+    `channel` is "telegram" (the worker) or "session" (the Claude app's packet): the same sections in the same order,
+    with the two lines that differ by interface (where the thread is, and whether the chat can save) worded for it.
+
     Returns {memory, thread, record_extra, follow_up, sections, dedupe}: `memory` replaces the worker's
     memory block, `thread` its stored thread, and `record_extra` rides on the reply row the worker stores."""
-    views = rr.fold(rr.read_rows(table, USER_ID))
-    follow_up = follow_up_to_raise(table, views, persona_id, day)
+    from coach import personal_context as pc
+
+    try:
+        views = rr.fold(rr.read_rows(table, USER_ID))
+    except Exception as e:  # noqa: BLE001 — named in the section, never an empty record dressed as a real one
+        logger.warning("[context_pilot] recommendation record unreadable: %s", type(e).__name__)
+        views = None
+    follow_up = _safe_follow_up(table, views, persona_id, day)
     notes, corrections = _split_memory_core(memory)
     new_thread, removed = dedupe_thread(order_thread(thread or []))
+    session = channel == "session"
     sections = {
         "lead": LEAD_LINE if persona_id == rr.LEAD_COACH_ID else "",
-        "priorities": priorities_section(table, persona_id, day),
+        "priorities": _safe("priorities", lambda: priorities_section(table, persona_id, day)),
         "planned_session": session_section(persona_id, day),
-        "recommendations": recommendations_section(views, persona_id, day, follow_up),
+        "recommendations": (
+            recommendations_section(views, persona_id, day, follow_up)
+            if views is not None
+            else f"{RECS_HEADER}\n- the record could not be read"
+        ),
+        "body_composition": _safe("body_composition", lambda: pc.scan_section(table, persona_id, day)),
+        "intake": _safe("intake", lambda: pc.intake_section(table, persona_id, day)),
+        "latest_message": _safe(
+            "latest_message",
+            lambda: pc.latest_message_section(
+                _visible(new_thread), notes, channel=channel, sent_day=_sent_day, note_days=_note_days(notes)
+            ),
+        ),
         "notes": f"{NOTES_HEADER}\n{notes}" if notes else "",
-        "thread_dates": thread_dates_section(new_thread, notes),
+        "thread_dates": "" if session else thread_dates_section(new_thread, notes),
         "corrections": corrections,
-        "capability": CAPABILITY,
+        "capability": CAPABILITY_SESSION if session else CAPABILITY,
     }
     return {
         "memory": "\n\n".join(s for s in sections.values() if s),
@@ -488,6 +562,16 @@ def build_turn_context(table, persona_id: str, day: str, *, memory: str = "", th
         "sections": sections,
         "dedupe": removed,
     }
+
+
+def _safe_follow_up(table, views, persona_id: str, day: str):
+    if views is None:
+        return None
+    try:
+        return follow_up_to_raise(table, views, persona_id, day)
+    except Exception as e:  # noqa: BLE001 — no follow-up is raised on a failed read
+        logger.warning("[context_pilot] follow-up check unavailable: %s", type(e).__name__)
+        return None
 
 
 def for_turn(table, persona_id: str, memory: str, thread: list, *, live: Optional[bool] = None, day: Optional[str] = None):
@@ -505,8 +589,9 @@ def for_turn(table, persona_id: str, memory: str, thread: list, *, live: Optiona
 
 
 PACKET_HOW_TO_USE = (
-    "Read this before the training fields. `priorities` are his recorded decisions, newest first — they outrank anything "
-    "else here and a newer one replaces an older one on the same subject; `told_in_chat` is what he told his AI (lines marked "
+    "Read `text` before the training fields: it is the SAME personal context the Telegram coaches are handed (#6291), "
+    "rendered for this session. `recorded_decisions` are advice he answered at the time (followed / overrode / not "
+    "recorded), newest first; they are records, not goals he set. `told_in_chat` is what he told his AI (lines marked "
     "(shared in confidence) shape your read but are not restated). The planned session is `fields.block_position`. "
     "`recommendations` are on record with HIS answers only ('not recorded' = not answered; never infer one from data). "
     "If `follow_up_due` is set, ask about that ONE recommendation once, at the end, and record his answer with "
@@ -516,21 +601,36 @@ PACKET_HOW_TO_USE = (
 
 
 def packet_context(table, day: str, *, live: Optional[bool] = None) -> Optional[dict[str, Any]]:
-    """The coach session packet's `coaching_context` (lead's view), or None while the switch is off."""
+    """The coach session packet's `coaching_context` (the lead's view), or None while the switch is off.
+
+    `text` is `build_turn_context` for the lead seat over the lead's own memory partition and Telegram thread — the one
+    assembly, so the Claude app and the phone hand the coach the same understanding of him."""
     if not (LIVE if live is None else live):
         return None
     try:
         from ai.platform_memory import platform_memory_block
         from common.pacific_time import parse_day_key
 
+        from coach import personal_context as pc
+
+        lead = rr.LEAD_COACH_ID
+        ctx = build_turn_context(
+            table,
+            lead,
+            day,
+            memory=pc.memory_core(table, lead),
+            thread=thread_turns(pc.chat_rows(table, lead), live=True),
+            channel="session",
+        )
         views = rr.fold(rr.read_rows(table, USER_ID))
-        open_, closed = visible_recommendations(views, rr.LEAD_COACH_ID, day)
+        open_, closed = visible_recommendations(views, lead, day)
         due = rr.due_follow_ups(views, day)
         slim = ("rec_id", "coach_id", "channel", "date", "text", "response", "response_label", "response_words", "follow_up_on", "outcome")
         return {
             "state": "measured",
-            "lead": rr.LEAD_COACH_ID,
-            "priorities": recorded_decisions(table, day),
+            "lead": lead,
+            "text": ctx["memory"],
+            "recorded_decisions": recorded_decisions(table, day),
             "told_in_chat": platform_memory_block(coach_id=None, table=table, today=parse_day_key(day)) or None,
             "recommendations": [{k: v.get(k) for k in slim} for v in open_],
             "recently_closed": [{k: v.get(k) for k in slim} for v in closed],

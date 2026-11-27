@@ -5329,6 +5329,28 @@ STRUCTURAL_HAND_PROOFS["structural::test_inferred_psych_fields_guard_6286.py"] =
     "proved_on": "2026-11-26",
 }
 
+# #6212 / #6291 — grounded nutrition and body-composition facts (the #6215 module, wired by #6291 through ONE importer)
+STRUCTURAL_HAND_PROOFS["structural::test_grounded_intake_facts_6212.py"] = {
+    "gate_name": "test_grounded_intake_facts_6212.py",
+    "command": "python3 -m pytest tests/test_grounded_intake_facts_6212.py -q -p no:cacheprovider   # baseline 20 passed",
+    "mutation": (
+        "Two plants, ONE AT A TIME, each removed before the next: M1 a new lambdas/health/zz_mut_6291.py containing "
+        "`from health import grounded_intake_facts` (a second importer beside coach/personal_context.py); M2 the "
+        "consistent-verdict statement prefixed with 'The log is accurate. '."
+    ),
+    "observed": (
+        "2026-11-26, #6291 lane. BASELINE 20 passed. M1 1 failed (the one-importer guard names the second importer); "
+        "M2 2 failed (verbatim approved sentence + forbidden phrase). REVERTED 20 passed."
+    ),
+    "scope": (
+        "The module's three facts on synthetic series; every .py under lambdas/ and mcp/ for the module name (text match, "
+        "so a dynamic import by a computed string is NOT seen); numeric and string literals of the module source only. "
+        "NOT SEEN: live data (the #6291 private dry render reads it), the coach-context sections that render the facts "
+        "(tests/test_personal_context_cases_6291.py)."
+    ),
+    "proved_on": "2026-11-26",
+}
+
 # #6292 — revisable, evidence-linked hypotheses about the person (owner rulings 2026-11-26, epic #6284): every write
 # queue-only through the #6287 approval scope, his rejection final until he reopens, never re-proposed, an
 # interpretation never a diagnosis, at most 7 open, retirement proposed (never performed), no coach/web reader, the
