@@ -57,6 +57,7 @@ from common.pacific_time import PACIFIC  # #2811: THE Pacific day helper — DAT
 # made the S5 injection a live no-op; both sides now normalize at the join
 # (`_item_ref_matches`). Flat sibling imports, per #781 (every root module ships together).
 from coach.coach_checkin import normalize_coach_id, read_cycle
+from coach.persona_registry import absorbing_coach_id
 
 PK = "USER#matthew#SOURCE#coach_corrections"
 SK_PREFIX = "CORRECTION#"
@@ -425,6 +426,13 @@ def _surface_scope(surface: Optional[str], surfaces) -> Optional[frozenset]:
     return None if surface is None else frozenset((surface,))
 
 
+def _coach_key(coach_id) -> str:
+    """The comparison key for a coach id: normalized (#1786) AND resolved to the seat that
+    absorbed it (#6312) — a correction logged to the retired "training" seat is the
+    Performance coach's. Both sides of the match go through it; stored rows are untouched."""
+    return normalize_coach_id(str(absorbing_coach_id(str(coach_id))))
+
+
 def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str], surfaces=None) -> bool:
     """True if `item`'s `item_ref` matches the requested coach/surface scope.
 
@@ -439,7 +447,7 @@ def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str
          differently (`coach_correction_resolver.build_item_ref` stores the archive
          `variant` — "mind_coach"; `tools_coach_intelligence` stores f"{bare}_coach";
          legacy rows carry the bare "mind") and the reader passes the suffixed
-         pipeline id. Both sides go through `normalize_coach_id`, so "mind" and
+         pipeline id. Both sides go through `_coach_key` (normalize + absorbed seat, #6312), so "mind" and
          "mind_coach" are the SAME coach. Normalization is one-way (suffix stripped,
          never re-added), so a non-coach `variant` on another surface still compares
          as itself.
@@ -457,7 +465,7 @@ def _item_ref_matches(item: dict, *, surface: Optional[str], coach: Optional[str
         row_coach = ref.get("coach")
         if row_coach in (None, ""):
             return True  # surface-wide correction — applies to every coach on this surface
-        if normalize_coach_id(str(row_coach)) != normalize_coach_id(str(coach)):
+        if _coach_key(row_coach) != _coach_key(coach):
             return False
     return True
 

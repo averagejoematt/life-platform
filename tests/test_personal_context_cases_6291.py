@@ -25,7 +25,7 @@ import personal_context_cases_6291 as h  # noqa: E402
 
 # What the builders hand a coach today, with the switch OFF (and the brief): case -> {column: verdict}.
 PINNED_OFF = {
-    1: {"telegram/off": "fail", "packet/off": "fail", "brief": "fail"},  # brief: the scan's fields are read off the wrong level (null)
+    1: {"telegram/off": "fail", "packet/off": "fail", "brief": "pass"},  # brief: reads the stored scan with its date since #6313
     2: {"telegram/off": "fail", "packet/off": "fail", "brief": "fail"},
     3: {"telegram/off": "fail", "packet/off": "fail", "brief": "n/a"},
     4: {"telegram/off": "fail", "packet/off": "fail", "brief": "n/a"},
