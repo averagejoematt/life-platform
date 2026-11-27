@@ -20,8 +20,18 @@ items in exactly two partitions — never a new item, never another partition (`
                               USER#<u>#SOURCE#personal_baselines SNAPSHOT#LATEST  the personal targets overlay
                               USER#<u>#SOURCE#effect_fits        FIT#<d>   the latest effect fit (badges)
                               USER#<u>#SOURCE#challenges         CHALLENGE#*  the consumed-challenge XP cross-check
-  never read or written       every wearable / nutrition / habit-log / journal / raw partition: a day is replayed from
-                              the stored sheet's own component measurements (``recompute_character_private_replay``)
+  read-only, the three raw-   through the compute Lambda's own ``assemble_data`` (``recompute_character_private_raw``):
+  dependent final steps only  whoop, macrofactor, apple_health, notion (DATE#<d>#journal#*), habit_scores, flourishing,
+                              evening_checkin, engagement_state (DATE#<d>, STATE#current), strava, hevy
+                              (DATE#<d>#WORKOUT#*), todoist, withings, labs, habitify, sick_days, travel,
+                              personal_baselines, and the ADR-097 GSI2 READING_SESSION index. Only each switch's ON and
+                              OFF output per date is kept (no raw row); the live run records every partition read
+                              (``partitions.raw_reads``)
+  never written               every source partition. A day is replayed from the stored sheet's own component
+                              measurements (``recompute_character_private_replay``); the three raw-dependent steps
+                              (planned_rest, lab_ageing, rest_day_completeness) apply only the on/off DIFFERENCE of the
+                              engine's own function on the SAME assembled inputs to that stored-derived chain, never a raw
+                              value (a raw recompute does not reproduce the stored rows: late data, earlier rule changes)
 
 No event, ledger, milestone, badge, notification, feed, email or ``character_stats.json`` write exists in this file:
 level events are REPORTED (kept / moved / removed / added) for the #6283 reconciliation, which owns their writes.
@@ -95,9 +105,27 @@ STORED STATES (``stored_states``; additive, outside the plan id; ``recompute_cha
 against.
 
 CAUSES (ladder order): replay_residual (not a method change) · stress_days · journal_frequency · model_values ·
-xp_debt · rest_decay · tree_switch_residual (control, must be 0) · relationships_exclusion · missing_data; stamps:
-method_version_stamp · recompute_provenance. Mind's two removals are attributed separately (journal_frequency, then
-model_values). A receipt row inherits its sheet's causes (it replays the sheet's transitions).
+xp_debt · rest_decay · tree_switch_residual (control, must be 0) · relationships_exclusion · missing_data ·
+final_switch_residual (control: the final tree with its four switches off vs the amended tree, must be 0) ·
+planned_rest · lab_ageing · rest_day_completeness · mood_label_presence; stamps: method_version_stamp ·
+recompute_provenance. Mind's two removals are attributed separately (journal_frequency, then model_values). A receipt
+row inherits its sheet's causes (it replays the sheet's transitions). Both controls are asserted 0 on every run.
+
+PLANNED REST AND THE PUBLIC RESTORE. A planned sheet whose Movement window was prorated carries
+``pillar_movement.components._planned_rest`` = {days, pre_rest_raw, pre_rest_raw_unblended, pre_rest_details} exactly
+as ``compute_movement_raw`` records it, the pre-rest values being the un-prorated stored-derived Movement. So
+``character_public.without_private_modifiers`` restores the public day from ``planned_sheets()`` with no other input.
+
+AN INTERRUPTED OR PHASED APPLY. A plan has ONE pre-image: ``backups/character-private-recompute/<plan_id>/export.json``
+(and ``OUT/export_<plan_id>.json``), covering every row of every phase, written once with IfNoneMatch before the first
+write. A later ``--apply`` of the same plan (the receipts phase after the sheets phase, or a re-run after an
+interruption) never takes or writes a second pre-image: it re-reads and verifies that object, refuses a local copy that
+differs, and re-derives the approval from the pre-image (``PreimageOverlay``: a row holding this plan's value reads as its
+exported pre-image), so the approved plan id still reproduces. It then COMPLETES idempotently — a row holding its planned
+value is skipped, a row holding its pre-image is written conditionally — when every exported row is exactly one of the
+two. If any exported row is neither (something else wrote it since), it writes nothing and STOPS, directing to
+``--rollback OUT/export_<plan_id>.json --apply``. Completing is safe because the state is proven to be the plan's own
+partial state against the one verified pre-image; anything else is a state the plan was not approved for.
 """
 
 from __future__ import annotations
@@ -141,6 +169,7 @@ PROVENANCE = "recompute_provenance"
 PROVENANCE_KIND = "historical_recompute"  # a nightly compute never writes this attribute
 TOOL = "scripts/recompute_character_private.py"
 OLD_TREE_COMMIT = "648d36d74d04f0a9554b6df6279c7fe2353ed9f9"  # engine 1.8.0 / config 1.6.0: #6299's base (#6283's tip)
+AMENDED_TREE_COMMIT = "dc199e9234f54097db158f971438f1600833f38e"  # #6299 as amended, before the four final switches
 BACKUP_PREFIX = "backups/character-private-recompute"
 WRITE_VERBS = ("put_item", "update_item", "delete_item", "batch_writer", "batch_write_item", "transact_write_items")
 S3_WRITE_VERBS = ("put_object", "delete_object", "delete_objects", "copy_object", "upload_file", "upload_fileobj")
@@ -153,6 +182,9 @@ SK_DATE = re.compile(r"^DATE#(\d{4}-\d{2}-\d{2})$")
 # that the pre-amendment tree with the amended XP/dark rules equals the amended tree with the pre-amendment missing-data
 # rules and Relationships still in the chain (it must be empty — see ``SUMMARY.md``).
 _BASE_OLD = {"tree": "old", "rebuild": ["movement", "nutrition"], "loader": "legacy", "relationships": "verbatim"}
+_BASE_AMENDED = {"tree": "new", "rebuild": ["movement", "nutrition", "mind"], "loader": "held_skip", "relationships": "engine"}
+_SWITCHES = ("PLANNED_REST_PRORATES", "LAB_AGE_TAPERS_WEIGHT", "REST_DAY_COMPLETENESS", "MOOD_NOT_OBSERVED")
+_EFFECTS = ("planned_rest", "lab_ageing", "rest_day_completeness")
 LADDER = (
     ("fidelity", "replay_residual", dict(_BASE_OLD)),
     ("stress", "stress_days", dict(_BASE_OLD, rebuild=["movement", "nutrition", "mind"])),
@@ -164,7 +196,7 @@ LADDER = (
         "switch",
         "tree_switch_residual",
         {
-            "tree": "new",
+            "tree": "amended",
             "rebuild": ["movement", "nutrition", "mind"],
             "loader": "legacy",
             "relationships": "verbatim",
@@ -175,21 +207,37 @@ LADDER = (
         "rel",
         "relationships_exclusion",
         {
-            "tree": "new",
+            "tree": "amended",
             "rebuild": ["movement", "nutrition", "mind"],
             "loader": "legacy",
             "relationships": "engine",
             "patches": ["legacy_missing"],
         },
     ),
-    (
-        "plan",
-        "missing_data",
-        {"tree": "new", "rebuild": ["movement", "nutrition", "mind"], "loader": "held_skip", "relationships": "engine"},
-    ),
+    ("md", "missing_data", dict(_BASE_AMENDED, tree="amended")),
+    # the final tree (#6299 head) from here: a control with its four switches OFF (must equal the amended tree's last step),
+    # then each switch ON in turn; the three raw-dependent ones apply their on/off difference (raw_effects)
+    ("final0", "final_switch_residual", dict(_BASE_AMENDED, switches=[])),
+    ("prest", "planned_rest", dict(_BASE_AMENDED, switches=_SWITCHES[:1], effects=["planned_rest"])),
+    ("lab", "lab_ageing", dict(_BASE_AMENDED, switches=_SWITCHES[:2], effects=["planned_rest", "lab_ageing"])),
+    ("comp", "rest_day_completeness", dict(_BASE_AMENDED, switches=_SWITCHES[:3], effects=list(_EFFECTS))),
+    ("plan", "mood_label_presence", dict(_BASE_AMENDED, switches=list(_SWITCHES), effects=list(_EFFECTS))),
 )
 PLAN_SPEC = LADDER[-1][2]
-METHOD_CAUSES = ("stress_days", "journal_frequency", "model_values", "xp_debt", "rest_decay", "relationships_exclusion", "missing_data")
+METHOD_CAUSES = (
+    "stress_days",
+    "journal_frequency",
+    "model_values",
+    "xp_debt",
+    "rest_decay",
+    "relationships_exclusion",
+    "missing_data",
+    "planned_rest",
+    "lab_ageing",
+    "rest_day_completeness",
+    "mood_label_presence",
+)
+CONTROL_CAUSES = ("tree_switch_residual", "final_switch_residual")
 STAMP_CAUSES = ("method_version_stamp", "recompute_provenance")
 CAUSES_LEGEND = {
     "replay_residual": "stored value the stored method's own replay does not reproduce (not a method change)",
@@ -201,6 +249,11 @@ CAUSES_LEGEND = {
     "tree_switch_residual": "control: pre-amendment tree + amended XP/dark rules vs amended tree + legacy missing data (must be 0)",
     "relationships_exclusion": "uninstrumented Relationships out of every aggregate, stored as its reason (#6293)",
     "missing_data": "only habits two-state; a no-evidence pillar-day held out of every aggregate; 0% completeness unknown (#6293)",
+    "final_switch_residual": "control: the final tree with its four #6293 switches off vs the amended tree (must be 0)",
+    "planned_rest": "a recorded planned pause (sick / travel) prorates Movement's 7-day window targets (PLANNED_REST_PRORATES)",
+    "lab_ageing": "an ageing lab result loses evidence weight, never score (LAB_AGE_TAPERS_WEIGHT)",
+    "rest_day_completeness": "a day with no activity anywhere does not expect a Strava row (REST_DAY_COMPLETENESS)",
+    "mood_label_presence": "logging silence reads 'unavailable', never 'dormant' or a presence-driven 'fading' (MOOD_NOT_OBSERVED)",
     "method_version_stamp": "engine_version / config_hash of the amended method",
     "recompute_provenance": "the recompute's own provenance attribute",
 }
@@ -478,6 +531,13 @@ def load_snapshot(store: Any, start: str, end: Optional[str]) -> dict:
     return snap
 
 
+def collect_raw_effects(store: Any, snap: dict) -> dict:
+    """The three raw-dependent steps' on/off outputs per date (``recompute_character_private_raw``; LIVE, read-only)."""
+    import recompute_character_private_raw as RAW
+
+    return RAW.collect_raw_effects(store, snap)
+
+
 def child_inputs(snap: dict) -> dict:
     """The replay child's inputs file: the stored rows as the compute reads them (every number a float)."""
     cfg_items = {}
@@ -494,6 +554,7 @@ def child_inputs(snap: dict) -> dict:
         "habit_scores": {d: as_float(to_typed(i)) for d, i in snap["habit_scores"].items()},
         "config_items": cfg_items,
         "fit_items": [as_float(to_typed(i)) for i in snap["fits"]],
+        "raw_effects": (snap.get("raw_effects") or {}).get("effects") or {},
     }
 
 
@@ -535,7 +596,12 @@ def child_env() -> dict:
 
 
 def run_step(spec: dict, inputs_path: str, workdir: str, trees: dict, name: str) -> dict:
-    full = dict(spec, tree=trees[spec["tree"]], new_tree=trees["new"], old_tree=trees.get("old", trees["new"]))
+    full = dict(
+        spec,
+        tree=trees.get(spec["tree"], trees["new"]),
+        new_tree=trees.get("amended", trees["new"]),  # the XP / Mind grafts come from the amended method's source
+        old_tree=trees.get("old", trees["new"]),
+    )
     spec_path = os.path.join(workdir, f"spec_{name}.json")
     out_path = os.path.join(workdir, f"result_{name}.json")
     with open(spec_path, "w", encoding="utf-8") as fh:
@@ -701,7 +767,8 @@ def finish_rows(rows: list, attribution: dict, method: dict, planned_at: str) ->
 
 
 def _cause_order(c: str) -> int:
-    order = ("replay_residual",) + METHOD_CAUSES[:5] + ("tree_switch_residual",) + METHOD_CAUSES[5:] + STAMP_CAUSES
+    order = ("replay_residual",) + METHOD_CAUSES[:5] + ("tree_switch_residual",) + METHOD_CAUSES[5:7]
+    order += ("final_switch_residual",) + METHOD_CAUSES[7:] + STAMP_CAUSES
     return order.index(c) if c in order else len(order)
 
 
@@ -759,6 +826,7 @@ def dry_run(
     ladder: tuple = LADDER,
     trees: Optional[dict] = None,
     planned_at: Optional[str] = None,
+    raw_effects: Optional[dict] = None,
 ) -> dict:
     import recompute_character_private_report as R  # the reports (module-size split, #1665)
 
@@ -766,7 +834,12 @@ def dry_run(
     snap = load_snapshot(store, start, end)
     os.makedirs(refuse_in_repo(out_dir), exist_ok=True)
     work = tempfile.mkdtemp(prefix="replay-", dir=out_dir)
-    trees = trees or {"new": ROOT, "old": materialize_old_tree(work)}
+    trees = trees or {"new": ROOT, "old": materialize_old_tree(work), "amended": materialize_old_tree(work, AMENDED_TREE_COMMIT)}
+    uses_effects = any((spec.get("effects") for _n, _c, spec in ladder))
+    if raw_effects is not None:  # supplied by the caller (tests)
+        snap["raw_effects"] = dict(raw_effects, source=raw_effects.get("source", "caller-supplied"))
+    else:
+        snap["raw_effects"] = collect_raw_effects(store, snap) if uses_effects else {"effects": {}, "reads": {}}
     inputs = child_inputs(snap)
     results = run_ladder(inputs, work, trees, ladder, plan_spec=ladder[-1][2])
     plan_result = results[ladder[-1][0]]
@@ -783,6 +856,9 @@ def dry_run(
     plan_id = finish_rows(rows, attribution, method, planned_at)
     assert_character_keys(rows, snap["start"], snap["end"])
     accounting = reconcile(rows, attribution, ladder_records, plan_result["sheet_attrs"])
+    for control in CONTROL_CAUSES:  # each control must change nothing, on any date
+        if accounting["ladder_totals"].get(control, {}).get("attributes", 0):
+            raise PlanGuardError(f"control {control} is not 0: {accounting['ladder_totals'][control]}")
     stored_f = {d: as_float(to_typed(i)) for d, i in snap["sheets"].items()}
     planned_f = {r["date"]: as_float(r["planned_item"]) for r in rows if r["pk"] == SHEET_PK and r["planned_item"]}
     ladder_f = [(c, {d: as_float(v) for d, v in recs.items()}) for c, recs in ladder_records]
@@ -801,12 +877,20 @@ def dry_run(
         "plan_id": plan_id,
         "generated_at": planned_at,
         "mode": "dry-run",
-        "method": {**method, "config_hash": plan_result.get("config_hash"), "tree": tree_state(), "old_tree_commit": OLD_TREE_COMMIT},
+        "method": {
+            **method,
+            "config_hash": plan_result.get("config_hash"),
+            "tree": tree_state(),
+            "old_tree_commit": OLD_TREE_COMMIT,
+            "amended_tree_commit": AMENDED_TREE_COMMIT,
+        },
         "window": {"genesis": EXPERIMENT_START_DATE, "start": snap["start"], "end": snap["end"], "sheet_dates": len(snap["sheets"])},
         "partitions": {
             "written": list(WRITTEN_PARTITIONS),
             "read_only_inputs": READ_ONLY_INPUTS,
             "reads": dict(getattr(store, "reads", {})),
+            "raw_read_only_inputs": list(R.RAW_READ_PARTITIONS),
+            "raw_reads": dict(snap["raw_effects"].get("reads") or {}),
         },
         "causes_legend": CAUSES_LEGEND,
         "ladder": [{"step": n, "cause": c, "spec": s} for n, c, s in ladder],
@@ -838,6 +922,13 @@ def dry_run(
         "challenge_xp": R.challenge_report(snap, rows),
         "notes": {n: results[n].get("notes") for n, _c, _s in ladder[-1:]},
         "invisible_sheets_in_window": snap["invisible_sheets"],
+        "raw_effects": {
+            "effects": snap["raw_effects"].get("effects") or {},
+            "dates_with_on_off_difference": R.changed_effects(snap["raw_effects"].get("effects") or {}),
+            "applied_by_step": {c: results[n].get("effects_applied") or {} for n, c, _s in ladder},
+            "source": snap["raw_effects"].get("source"),
+        },
+        "mood_labels": R.mood_report(stored_f, planned_f, ladder_f),
     }
     R.check_final_state(plan["ladder_states"], plan["planned_states"])  # every field, composite included; else refuse
     plan["stress_days"]["accounting"] = R.check_stress_days(plan["stress_days"], rows)  # distinct, 46 + 1, all written
@@ -910,9 +1001,10 @@ def main(argv: list) -> int:
         if refusal:
             print(f"REFUSED: {refusal}", file=sys.stderr)
             return 4
-        fresh = dry_run(
-            live_store(writable=False), out_dir, plan["window"]["start"], plan["window"]["end"], planned_at=plan["generated_at"]
-        )
+        ro = live_store(writable=False)
+        # a phased or interrupted apply: the approval is re-derived from the pre-image the apply started from
+        overlay = A.PreimageOverlay(ro, A.existing_preimages(ro, plan))
+        fresh = dry_run(overlay, out_dir, plan["window"]["start"], plan["window"]["end"], planned_at=plan["generated_at"])
         refusal = A.check_approval(args.approved_plan_id, plan, fresh["plan_id"])
         if refusal:
             print(f"REFUSED: {refusal}", file=sys.stderr)

@@ -23,6 +23,19 @@ THE STEP SPEC (JSON):
                 amended ``load_raw_score_histories`` rule: a held pillar-day is left out)
   relationships "verbatim" (the stored pillar through the chain) or "engine" (the tree's own rule)
   emit          "records" (the step's sheet records) or "items" (the planned DynamoDB items + receipts, the plan step)
+  switches      the final #6293 module switches turned ON for the step (PLANNED_REST_PRORATES, LAB_AGE_TAPERS_WEIGHT,
+                REST_DAY_COMPLETENESS, MOOD_NOT_OBSERVED); every other one of the four is OFF. A tree without them ignores it
+  effects       which raw-input effects the step applies: planned_rest, lab_ageing, rest_day_completeness (below)
+
+THE THREE RAW-DEPENDENT STEPS. planned_rest, lab_ageing and rest_day_completeness read inputs the stored component scores
+do not carry (the planned-pause days, the lab draw, which sources arrived). The parent runs the compute Lambda's own
+``assemble_data`` once per date (read-only) and records each switch's ON and OFF output on the SAME assembled inputs
+(``inputs["raw_effects"]``). A step applies only that on/off DIFFERENCE to the stored-derived chain — never the raw value:
+a raw recompute with the switches off does not reproduce the stored rows (late-arriving rows, earlier rule changes), and
+that drift is not a method change. Movement's window components scale by the on/off ratio (the proration is linear in
+the target below the cap); the lab score and the completeness shift by on minus off. A date whose on and off agree is
+untouched. A stored row already computed by this engine version carries the effects natively and is never adjusted
+again (idempotence after an apply).
 
 WHAT A DAY REPLAYS FROM. Never a raw wearable, nutrition, habit or journal partition: each pillar's day is taken from the
 stored sheet's own per-component measurements (the compute's record of what the sources said that night), re-weighted
@@ -44,6 +57,8 @@ from datetime import date, timedelta
 from typing import Any, Optional
 
 STEP_PATCHES = ("xp_net", "no_neglect", "legacy_missing", "rel_in_chain")
+FINAL_SWITCHES = ("PLANNED_REST_PRORATES", "LAB_AGE_TAPERS_WEIGHT", "REST_DAY_COMPLETENESS", "MOOD_NOT_OBSERVED")
+STEP_EFFECTS = ("planned_rest", "lab_ageing", "rest_day_completeness")
 PILLAR_ORDER = ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency")
 PRIMARY = ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships")
 LEGACY_FILL = 40.0  # the pre-amendment loader's stand-in for a missing raw score (removed by #6293)
@@ -150,6 +165,14 @@ def load_tree(spec: dict) -> dict:
         ce.day_is_held = lambda *_a, **_k: False  # pre-amendment: a no-evidence day entered every aggregate
     if "rel_in_chain" in patches:
         ce.UNINSTRUMENTED_PILLARS = ()
+    on = set(spec.get("switches") or ())
+    if on - set(FINAL_SWITCHES) or set(spec.get("effects") or ()) - set(STEP_EFFECTS):
+        raise RuntimeError(f"unknown switches/effects in {spec.get('switches')} / {spec.get('effects')}")
+    for name in FINAL_SWITCHES:
+        if hasattr(ce, name):
+            setattr(ce, name, name in on)
+        elif name in on:
+            raise RuntimeError(f"{name} is not in this engine tree")
     if "rel_in_chain" in patches:  # Relationships as the pre-amendment method configured it (its components and note)
         with open(os.path.join(spec["old_tree"], "config", "character_sheet.json"), encoding="utf-8") as fh:
             config["pillars"]["relationships"] = copy.deepcopy(json.load(fh)["pillars"]["relationships"])
@@ -197,6 +220,70 @@ def rebuild_pillar(ce: Any, pillar: str, stored_pd: dict, config: dict) -> tuple
     return raw, details
 
 
+def shifted(stored: Any, off: Any, on: Any) -> Any:
+    """``stored`` moved by on - off (clamped 0..100); the raw value only where there is no stored or off value to shift."""
+    if on is None:
+        return None
+    if stored is None or off is None:
+        return on
+    return round(max(0.0, min(100.0, float(stored) + float(on) - float(off))), 1)
+
+
+def planned_rest_movement(ce: Any, stored_pd: dict, config: dict, eff: dict, applied: list) -> tuple:
+    """Movement with the planned-rest proration applied to the STORED window scores (each scaled by the raw recompute's
+    on/off ratio; unknown where "on" is unknown; the raw value only where the stored or off score is missing), carrying
+    ``_planned_rest`` with the un-prorated stored-derived values exactly as ``compute_movement_raw`` records them (the
+    public method restores the day from it)."""
+    pre_raw, pre_det = rebuild_pillar(ce, "movement", stored_pd, config)
+    offc, onc = eff.get("off") or {}, eff.get("on") or {}
+    days = int(eff.get("days") or 0)
+    if not days or all(onc.get(c) == offc.get(c) for c in onc):
+        return pre_raw, pre_det
+    pd = copy.deepcopy(stored_pd)
+    comps = pd.setdefault("components", {})
+    for c, sc in onc.items():
+        det = comps.get(c)
+        if not isinstance(det, dict) or sc == offc.get(c):
+            continue
+        stored_sc = None if det.get("absent") else det.get("score")
+        if sc is None:
+            new = None
+        elif stored_sc is None or not offc.get(c):
+            new = sc
+        else:
+            new = round(min(100.0, float(stored_sc) * float(sc) / float(offc[c])), 1)
+        comps[c] = {k: v for k, v in det.items() if k not in ("score", "absent")}
+        comps[c]["score"] = new
+    raw, det = rebuild_pillar(ce, "movement", pd, config)
+    det["_planned_rest"] = {
+        "days": days,
+        "pre_rest_raw": pre_raw,
+        "pre_rest_raw_unblended": pre_det.get("_raw_unblended"),
+        "pre_rest_details": pre_det,
+    }
+    applied.append("planned_rest")
+    return raw, det
+
+
+def lab_aged_metabolic(ce: Any, stored_pd: dict, config: dict, eff: dict, applied: list) -> tuple:
+    """Metabolic with lab ageing applied: when the raw recompute's lab score or evidence weight differs between the switch
+    states, the stored lab score shifts by on - off and the component carries the "on" evidence weight; else verbatim."""
+    off, on = eff.get("off") or {}, eff.get("on") or {}
+    if (off.get("lab_score"), off.get("evidence_weight")) == (on.get("lab_score"), on.get("evidence_weight")):
+        return stored_pd.get("raw_score"), copy.deepcopy(stored_pd.get("components") or {})
+    pd = copy.deepcopy(stored_pd)
+    comps = pd.setdefault("components", {})
+    det = comps.get("lab_biomarkers") or {}
+    stored_sc = None if det.get("absent") else det.get("score")
+    comps["lab_biomarkers"] = dict(det, score=shifted(stored_sc, off.get("lab_score"), on.get("lab_score")))
+    cfg = copy.deepcopy(config)
+    lab_cfg = cfg["pillars"]["metabolic"]["components"].get("lab_biomarkers")
+    if isinstance(lab_cfg, dict) and on.get("evidence_weight") is not None:
+        lab_cfg["evidence_weight"] = on["evidence_weight"]
+    applied.append("lab_ageing")
+    return rebuild_pillar(ce, "metabolic", pd, cfg)
+
+
 def histories(ce: Any, window: list, loader: str) -> dict:
     out: dict = {p: [] for p in PILLAR_ORDER}
     for w in window:
@@ -229,6 +316,7 @@ def replay(spec: dict, inputs: dict) -> dict:
     rel_mode = spec.get("relationships", "verbatim")
     replayed: dict = {}
     transitions: dict = {}  # the receipt is built from the in-memory record (full precision), as the compute builds it
+    applied: dict = {}  # date -> the raw-input effects this step applied
     notes: list = []
 
     def view(d: str) -> Optional[dict]:
@@ -252,6 +340,10 @@ def replay(spec: dict, inputs: dict) -> dict:
             d = shift(d, 1)
             continue
         window = [w for w in (view(shift(d, -b)) for b in range(21, 0, -1)) if w]
+        effects = set(spec.get("effects") or ())
+        eff = (inputs.get("raw_effects") or {}).get(d) or {}
+        if s.get("engine_version") == ce.ENGINE_VERSION:
+            eff = {}  # already computed by this method: the effects are in the stored values
         pre: dict = {}
         mods: dict = {}
         for p in PRIMARY:
@@ -260,8 +352,15 @@ def replay(spec: dict, inputs: dict) -> dict:
                 if rel_mode == "verbatim":
                     pre[p] = (pd.get("raw_score"), copy.deepcopy(pd.get("components") or {}))
                 continue
-            if p in rebuild:
+            if p in rebuild and p == "movement" and "planned_rest" in effects and eff.get("movement"):
+                pre[p] = planned_rest_movement(ce, pd, config, eff["movement"], applied.setdefault(d, []))
+            elif p == "metabolic" and "lab_ageing" in effects and eff.get("metabolic"):
+                pre[p] = lab_aged_metabolic(ce, pd, config, eff["metabolic"], applied.setdefault(d, []))
+            elif p in rebuild:
                 pre[p] = rebuild_pillar(ce, p, pd, config)
+                kept = (pd.get("components") or {}).get("_planned_rest")
+                if p == "movement" and isinstance(kept, dict):  # a row the final method wrote: its proration record stays
+                    pre[p][1]["_planned_rest"] = copy.deepcopy(kept)
                 mod = pd.get("raw_modifier")
                 if isinstance(mod, dict) and mod.get("multiplier") not in (None, 1, 1.0):
                     mods[p] = {"multiplier": mod["multiplier"], "source": mod.get("source")}
@@ -271,6 +370,10 @@ def replay(spec: dict, inputs: dict) -> dict:
         if mods:
             data["raw_score_modifiers"] = mods
         data.update(cpub.consistency_inputs((s.get("pillar_consistency") or {}).get("components"), window, d))
+        comp = eff.get("completeness") or {}
+        if "rest_day_completeness" in effects and comp.get("on") != comp.get("off"):
+            data["data_completeness_pct"] = shifted(data.get("data_completeness_pct"), comp.get("off"), comp.get("on"))
+            applied.setdefault(d, []).append("rest_day_completeness")
         data["engagement_state"] = copy.deepcopy((inputs.get("engagement") or {}).get(d))
         data["vice_streaks"] = engine_inputs(s, (inputs.get("habit_scores") or {}).get(d))
         if s.get("challenge_bonus_xp"):  # carried forward as stored: consumed challenge XP is never recomputed away
@@ -288,9 +391,10 @@ def replay(spec: dict, inputs: dict) -> dict:
         "config_version": (h["config"].get("_meta") or {}).get("version"),
         "uninstrumented_pillars": list(getattr(ce, "UNINSTRUMENTED_PILLARS", ())),
     }
+    applied = {d: v for d, v in applied.items() if v}
     if spec.get("emit") != "items":
-        return {"meta": meta, "notes": notes, "records": {k: strip_transitions(v) for k, v in replayed.items()}}
-    return {"meta": meta, "notes": notes, **emit_items(ce, config, replayed, transitions, inputs)}
+        return {"meta": meta, "notes": notes, "effects_applied": applied, "records": {k: strip_transitions(v) for k, v in replayed.items()}}
+    return {"meta": meta, "notes": notes, "effects_applied": applied, **emit_items(ce, config, replayed, transitions, inputs)}
 
 
 def strip_transitions(rec: dict) -> dict:
