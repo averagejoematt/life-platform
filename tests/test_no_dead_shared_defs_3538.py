@@ -93,6 +93,9 @@ LIVE_DIRS = ("lambdas", "mcp", "deploy", "scripts", "cdk")
 # request_validator.validate_source (deploy/dedup_source_records.py). That they ride in
 # the bundle unused at RUNTIME is a packaging question (#781), not a dead-code one.
 ALLOWED_UNREFERENCED_SHARED_DEFS: dict[str, str] = {
+    "lambdas/health/grounded_intake_facts.py:build_facts": (
+        "#6212/#6291: the all-three-facts entry point of the grounded nutrition and body-composition facts. #6291 wires the module through ONE importer (coach/personal_context.py, behind the coach-context switch, still off), which calls intake_fact and scan_fact directly because the home-scale fact (scale_fact) has no stored series read yet. Pinned by tests/test_grounded_intake_facts_6212.py. Delete this entry when a reader calls build_facts (or delete build_facts if scale_fact stays unread)."
+    ),
     "lambdas/content/private_call_check.py:ledger_findings": (
         "#6199 G2 (owner ruling 2026-11-22 §1): the live invariant tying the ledger's withheld_paths annotation to the private-call detector, run read-only by the driver after the annotation data step (no Lambda calls it until the qa-smoke dead-man leg the PROPORTIONALITY row names); pinned by tests/test_story_ledger_public_view_6199.py. Delete this entry when that leg calls it."
     ),

@@ -699,7 +699,9 @@ def test_a_specialist_sees_its_own_open_recommendations_only(pilot_table):
 def test_the_packet_context_carries_priorities_recommendations_and_the_due_follow_up(pilot_table):
     rid = _seed_rec(pilot_table, follow_up_on="2026-11-20")
     ctx = ccp.packet_context(pilot_table, TODAY, live=True)
-    assert ctx["state"] == "measured" and ctx["priorities"][0]["decision"] == "Push the morning move to December"
+    # #6291: the decisions are `recorded_decisions` (advice he answered), and `text` is the one assembly's render.
+    assert ctx["state"] == "measured" and ctx["recorded_decisions"][0]["decision"] == "Push the morning move to December"
+    assert ctx["text"].startswith(ccp.LEAD_LINE) and "Push the morning move to December" in ctx["text"]
     assert ctx["follow_up_due"]["rec_id"] == rid and ctx["recommendations"][0]["response"] == rr.NOT_RECORDED
     assert "(shared in confidence)" in ctx["told_in_chat"]
 
