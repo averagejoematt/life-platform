@@ -402,13 +402,15 @@ def summary_md(c: dict, preliminary: bool) -> str:
         f"private → every item byte-identical): {'PASSED' if c['e2e']['passed'] else 'FAILED'} — {c['e2e']['result']}.",
         "",
         "## Open items the owner must know",
+        f"- Stress days (the private tool's own accounting, `stress_days.accounting`): {sd.get('accounting')}.",
         f"- Stress days: {total} = {total - len(freeze)} independently computed day(s) whose stored Mind includes a "
         f"stress contribution the revised method holds out, plus {len(freeze)} sick-day freeze row(s) "
         f"({', '.join(freeze) or 'none'}) that copy the previous day's record verbatim and are rewritten from the recomputed "
         f"previous day. Definition: {sd.get('definition')}",
         "- Approval and apply must fall in ONE nightly cycle: both tools refuse once a newer stored sheet exists.",
         "- #6096 landing first would change the plan (re-run, re-approve).",
-        "- The one remaining unexercised safeguard: the private backup's conditional S3 put (`IfNoneMatch`) has not run against real AWS.",
+        "- Unexercised without a production write (stated by the private preflight, verbatim in the backup section): the "
+        "conditional put itself and write permission at request time.",
         "",
     ]
     return "\n".join(lines)
@@ -486,6 +488,7 @@ def main(argv: list) -> int:
     generated = json.load(open(os.path.join(out, "public", "manifest.json"), encoding="utf-8"))["generated_at"]
     silent = None if args.skip_tests else S.run_silent_tests()
     combined = build(out, args.preliminary, generated, e2e, walk, args.previous, silent)
+    combined["preflight"] = S.preflights(out, plan_path)
     with open(os.path.join(out, "combined.json"), "w", encoding="utf-8") as fh:
         json.dump(combined, fh, indent=1, sort_keys=True, default=str)
     with open(os.path.join(out, "COMBINED_SUMMARY.md"), "w", encoding="utf-8") as fh:

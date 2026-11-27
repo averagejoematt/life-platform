@@ -126,7 +126,11 @@ def test_end_to_end_apply_verify_and_rollback_restore_every_item_byte_identicall
     # must-fail: before the private apply the live rows are not the planned ones — the public apply is refused
     assert PI.unplanned_rows(lambda k: table.get_item(Key=k).get("Item"), pub)
 
-    priv = A.apply_plan(store, A.load_plan(plan_path), str(tmp_path), "all", TS)
+    plan = A.load_plan(plan_path)
+    with pytest.raises(T.PlanGuardError):
+        A.apply_plan(store, plan, str(tmp_path / "wrong"), "all", TS, approved_plan_id="0" * 16)  # a wrong approval
+    assert _canon(store) == start  # refused before any write
+    priv = A.apply_plan(store, plan, str(tmp_path), "all", TS, approved_plan_id=plan["plan_id"])
     assert priv["aborted"] == []
     # rollback coverage == write set, both tools (owner: "rollback coverage")
     private_writes = {(r["pk"], r["sk"]) for r in A.load_plan(plan_path)["rows"] if r["action"] == "write"}
@@ -366,3 +370,18 @@ def test_must_fail_a_composite_only_difference_on_the_public_side():
     recs = {d: {"d": d} for d in served}
     assert VF.public_composite_check(recs, dict(served), route=route)["verified"] == 2
     assert VF.public_composite_check(recs, {"2026-10-01": 50.0, "2026-10-02": 51.1}, route=route)["mismatches"][0]["date"] == "2026-10-02"
+
+
+def test_the_private_apply_refuses_without_the_exact_approved_plan_id(private, tmp_path, monkeypatch):
+    """Through the private tool's CLI: no --approved-plan-id, or a different one, exits 4 before any store is opened."""
+    _base, plan_path = private
+    for var in ("AWS_CONFIG_FILE", "AWS_SHARED_CREDENTIALS_FILE"):
+        monkeypatch.setenv(var, os.devnull)
+
+    def no_store(*_a, **_k):
+        raise AssertionError("the refusal must come before any store is opened")
+
+    monkeypatch.setattr(T, "live_store", no_store)
+    out = str(tmp_path / "apply")
+    assert T.main(["--out", out, "--apply", "--plan-in", plan_path]) == 4
+    assert T.main(["--out", out, "--apply", "--plan-in", plan_path, "--approved-plan-id", "0" * 16]) == 4

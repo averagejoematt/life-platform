@@ -45,7 +45,58 @@ SILENT_PATHS = (
 ROLLBACK_COVERAGE_TEST = (
     "tests/test_recompute_combined_6224.py::test_end_to_end_apply_verify_and_rollback_restore_every_item_byte_identically"
 )
-PRIVATE_PLAN_ID_ARG = "reported by the private tool's owner as being added (a mandatory approved plan-id argument); not tested here"
+
+
+def preflights(out: str, plan_path: str) -> dict:
+    """The read-only backup preconditions of both tools. PRIVATE: the private tool's own ``--preflight`` (ListObjectsV2
+    on its backup prefix, GetBucketVersioning — no write). PUBLIC: the public tool writes its pre-image export as a LOCAL
+    file in its ``--out`` directory; the check is that the directory exists, is writable (an access check, not a write)
+    and lies outside the repo."""
+    import json
+
+    cp = subprocess.run(
+        [
+            sys.executable,
+            "scripts/recompute_character_private.py",
+            "--out",
+            os.path.join(out, "preflight"),
+            "--preflight",
+            "--plan-in",
+            plan_path,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        private = json.loads(cp.stdout)
+    except ValueError:
+        private = {"ok": False, "error": (cp.stderr or cp.stdout)[-800:]}
+    pub_dir = os.path.realpath(os.path.join(out, "public"))
+    root = os.path.realpath(ROOT)
+    public = {
+        "location": f"local file {pub_dir}/export_<phase>_<ts>.json (not S3)",
+        "directory_exists": os.path.isdir(pub_dir),
+        "writable": os.access(pub_dir, os.W_OK),
+        "outside_repo": not (pub_dir == root or pub_dir.startswith(root + os.sep)),
+        "copy_to": "after each phase, copy the export (and SUMMARY/manifest) beside the private backup or another durable "
+        "private store — not automated; the rollback reads the local file",
+    }
+    public["ok"] = public["directory_exists"] and public["writable"] and public["outside_repo"]
+    return {"private": private, "public": public}
+
+
+def preflight_lines(c: dict) -> list:
+    pf = c.get("preflight") or {}
+    pv, pb = pf.get("private") or {}, pf.get("public") or {}
+    return [
+        f"- PRIVATE preflight (`recompute_character_private.py --preflight`, read-only): ok={pv.get('ok')}; "
+        f"{pv.get('verified_read_only') or pv.get('error')}.",
+        "  - What a read cannot prove (verbatim): " + "; ".join(pv.get("unverifiable_without_a_write") or ["(not reported)"]),
+        f"- PUBLIC preflight: ok={pb.get('ok')}; the pre-image is a {pb.get('location')}; directory exists "
+        f"{pb.get('directory_exists')}, writable {pb.get('writable')}, outside the repo {pb.get('outside_repo')}. "
+        f"Copy: {pb.get('copy_to')}.",
+    ]
 
 
 def run_silent_tests() -> dict:
@@ -68,6 +119,9 @@ def failures(c: dict, preliminary: bool) -> list:
         out.append(f"public composite differs from /api/character on {len(pc['mismatches'])} date(s)")
     if fs.get("mismatches"):
         out.append(f"last ladder step differs from planned_states on {len(fs['mismatches'])} field(s)")
+    pf = c.get("preflight") or {}
+    if pf and not ((pf.get("private") or {}).get("ok") and (pf.get("public") or {}).get("ok")):
+        out.append("a backup preflight did not pass")
     if fs.get("status") == "pending" and not preliminary:
         out.append("planned_states (the private final-state reader) is missing: the private composite is unverified")
     bad = [n for n, s in (c.get("silent_tests") or {}).items() if s != "PASSED"]
@@ -89,8 +143,13 @@ def final_state_lines(c: dict) -> list:
         )
     else:
         priv = (
-            f"- PRIVATE: last ladder step == `planned_states` on every field (level, XP, composite, pillars, events): "
-            f"{len(fs.get('mismatches') or []) == 0}; composite verified on {fs.get('composite_verified')} of {fs.get('dates')} dates."
+            f"- PRIVATE (supported reader): last ladder step == `planned_states` on every field (level, XP, composite, "
+            f"pillars, events): {len(fs.get('mismatches') or []) == 0}; composite verified on {fs.get('composite_verified')} "
+            f"of {fs.get('dates')} dates. `planned_states` is computed by the tool from the planned items, not copied from "
+            "the ladder. The independent site-API second opinion cannot be taken on the PRIVATE composite: the rule is "
+            "inline in `web.site_api_character.character()` (no callable function) and that route serves only the public "
+            "variant (`character_privacy.public_sheets` fails closed on a private record) — computing it would need a "
+            "site-API change (extracting the rule), not done and not approximated."
         )
     return [
         priv,
@@ -176,6 +235,7 @@ def operations_lines(c: dict) -> list:
         "(conditional put, never overwrites); each entry is the FULL stored item of every row the phase writes, with its digest.",
         "- PUBLIC: `export_<phase>_<ts>.json` in the public --out; each entry is the item's previous `public` attribute (or its "
         "absence) and its method-1 fingerprint, for every item the phase writes, plus the ledger item's pre-image.",
+        *preflight_lines(c),
         f"- Rollback coverage: each tool's export covers exactly its write set (asserted: {ROLLBACK_COVERAGE_TEST}); rollback "
         "order PUBLIC first, then PRIVATE; every item byte-identical after both.",
         "",
@@ -188,7 +248,9 @@ def operations_lines(c: dict) -> list:
         "",
         "**Exact-plan approval before any production write.**",
         f"1. `python3 scripts/recompute_character_private.py --apply --plan-in <out>/private/plan.json --phase sheets` (then "
-        f"`--phase receipts`) — private plan `{p['plan_id']}`; its mandatory approved plan-id argument: {PRIVATE_PLAN_ID_ARG}.",
+        f"`--phase receipts`), each with `--approved-plan-id {p['plan_id']}` — REFUSES (exit 4, before any backup or write) "
+        "unless the id equals the plan file's and the id re-derived from the live rows (tested through the CLI: "
+        "tests/test_recompute_combined_6224.py::test_the_private_apply_refuses_without_the_exact_approved_plan_id).",
         f"2. `python3 scripts/backfill_public_variant.py --apply --plan-in <out>/private/plan.json --approved-public-plan-id "
         f"{pub['public_plan_id']} --phase pre-merge` (then `--phase post-merge`) — REFUSES unless the approved id equals the "
         "recomputed one AND every live row is exactly the approved private plan's planned row (tested: "
