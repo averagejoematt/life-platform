@@ -7,8 +7,8 @@ nothing about which change moved which number. Attribution is therefore in TWO l
 LAYER 1 — the METHOD, on the PRIVATE (method-1) chain. Read from the private tool's own supported reader
 ``recompute_character_private_apply.ladder_states(path)`` (never re-implemented here): the chain's values after each
 named step, cumulative, in the ladder's order. A date's level / XP / composite change is credited to the FIRST step whose
-value differs from the step before (for ``replay_residual``: from the stored row, summarised with the private tool's own
-``chain_state``). Attribution is ORDER-DEPENDENT: a different ladder order would credit differently. Two checks FAIL the
+value differs from the step before (for ``replay_residual``: from the stored row, read with the private tool's own
+``stored_states``). Attribution is ORDER-DEPENDENT: a different ladder order would credit differently. Two checks FAIL the
 run: the control step (``tree_switch_residual``) must equal its predecessor on every date, and the last step must equal
 the planned sheets (``planned_sheets``).
 
@@ -55,9 +55,27 @@ def _range(xs: list) -> Optional[list]:
 # ── layer 1: the method on the private chain ─────────────────────────────────────────────────────────────────────────
 
 
-def method_layer(states: dict, stored_states: dict, planned_states: dict) -> dict:
-    """``states``: {cause: {date: state}} in ladder order (the reader); ``stored_states`` / ``planned_states``:
-    {date: state} of the stored rows and the planned sheets (the same ``chain_state`` summary)."""
+def plan_fields(item: Optional[dict]) -> dict:
+    """The fields a ladder state shares verbatim with a planned sheet (level, XP, each pillar's raw score and level) —
+    read, never re-derived: the composite is the private tool's own summary and is not recomputed here."""
+    v = item or {}
+
+    def num(x: Any) -> Optional[float]:
+        try:
+            return None if x is None else round(float(x), 4)
+        except (TypeError, ValueError):
+            return None
+
+    out = {"character_level": num(v.get("character_level")), "character_xp": num(v.get("character_xp"))}
+    for p in PILLARS:
+        src = (v.get("pillars") or {}).get(p) if "pillars" in v else v.get(f"pillar_{p}")
+        out[p] = (num((src or {}).get("raw_score")), num((src or {}).get("level")))
+    return out
+
+
+def method_layer(states: dict, stored_states: dict, planned_sheets: dict) -> dict:
+    """``states``: {cause: {date: state}} in ladder order (``ladder_states``); ``stored_states``: {date: state} of the
+    stored rows (``stored_states``); ``planned_sheets``: {date: planned sheet} (``planned_sheets``)."""
     order = list(states)
     dates = sorted(stored_states)
     first: dict = {q: {} for q in CHAIN}
@@ -82,13 +100,18 @@ def method_layer(states: dict, stored_states: dict, planned_states: dict) -> dic
             prev_state = cur_state
     i = order.index(CONTROL) if CONTROL in order else -1
     control_diff = [d for d in dates if i > 0 and states[order[i]].get(d) != states[order[i - 1]].get(d)]
-    last_diff = [d for d in dates if order and states[order[-1]].get(d) != planned_states.get(d)]
+    last_diff = [d for d in dates if order and plan_fields(states[order[-1]].get(d)) != plan_fields(planned_sheets.get(d))]
+    first_step = states.get(FIRST_STEP) or {}
+    replay_residual = {
+        q: [d for d in dates if _moved((stored_states.get(d) or {}).get(q), (first_step.get(d) or {}).get(q))] for q in CHAIN
+    }
     return {
         "order": order,
         "first_cause": {q: dict(sorted(v.items(), key=lambda kv: -kv[1])) for q, v in first.items()},
         "first_cause_range": {q: {c: _range([x for x in xs if x is not None]) for c, xs in v.items()} for q, v in deltas.items()},
         "control_differs": control_diff,
         "last_step_differs_from_plan": last_diff,
+        "stored_vs_replay_residual": replay_residual,  # a presentation residual: expected empty, reported, never a failure
         "private_changed_dates": changed_dates,
     }
 
@@ -202,13 +225,11 @@ def public_attribution(cli: Any, snap: dict, config: dict, run_ts: str, plan_pat
     """Both layers and the method event table, for the public manifest (per-date detail stays in the private manifest)."""
     import backfill_public_variant_events as EV
     import recompute_character_private_apply as A
-    import recompute_character_private_report as PR
 
     stored = snap["stored_sheets"]
     states = A.ladder_states(plan_path)
-    stored_states = {d: PR.chain_state(item) for d, item in stored.items()}
-    planned_states = {d: PR.chain_state(item) for d, item in A.planned_sheets(plan_path).items()}
-    layer1 = method_layer(states, stored_states, planned_states)
+    stored_states = A.stored_states(plan_path)
+    layer1 = method_layer(states, stored_states, A.planned_sheets(plan_path))
     base = dict(snap, sheets=stored)
     before = {d: quantities(cli.served_view(item, None), cli.route_composite) for d, item in stored.items()}
     final = _views(cli, snap["sheets"], char)

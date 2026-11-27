@@ -232,8 +232,14 @@ def _attribution_lines(att: dict) -> list:
     lines += [
         f"- Control step `tree_switch_residual` equal to its predecessor on every date: {not m.get('control_differs')} "
         f"(differs on {len(m.get('control_differs') or [])}).",
-        f"- Last step equal to the planned sheets on every date: {not m.get('last_step_differs_from_plan')} "
-        f"(differs on {len(m.get('last_step_differs_from_plan') or [])}).",
+        f"- Last step equal to the planned sheets on every date (level, XP, each pillar's raw score and level): "
+        f"{not m.get('last_step_differs_from_plan')} (differs on {len(m.get('last_step_differs_from_plan') or [])}).",
+        "- Stored states vs the replay_residual step (level / XP / composite; a presentation residual, expected empty, "
+        "reported not failed): "
+        + "; ".join(
+            f"{q} differs on {len(v)}" + (f" ({', '.join(v)})" if v else "") for q, v in (m.get("stored_vs_replay_residual") or {}).items()
+        )
+        + ".",
         "",
         "**Layer 2 — the PUBLIC delta (stored public → v3 public)**, cumulative: `privacy` = the v3 projection of the STORED "
         "private rows (restraint inputs removed, Mind and Relationships unscored in public, the food-delivery multiplier not "

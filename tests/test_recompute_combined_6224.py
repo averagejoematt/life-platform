@@ -194,12 +194,19 @@ def test_layer1_credits_the_first_changing_step_and_fails_a_moving_control():
         "tree_switch_residual": {"2026-10-01": _st(4), "2026-10-02": _st(5)},
         "missing_data": {"2026-10-01": _st(3), "2026-10-02": _st(6)},
     }
-    out = ATT.method_layer(states, stored, states["missing_data"])
+    plan = {"2026-10-01": {"character_level": 3, "character_xp": 10.0}, "2026-10-02": {"character_level": 6, "character_xp": 10.0}}
+    out = ATT.method_layer(states, stored, plan)
     assert out["first_cause"]["character_level"] == {"journal_frequency": 1, "missing_data": 1}  # first step only
     assert out["control_differs"] == [] and out["last_step_differs_from_plan"] == []
+    assert out["stored_vs_replay_residual"] == {"character_level": [], "character_xp": [], "composite": []}
+    states["replay_residual"]["2026-10-02"] = _st(5, xp=11.0)  # a presentation residual is reported, never a failure
+    assert ATT.method_layer(states, stored, plan)["stored_vs_replay_residual"]["character_xp"] == ["2026-10-02"]
+    assert not ATT.failures({"method": ATT.method_layer(states, stored, plan), "public": {}})
+    states["replay_residual"]["2026-10-02"] = _st(5)
     states["tree_switch_residual"]["2026-10-02"] = _st(9)  # must-fail: the control step moves
-    assert ATT.failures({"method": ATT.method_layer(states, stored, states["missing_data"]), "public": {}})
-    assert ATT.failures({"method": ATT.method_layer(states, stored, {"2026-10-01": _st(1)}), "public": {}})  # last != plan
+    assert ATT.failures({"method": ATT.method_layer(states, stored, plan), "public": {}})
+    states["tree_switch_residual"]["2026-10-02"] = _st(5)
+    assert ATT.failures({"method": ATT.method_layer(states, stored, {"2026-10-01": {"character_level": 1}}), "public": {}})  # last != plan
 
 
 def test_layer2_fails_on_a_public_change_no_ladder_step_produces():
@@ -241,6 +248,10 @@ def test_the_plan_carries_ladder_states_the_attribution_reads(private):
     _base, plan_path = private
     states = A.ladder_states(plan_path)
     assert list(states)[-1] == "missing_data" and "tree_switch_residual" in states
+    import recompute_character_attribution as ATT
+
+    out = ATT.method_layer(states, A.stored_states(plan_path), A.planned_sheets(plan_path))
+    assert out["last_step_differs_from_plan"] == [] and out["control_differs"] == []
 
 
 def test_floats_to_decimal_round_trip_keeps_the_fingerprint(private):
