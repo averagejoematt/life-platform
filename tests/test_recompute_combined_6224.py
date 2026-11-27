@@ -128,9 +128,14 @@ def test_end_to_end_apply_verify_and_rollback_restore_every_item_byte_identicall
 
     priv = A.apply_plan(store, A.load_plan(plan_path), str(tmp_path), "all", TS)
     assert priv["aborted"] == []
+    # rollback coverage == write set, both tools (owner: "rollback coverage")
+    private_writes = {(r["pk"], r["sk"]) for r in A.load_plan(plan_path)["rows"] if r["action"] == "write"}
+    priv_export = json.load(open(priv["export"], encoding="utf-8"))
+    assert {(e["pk"], e["sk"]) for e in priv_export["entries"]} == private_writes == {(w["pk"], w["sk"]) for w in priv["written"]}
     assert PI.unplanned_rows(lambda k: table.get_item(Key=k).get("Item"), pub) == []  # now exactly the approved rows
 
     export = B.build_export(lambda k: table.get_item(Key=k).get("Item"), pub, TS)
+    assert {(e["pk"], e["sk"]) for e in export["entries"]} == {(w["pk"], w["sk"]) for w in pub}
     B.record_ledger_preimage(table, export)
     assert B.apply_plan(table, pub, export)["written"] == len(pub)
     B.put_public_ledger(table, {"ledger_version": "v2", "rows": []})
@@ -272,3 +277,92 @@ def test_the_public_apply_refusal_names_the_approval_and_the_live_rows(private, 
     assert "run the private apply first" in PI.apply_refusal(plan, pid, pid, table, pub)
     A.apply_plan(store, A.load_plan(plan_path), str(tmp_path), "all", TS)
     assert PI.apply_refusal(plan, pid, pid, table, pub) is None  # control: approved id + planned rows live
+
+
+# ── owner conditions A and the final state (recompute_character_verify) ──────────────────────────────────────────────
+
+
+def _row(date, who, level, status, new_date=None, reason=None):
+    r = {"date": date, "who": who, "type": "level_up", "key": [who, "level_up", str(level)], "new": level, "status": status}
+    if new_date:
+        r["new_date"] = new_date
+    if reason:
+        r["reason"] = reason
+    return r
+
+
+def _ev(date, who, level):
+    return {"date": date, "who": who, "type": "level_up", "new": level}
+
+
+def _reconcile_fixture():
+    rows = [
+        _row("2026-10-01", "sleep", 4, "KEPT"),
+        _row("2026-10-02", "movement", 7, "MOVED", new_date="2026-10-04"),
+        _row("2026-10-03", "character", 9, "REMOVED", reason="the corrected chain does not reach it"),
+        _row("2026-10-05", "nutrition", 3, "ADDED"),
+    ]
+    marked = [("2026-10-04", ["movement", "level_up", "7"], "2026-10-02"), ("2026-10-05", ["nutrition", "level_up", "3"], None)]
+    final = [_ev("2026-10-01", "sleep", 4), _ev("2026-10-04", "movement", 7), _ev("2026-10-05", "nutrition", 3)]
+    before = [_ev("2026-10-01", "sleep", 4), _ev("2026-10-02", "movement", 7), _ev("2026-10-03", "character", 9)]
+    return {"rows": rows}, marked, final, before
+
+
+def test_the_reconciliation_equation_holds_and_names_the_moved_event():
+    import recompute_character_verify as VF
+
+    out = VF.reconcile_events(*_reconcile_fixture())
+    assert out["failures"] == [] and out["equation"] == {"reconstructed": 2, "added": 1, "moved": 1, "holds": True}
+    assert out["marked_not_added"] == [{"date": "2026-10-04", "key": ["movement", "level_up", "7"], "redated_from": "2026-10-02"}]
+    assert out["served_before"]["by_disposition"] == {"KEPT": 1, "MOVED": 1, "REMOVED (the corrected chain does not reach it)": 1}
+
+
+def test_must_fail_a_planted_duplicate_fails_the_reconciliation():
+    import recompute_character_verify as VF
+
+    comp, marked, final, before = _reconcile_fixture()
+    final.append(_ev("2026-10-09", "sleep", 4))  # the same (who, type, level) on a second date
+    assert any("duplicate" in f for f in VF.reconcile_events(comp, marked, final, before)["failures"])
+
+
+def test_must_fail_an_unmarked_added_event_and_a_marked_kept_one():
+    import recompute_character_verify as VF
+
+    comp, marked, final, before = _reconcile_fixture()
+    fails = VF.reconcile_events(comp, marked[:1] + [("2026-10-01", ["sleep", "level_up", "4"], None)], final, before)["failures"]
+    assert any("without the reconstructed marker" in f for f in fails) and any("KEPT event(s) carry" in f for f in fails)
+
+
+def test_must_fail_a_served_event_with_no_disposition():
+    import recompute_character_verify as VF
+
+    comp, marked, final, before = _reconcile_fixture()
+    before.append(_ev("2026-10-06", "sleep", 5))  # served, but the comparison never accounts for it
+    assert any("no disposition" in f for f in VF.reconcile_events(comp, marked, final, before)["failures"])
+
+
+def _state(comp):
+    return {"character_level": 5.0, "character_xp": 10.0, "composite": comp, "pillars": {}, "events": []}
+
+
+def test_must_fail_a_composite_only_difference_in_the_private_final_state():
+    import recompute_character_verify as VF
+
+    last = {"2026-10-01": _state(61.2), "2026-10-02": _state(60.0)}
+    assert VF.final_state_check(last, {"2026-10-01": _state(61.2), "2026-10-02": _state(60.0)})["mismatches"] == []
+    bad = VF.final_state_check(last, {"2026-10-01": _state(61.2), "2026-10-02": _state(60.1)})
+    assert bad["mismatches"] == ["2026-10-02 composite"] and bad["composite_verified"] == 1
+    assert VF.final_state_check(last, None)["status"] == "pending"
+
+
+def test_must_fail_a_composite_only_difference_on_the_public_side():
+    import recompute_character_verify as VF
+
+    recs = {"2026-10-01": {}, "2026-10-02": {}}
+    ok = VF.public_composite_check(recs, {"2026-10-01": 50.0, "2026-10-02": 51.0}, route=lambda r: None)
+    assert ok["verified"] == 0  # the route serves nothing: never a silent pass
+    served = {"2026-10-01": 50.0, "2026-10-02": 51.0}
+    route = lambda r: served[r["d"]]  # noqa: E731
+    recs = {d: {"d": d} for d in served}
+    assert VF.public_composite_check(recs, dict(served), route=route)["verified"] == 2
+    assert VF.public_composite_check(recs, {"2026-10-01": 50.0, "2026-10-02": 51.1}, route=route)["mismatches"][0]["date"] == "2026-10-02"

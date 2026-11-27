@@ -230,6 +230,10 @@ def public_attribution(cli: Any, snap: dict, config: dict, run_ts: str, plan_pat
     states = A.ladder_states(plan_path)
     stored_states = A.stored_states(plan_path)
     layer1 = method_layer(states, stored_states, A.planned_sheets(plan_path))
+    import recompute_character_verify as VF
+
+    reader = getattr(A, "planned_states", None)  # the private tool's supported reader (composite and events included)
+    layer1["final_state"] = VF.final_state_check(states[list(states)[-1]] if states else {}, reader(plan_path) if reader else None)
     base = dict(snap, sheets=stored)
     before = {d: quantities(cli.served_view(item, None), cli.route_composite) for d, item in stored.items()}
     final = _views(cli, snap["sheets"], char)
@@ -252,6 +256,9 @@ def failures(att: dict) -> list:
         out.append(f"the control step {CONTROL} differs from its predecessor on {len(m['control_differs'])} date(s)")
     if m.get("last_step_differs_from_plan"):
         out.append(f"the last ladder step differs from the planned sheets on {len(m['last_step_differs_from_plan'])} date(s)")
+    fs = m.get("final_state") or {}
+    if fs.get("mismatches"):
+        out.append(f"the last ladder step differs from planned_states on {len(fs['mismatches'])} field(s)")
     if p.get("unattributed"):
         out.append(f"{len(p['unattributed'])} public change(s) no ladder step produces")
     return out

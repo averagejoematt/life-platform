@@ -32,6 +32,8 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
 E2E_TEST = "tests/test_recompute_combined_6224.py"
+import recompute_character_combined_sections as S  # noqa: E402
+
 LOCAL_RUNS = (
     "black / ruff / flake8 on every changed file",
     "the targeted character, public-copies, restraint, private-recompute and combined tests",
@@ -302,6 +304,18 @@ def summary_md(c: dict, preliminary: bool) -> str:
             else "Sleep and movement events lost or moved: none (method or privacy)."
         ),
         "",
+        (
+            "**Run checks: FAILED — " + "; ".join(_att_failures(att) + S.failures(c, preliminary)) + ".**"
+            if _att_failures(att) + S.failures(c, preliminary)
+            else "Run checks: passed (attribution, reconciliation, duplicates, served-event dispositions, public composite, "
+            "silent paths"
+            + (
+                "; the PRIVATE final-state check is PENDING — `planned_states` has not landed — which only a preliminary run " "allows)."
+                if (c.get("final_state") or {}).get("status") == "pending"
+                else ", private final state)."
+            )
+        ),
+        "",
         f"Generated {c['generated_at']}. Nothing written. Private plan id `{p['plan_id']}` · public plan id `{pub['public_plan_id']}`.",
         "",
         "**CI:** the full CI suite has NOT run on this stack (the CI workflows trigger only on PRs to main). Ran locally: "
@@ -364,6 +378,18 @@ def summary_md(c: dict, preliminary: bool) -> str:
         "- The notice readers will see (owner-approved, exactly):",
         *(f"  > {ln}" if ln else "  >" for ln in (pr["notice"] or "").split("\n")),
         "",
+        "## Final-state verification (the complete planned state, composite included)",
+        *S.final_state_lines(c),
+        "",
+        "## Event reconciliation (57 added vs 58 reconstructed; duplicates; every served event accounted for)",
+        *S.reconciliation_lines(c),
+        "",
+        "## What still responds to a poor measured day (XP debt is 0)",
+        *S.responsiveness_lines(c),
+        "",
+        "## Write counts, baselines, backups, rollback, notification suppression and the approval commands",
+        *S.operations_lines(c),
+        "",
         "## Backup and rollback evidence",
         "- PRIVATE pre-image: a local export (+ `.sha256`) and `s3://…/backups/character-private-recompute/<plan_id>/<phase>-<ts>/export.json`, "
         "both re-read and hashed before the first write.",
@@ -388,7 +414,15 @@ def summary_md(c: dict, preliminary: bool) -> str:
     return "\n".join(lines)
 
 
-def build(out: str, preliminary: bool, generated_at: str, e2e: dict, route_walk: Optional[dict], previous: Optional[str] = None) -> dict:
+def build(
+    out: str,
+    preliminary: bool,
+    generated_at: str,
+    e2e: dict,
+    route_walk: Optional[dict],
+    previous: Optional[str] = None,
+    silent: Optional[dict] = None,
+) -> dict:
     priv = json.load(open(os.path.join(out, "private", "plan.json"), encoding="utf-8"))
     pman = json.load(open(os.path.join(out, "public", "manifest.json"), encoding="utf-8"))
     old = json.load(open(previous, encoding="utf-8")) if previous else None
@@ -418,6 +452,10 @@ def build(out: str, preliminary: bool, generated_at: str, e2e: dict, route_walk:
             "events": event_deltas(old, lc["events"], _method_events(att)),
         },
         "privacy": privacy_checks(os.path.join(out, "public")),
+        "verification": pman.get("verification") or {},
+        "final_state": S.final_state(pman),
+        "baselines": S.baselines(pman),
+        "silent_tests": silent,
         "route_walk": route_walk,
         "e2e": e2e,
     }
@@ -446,15 +484,16 @@ def main(argv: list) -> int:
     e2e = {"passed": False, "result": "skipped (--skip-tests)"} if args.skip_tests else e2e_test()
     walk = None if args.skip_tests else synthetic_route_walk()
     generated = json.load(open(os.path.join(out, "public", "manifest.json"), encoding="utf-8"))["generated_at"]
-    combined = build(out, args.preliminary, generated, e2e, walk, args.previous)
+    silent = None if args.skip_tests else S.run_silent_tests()
+    combined = build(out, args.preliminary, generated, e2e, walk, args.previous, silent)
     with open(os.path.join(out, "combined.json"), "w", encoding="utf-8") as fh:
         json.dump(combined, fh, indent=1, sort_keys=True, default=str)
     with open(os.path.join(out, "COMBINED_SUMMARY.md"), "w", encoding="utf-8") as fh:
         fh.write(summary_md(combined, args.preliminary))
-    fails = _att_failures(combined["attribution"])
+    fails = _att_failures(combined["attribution"]) + S.failures(combined, args.preliminary)
     state = "FAILED: " + "; ".join(fails) if fails else "checks passed"
     print(
-        f"COMBINED DRY RUN — nothing written. private {combined['private']['plan_id']} · public {combined['public']['public_plan_id']} · attribution {state}"
+        f"COMBINED DRY RUN — nothing written. private {combined['private']['plan_id']} · public {combined['public']['public_plan_id']} · {state}"
     )
     return 2 if fails else 0
 

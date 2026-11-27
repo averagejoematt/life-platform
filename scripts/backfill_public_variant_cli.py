@@ -796,6 +796,9 @@ def main(argv: list) -> int:
         run_ts[:10],
         character_privacy.PUBLIC_METHOD_VERSION,
     )
+    import recompute_character_verify as VF
+
+    manifest["verification"] = VF.manifest_checks(snap, char, c_rows, manifest["level_credit"])  # #6224 owner conditions A/B
     if private_plan is not None:  # #6224: which named change moves each public number (order-dependent, stated)
         import recompute_character_attribution as ATT
 
