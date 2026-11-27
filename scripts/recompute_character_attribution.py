@@ -29,7 +29,14 @@ from __future__ import annotations
 import statistics
 from typing import Any, Optional
 
-CONTROL = "tree_switch_residual"
+CONTROL = "tree_switch_residual"  # the default; a run reads every control from the plan's ``causes_legend``
+
+
+def controls_of(legend: dict) -> tuple:
+    """The control causes (each must equal its predecessor on every date): the legend entries that say "control"."""
+    return tuple(c for c, text in (legend or {}).items() if str(text).lower().startswith("control")) or (CONTROL,)
+
+
 FIRST_STEP = "replay_residual"
 CHAIN = ("character_level", "character_xp", "composite")
 PUBLIC_Q = ("character_level", "character_xp", "character_xp_debt", "composite")
@@ -73,7 +80,7 @@ def plan_fields(item: Optional[dict]) -> dict:
     return out
 
 
-def method_layer(states: dict, stored_states: dict, planned_sheets: dict) -> dict:
+def method_layer(states: dict, stored_states: dict, planned_sheets: dict, controls: tuple = (CONTROL,)) -> dict:
     """``states``: {cause: {date: state}} in ladder order (``ladder_states``); ``stored_states``: {date: state} of the
     stored rows (``stored_states``); ``planned_sheets``: {date: planned sheet} (``planned_sheets``)."""
     order = list(states)
@@ -98,8 +105,10 @@ def method_layer(states: dict, stored_states: dict, planned_sheets: dict) -> dic
             if cur_state != prev_state:
                 changed_dates.setdefault(d, []).append(cause)
             prev_state = cur_state
-    i = order.index(CONTROL) if CONTROL in order else -1
-    control_diff = [d for d in dates if i > 0 and states[order[i]].get(d) != states[order[i - 1]].get(d)]
+    control_diff = {}
+    for ctl in controls:
+        i = order.index(ctl) if ctl in order else -1
+        control_diff[ctl] = [d for d in dates if i > 0 and states[order[i]].get(d) != states[order[i - 1]].get(d)]
     last_diff = [d for d in dates if order and plan_fields(states[order[-1]].get(d)) != plan_fields(planned_sheets.get(d))]
     first_step = states.get(FIRST_STEP) or {}
     replay_residual = {
@@ -229,7 +238,7 @@ def public_attribution(cli: Any, snap: dict, config: dict, run_ts: str, plan_pat
     stored = snap["stored_sheets"]
     states = A.ladder_states(plan_path)
     stored_states = A.stored_states(plan_path)
-    layer1 = method_layer(states, stored_states, A.planned_sheets(plan_path))
+    layer1 = method_layer(states, stored_states, A.planned_sheets(plan_path), controls_of(A.load_plan(plan_path).get("causes_legend")))
     import recompute_character_verify as VF
 
     reader = getattr(A, "planned_states", None)  # the private tool's supported reader (composite and events included)
@@ -252,8 +261,9 @@ def failures(att: dict) -> list:
     """Why the combined run fails (empty = it passes)."""
     m, p = att.get("method") or {}, att.get("public") or {}
     out = []
-    if m.get("control_differs"):
-        out.append(f"the control step {CONTROL} differs from its predecessor on {len(m['control_differs'])} date(s)")
+    for ctl, ds in (m.get("control_differs") or {}).items():
+        if ds:
+            out.append(f"the control step {ctl} differs from its predecessor on {len(ds)} date(s)")
     if m.get("last_step_differs_from_plan"):
         out.append(f"the last ladder step differs from the planned sheets on {len(m['last_step_differs_from_plan'])} date(s)")
     fs = m.get("final_state") or {}

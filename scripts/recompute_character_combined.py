@@ -232,8 +232,10 @@ def _attribution_lines(att: dict) -> list:
             cells.append(f"{n}, {((m.get('first_cause_range') or {}).get(q) or {}).get(c)}" if n else "0")
         lines.append(f"| {c} | " + " | ".join(cells) + " |")
     lines += [
-        f"- Control step `tree_switch_residual` equal to its predecessor on every date: {not m.get('control_differs')} "
-        f"(differs on {len(m.get('control_differs') or [])}).",
+        *(
+            f"- Control step `{ctl}` (from `causes_legend`) equal to its predecessor on every date: {not ds} (differs on {len(ds)})."
+            for ctl, ds in (m.get("control_differs") or {}).items()
+        ),
         f"- Last step equal to the planned sheets on every date (level, XP, each pillar's raw score and level): "
         f"{not m.get('last_step_differs_from_plan')} (differs on {len(m.get('last_step_differs_from_plan') or [])}).",
         "- Stored states vs the replay_residual step (level / XP / composite; a presentation residual, expected empty, "

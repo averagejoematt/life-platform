@@ -236,7 +236,7 @@ def test_layer1_credits_the_first_changing_step_and_fails_a_moving_control():
     plan = {"2026-10-01": {"character_level": 3, "character_xp": 10.0}, "2026-10-02": {"character_level": 6, "character_xp": 10.0}}
     out = ATT.method_layer(states, stored, plan)
     assert out["first_cause"]["character_level"] == {"journal_frequency": 1, "missing_data": 1}  # first step only
-    assert out["control_differs"] == [] and out["last_step_differs_from_plan"] == []
+    assert out["control_differs"] == {"tree_switch_residual": []} and out["last_step_differs_from_plan"] == []
     assert out["stored_vs_replay_residual"] == {"character_level": [], "character_xp": [], "composite": []}
     states["replay_residual"]["2026-10-02"] = _st(5, xp=11.0)  # a presentation residual is reported, never a failure
     assert ATT.method_layer(states, stored, plan)["stored_vs_replay_residual"]["character_xp"] == ["2026-10-02"]
@@ -286,11 +286,15 @@ def test_method_events_name_the_first_step_and_the_served_state():
 def test_the_plan_carries_ladder_states_the_attribution_reads(private):
     _base, plan_path = private
     states = A.ladder_states(plan_path)
-    assert list(states)[-1] == "missing_data" and "tree_switch_residual" in states
+    plan = A.load_plan(plan_path)
+    assert list(states) == [s["cause"] for s in plan["ladder"]]  # the order is the plan's, never hard-coded
     import recompute_character_attribution as ATT
 
-    out = ATT.method_layer(states, A.stored_states(plan_path), A.planned_sheets(plan_path))
-    assert out["last_step_differs_from_plan"] == [] and out["control_differs"] == []
+    controls = ATT.controls_of(plan["causes_legend"])
+    assert set(controls) >= {"tree_switch_residual", "final_switch_residual"}  # both controls, read from the legend
+    out = ATT.method_layer(states, A.stored_states(plan_path), A.planned_sheets(plan_path), controls)
+    assert out["last_step_differs_from_plan"] == [] and set(out["control_differs"]) == set(controls)
+    assert not any(out["control_differs"].values())
 
 
 def test_floats_to_decimal_round_trip_keeps_the_fingerprint(private):
@@ -375,8 +379,27 @@ def test_must_fail_a_served_event_with_no_disposition():
     assert any("no disposition" in f for f in VF.reconcile_events(comp, marked, final, before)["failures"])
 
 
-def _state(comp):
-    return {"character_level": 5.0, "character_xp": 10.0, "composite": comp, "pillars": {}, "events": []}
+def _state(comp, mood="steady"):
+    return {"character_level": 5.0, "character_xp": 10.0, "composite": comp, "character_mood": mood, "pillars": {}, "events": []}
+
+
+def test_must_fail_a_mood_only_difference_in_the_private_final_state():
+    import recompute_character_verify as VF
+
+    last = {"2026-10-01": _state(61.2)}
+    assert VF.final_state_check(last, {"2026-10-01": _state(61.2, mood="unavailable")})["mismatches"] == ["2026-10-01 character_mood"]
+
+
+def test_must_fail_the_second_control_moving():
+    import recompute_character_attribution as ATT
+
+    s0 = {"2026-10-01": _st(5)}
+    states = {"a": s0, "tree_switch_residual": s0, "b": s0, "final_switch_residual": {"2026-10-01": _st(6)}}
+    out = ATT.method_layer(
+        states, s0, {"2026-10-01": {"character_level": 6, "character_xp": 10.0}}, ("tree_switch_residual", "final_switch_residual")
+    )
+    assert out["control_differs"] == {"tree_switch_residual": [], "final_switch_residual": ["2026-10-01"]}
+    assert ATT.failures({"method": out, "public": {}})
 
 
 def test_must_fail_a_composite_only_difference_in_the_private_final_state():

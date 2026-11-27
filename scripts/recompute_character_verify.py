@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Optional
 
-STATE_FIELDS = ("character_level", "character_xp", "composite", "pillars", "events")
+STATE_FIELDS = ("character_level", "character_xp", "composite", "character_mood", "pillars", "events")
 PUBLIC_PILLARS = ("sleep", "movement", "nutrition", "metabolic", "consistency")
 COMPOSITE_RULE = (
     "/api/character: round(mean of raw_score over the pillars not flagged not_instrumented, 1) — computed by the route "
