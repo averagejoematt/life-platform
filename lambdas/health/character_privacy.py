@@ -435,6 +435,24 @@ def _level(value: Any) -> int:
         return 1
 
 
+# #6224 (owner ruling 2026-11-26 23:50Z): a reconstructed historical event — one the corrected public chain produces on
+# a date where nothing was served before, or a re-dated one — carries INTERNAL provenance: these keys, in the stored
+# public projection and the private audit, read by internal readers only. ``public_sheet`` never serves them, and never
+# serves a reconstructed event among a view's ``level_events`` — so no outbound or time-ordered reader (the chronicle,
+# the dossier, the buddy page, character_stats.json, an email) can present it as new activity. The historical record
+# still shows it on its date: the timelines derive level-ups from the level series on ``public_event_sheets`` days.
+PROVENANCE_KEYS = ("event_provenance", "reconstructed_at", "reconstructed_method", "redated_from")
+RECONSTRUCTED = "reconstructed"
+
+
+def is_reconstructed(event: Any) -> bool:
+    return isinstance(event, dict) and event.get("event_provenance") == RECONSTRUCTED
+
+
+def without_provenance(event: Any) -> Any:
+    return {k: v for k, v in event.items() if k not in PROVENANCE_KEYS} if isinstance(event, dict) else event
+
+
 def is_corrected_chain(view: Any) -> bool:
     """#6224 (owner decision 2026-11-26): True for a variant of the CURRENT public method — the corrected public chain.
     Its stored events are that chain's own day-over-day transitions, so they are served on their dates whatever the
@@ -442,7 +460,7 @@ def is_corrected_chain(view: Any) -> bool:
     return isinstance(view, dict) and view.get("public_method_version") == PUBLIC_METHOD_VERSION
 
 
-def public_event_sheets(records: Any) -> list[dict[str, Any]]:
+def public_event_sheets(records: Any, internal: bool = False) -> list[dict[str, Any]]:
     """The public views that may carry an EVENT, oldest first, as given. #6224: none while the scores are pending a
     recompute.
 
@@ -456,7 +474,7 @@ def public_event_sheets(records: Any) -> list[dict[str, Any]]:
     level."""
     if scores_pending():
         return []
-    views = public_sheets(records, pending=False)
+    views = public_sheets(records, pending=False, internal=internal)
     floor = max((_level(v.get("character_level")) for v in views if _origin(v) != "live" and not is_corrected_chain(v)), default=0)
     return [v for v in views if is_corrected_chain(v) or (_origin(v) == "live" and _level(v.get("character_level")) > floor)]
 
@@ -492,7 +510,7 @@ def event_level(records: Any) -> int:
     return series[-1][1] if series else 1
 
 
-def public_sheet(record: Any, pending: Optional[bool] = None) -> Any:
+def public_sheet(record: Any, pending: Optional[bool] = None, internal: bool = False) -> Any:
     """A stored ``character_sheet`` record as every public route must read it: its PUBLIC variant (owner ruling
     2026-11-05, ``public_view``) with each unpublishable pillar replaced by the held shape. None when the record
     carries no public variant — fail closed, never the method-1 record. Pure; the stored record is never changed. A
@@ -513,6 +531,10 @@ def public_sheet(record: Any, pending: Optional[bool] = None) -> Any:
     if _origin(out) != "live" and not is_corrected_chain(out):  # 11-06: a recalculation (older method) is not an event
         out["recalculated_level_events"] = out.get("level_events") or []
         out["level_events"] = []
+    if not internal:  # #6224: no provenance on a public body, and no reconstructed event served as an event
+        for key in ("level_events", "recalculated_level_events"):
+            if isinstance(out.get(key), list):
+                out[key] = [without_provenance(e) for e in out[key] if not is_reconstructed(e)]
     if scores_pending() if pending is None else pending:  # #6224 containment: the chain values are being recalculated
         suppress_pending(out)
     return out
@@ -621,9 +643,9 @@ def scrub_restraint(view: dict[str, Any]) -> dict[str, Any]:
     return view
 
 
-def public_sheets(records: Any, pending: Optional[bool] = None) -> list[dict[str, Any]]:
+def public_sheets(records: Any, pending: Optional[bool] = None, internal: bool = False) -> list[dict[str, Any]]:
     """``public_sheet`` over a list, dropping every record with no public variant (order kept)."""
-    return [v for v in (public_sheet(r, pending) for r in records or []) if isinstance(v, dict)]
+    return [v for v in (public_sheet(r, pending, internal) for r in records or []) if isinstance(v, dict)]
 
 
 def component_is_publishable(name: str) -> bool:

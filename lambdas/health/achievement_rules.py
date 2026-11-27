@@ -328,8 +328,17 @@ def with_corrected_level_badges(first_earns: dict, chars: Any) -> dict:
     if not any(character_privacy.is_corrected_chain(character_privacy.public_variant(c)) for c in chars or []):
         return first_earns
     level_ids = {r.id for r in BADGE_RULES if r.signal == "current_level"}
-    out = {k: v for k, v in (first_earns or {}).items() if k not in level_ids}
-    out.update({bid: {"earned_date": d, "basis": "corrected_public_level"} for bid, d in level_badge_first_crossings(chars).items()})
+    stored = first_earns or {}
+    out = {k: v for k, v in stored.items() if k not in level_ids}
+    for bid, d in level_badge_first_crossings(chars).items():
+        old = (stored.get(bid) or {}).get("earned_date")
+        if old == d:
+            out[bid] = stored[bid]  # kept: the original record
+        else:  # #6224: reconstructed (new or re-dated) — INTERNAL provenance; render() serves only the date
+            rec = {"earned_date": d, "event_provenance": character_privacy.RECONSTRUCTED}
+            if old:
+                rec["redated_from"] = old
+            out[bid] = rec
     return out
 
 
