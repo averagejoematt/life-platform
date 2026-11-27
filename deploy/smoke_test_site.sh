@@ -652,7 +652,9 @@ if [[ "$QUICK" != "--quick" ]]; then
   # replaced layout is kept as a reference page, never deleted), so neither is the front page's
   # contract any more. The build is fully static — assert its rendered markup, not a client mount.
   check_body_contains "Home: v9 masthead"             "$HOME_FILE"  'header class="mast"'   "$BASE/"
-  check_body_contains "Home: the six-dimensional portrait" "$HOME_FILE" 'portrait-tiles' "$BASE/"
+  # #6320 (2026-11-27): the six portrait tiles became The Days — The Line with the days under it. The check pinned
+  # `portrait-tiles` and rolled the launch of that figure back; it asserts the figure that replaced them.
+  check_body_contains "Home: The Line and the days under it" "$HOME_FILE" 'thedays-start' "$BASE/"
   check_body_contains "Home: self-canonical at /"     "$HOME_FILE"  'rel="canonical" href="https://averagejoematt.com/"' "$BASE/"
   check_body_not_contains "Home: not the preview build" "$HOME_FILE" 'name="robots" content="noindex' "$BASE/"
   check_body_not_contains "Home: kit front page gone"   "$HOME_FILE" 'data-ck-page="front"'  "$BASE/"
