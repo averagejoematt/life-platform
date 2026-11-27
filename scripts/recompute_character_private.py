@@ -82,6 +82,7 @@ LADDER STATES (``ladder_states`` in the plan; additive, outside the plan id; rea
 ``recompute_character_private_apply.ladder_states(path)``) — the chain's values AFTER each step, cumulatively:
 
   {cause: {date: {"character_level": float|None, "character_xp": float|None, "composite": float|None,
+                  "character_mood": str|None,
                   "pillars": {pillar: {"raw_score": float|None, "level": float|None}},
                   "events": [{"who", "type", "old", "new"}]}}}
 

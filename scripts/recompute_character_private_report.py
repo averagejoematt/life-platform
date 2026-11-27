@@ -398,6 +398,7 @@ def chain_state(rec: Optional[dict]) -> Optional[dict]:
         "character_level": num(rec.get("character_level")),
         "character_xp": num(rec.get("character_xp")),
         "composite": round(sum(raws) / len(raws), 1) if raws else None,
+        "character_mood": rec.get("character_mood"),
         "pillars": pillars,
         "events": events,
     }
@@ -408,7 +409,7 @@ def ladder_states(ladder_f: list) -> dict:
     return {cause: {d: chain_state(r) for d, r in sorted(recs.items())} for cause, recs in ladder_f}
 
 
-STATE_FIELDS = ("character_level", "character_xp", "composite", "pillars", "events")
+STATE_FIELDS = ("character_level", "character_xp", "composite", "character_mood", "pillars", "events")
 
 
 def check_final_state(ladder_states: dict, planned_states: dict) -> None:

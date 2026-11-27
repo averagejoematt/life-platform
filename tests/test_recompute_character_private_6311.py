@@ -625,7 +625,7 @@ def test_ladder_states_reconcile_to_the_plan_and_the_control_equals_its_predeces
     assert states["missing_data"] == {d: R.chain_state(sheets[d]) for d in sorted(sheets)}  # the last step IS the plan
     assert states["tree_switch_residual"] == states["replay_residual"]  # the control changes nothing
     one = states["missing_data"][_d(1)]
-    assert set(one) == {"character_level", "character_xp", "composite", "pillars", "events"}
+    assert set(one) == {"character_level", "character_xp", "composite", "character_mood", "pillars", "events"}
     assert one["pillars"]["relationships"] == {"raw_score": None, "level": None}
     assert set(one["pillars"]) == set(R.STATE_PILLARS)
     # the ablation question the public side asks: at which step did a value first change?
