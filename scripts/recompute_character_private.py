@@ -499,7 +499,31 @@ class LiveStore:
             if err.get("Code") == "PreconditionFailed" or status == 412:
                 raise BackupExists(f"s3://{self.bucket}/{key}: {err.get('Code')} (HTTP {status})") from e
             raise
-        return {"http_status": resp.get("ResponseMetadata", {}).get("HTTPStatusCode"), "version_id": resp.get("VersionId")}
+        return {
+            "http_status": resp.get("ResponseMetadata", {}).get("HTTPStatusCode"),
+            "version_id": resp.get("VersionId"),
+            "server_side_encryption": resp.get("ServerSideEncryption"),
+            "checksums": {k: v for k, v in resp.items() if k.startswith("Checksum")},
+        }
+
+    def client_settings(self) -> dict:
+        """The S3 client's settings the backup put runs under (for comparison across sessions)."""
+        import boto3
+        import botocore
+
+        inner = getattr(self.s3, "_inner", self.s3)
+        cfg = inner.meta.config
+        return {
+            "boto3": boto3.__version__,
+            "botocore": botocore.__version__,
+            "endpoint_url": inner.meta.endpoint_url,
+            "region": inner.meta.region_name,
+            "request_checksum_calculation": getattr(cfg, "request_checksum_calculation", None),
+            "response_checksum_validation": getattr(cfg, "response_checksum_validation", None),
+            "signature_version": getattr(cfg, "signature_version", None),
+            "s3_config": getattr(cfg, "s3", None),
+            "put_parameters": {"IfNoneMatch": "*", "ContentType": "application/json", "ServerSideEncryption": "not set (bucket default)"},
+        }
 
     def object_version(self, key: str) -> Optional[str]:
         """The object's current version id (HeadObject, a read)."""

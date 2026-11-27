@@ -295,7 +295,8 @@ def probe_conditional_put(store: Any, key: Optional[str] = None) -> dict:
     key = key or probe_key()
     if not key.startswith(PROBE_PREFIX) or key.startswith(BACKUP_PREFIX + "/"):
         raise PlanGuardError(f"the probe writes only under {PROBE_PREFIX}: refused {key}")
-    out: dict = {"key": key, "bucket": getattr(store, "bucket", None), "steps": {}}
+    settings = getattr(store, "client_settings", None)
+    out: dict = {"key": key, "bucket": getattr(store, "bucket", None), "client_settings": settings() if settings else None, "steps": {}}
     existing = [k for k in store.list_backups(key) if k == key]
     out["steps"]["a_absent_before"] = {"ok": not existing, "existing": existing}
     if existing:
@@ -304,7 +305,13 @@ def probe_conditional_put(store: Any, key: Optional[str] = None) -> dict:
     first, second = probe_payload("first", key), probe_payload("second", key)
     try:
         put = put_verified_backup(store, key, first)
-        out["steps"]["b_conditional_put"] = {"ok": True, "http_status": put.get("http_status"), "version_id": put.get("version_id")}
+        out["steps"]["b_conditional_put"] = {
+            "ok": True,
+            "http_status": put.get("http_status"),
+            "version_id": put.get("version_id"),
+            "server_side_encryption": put.get("server_side_encryption"),
+            "checksums": put.get("checksums"),
+        }
         out["steps"]["c_read_back"] = {
             "ok": put["read_back_sha256"] == put["sha256"],
             "sha256": put["sha256"],
