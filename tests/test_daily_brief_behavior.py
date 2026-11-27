@@ -2187,13 +2187,30 @@ class TestPreComputedContext:
         assert handler_env["html"].calls[0][1]["brief_mode"] == "standard"
 
     def test_the_character_sheet_reaches_both_the_renderer_and_the_public_character_block(self, handler_env):
+        from health import character_privacy
+
         cs = day_row("character_sheet", YESTERDAY, character_level=Decimal("7"), tier_name="Forged", xp_total=Decimal("4100"))
-        # #6224: public_stats.json's character block is the PUBLIC variant's, never the method-1 record's (that was a leak)
-        cs["public"] = {"public_method_version": "character-public-v2", "origin": "live", "character_level": Decimal("5")}
+        # #6224: public_stats.json's character block is the PUBLIC variant's, never the method-1 record's (that was a leak).
+        # A CURRENT-method block (the global switch off here) publishes its level.
+        cs["public"] = {"public_method_version": character_privacy.PUBLIC_METHOD_VERSION, "origin": "live", "character_level": Decimal("5")}
         handler_env["table"].store[(cs["pk"], cs["sk"])] = cs
         brief.lambda_handler({}, None)
         assert handler_env["html"].calls[0][1]["character_sheet"]["character_level"] == 7.0  # the owner's email: method 1
         assert _published(handler_env)["character"]["level"] == 5.0
+
+    def test_an_older_method_public_block_publishes_the_recalculating_state_with_the_switch_off(self, handler_env):
+        """#6224 (2026-11-27): an older-method (v2) block is always "being recalculated" — no number — whatever the
+        global switch says; the owner's email still reads method 1."""
+        from health import character_privacy
+
+        assert not character_privacy.scores_pending()
+        cs = day_row("character_sheet", YESTERDAY, character_level=Decimal("7"))
+        cs["public"] = {"public_method_version": character_privacy.PUBLIC_METHOD_V2, "origin": "live", "character_level": Decimal("5")}
+        handler_env["table"].store[(cs["pk"], cs["sk"])] = cs
+        brief.lambda_handler({}, None)
+        assert handler_env["html"].calls[0][1]["character_sheet"]["character_level"] == 7.0
+        published = _published(handler_env)["character"]
+        assert published["status"] == "recalculating" and published["level"] is None
 
     def test_while_pending_the_public_character_block_is_the_recalculating_state(self, handler_env, monkeypatch):
         from health import character_privacy
