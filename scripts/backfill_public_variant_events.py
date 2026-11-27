@@ -60,7 +60,7 @@ def _day(view: dict) -> str:
 def served_events(records: list, *, old_rule: bool) -> list[dict]:
     """Every level event the public routes serve from ``records``, flattened: {date, who, type, old, new, key}."""
     with _serving(old_rule=old_rule, keep_mind=old_rule):
-        views = CP.public_event_sheets(records)
+        views = CP.public_event_sheets(records, internal=True)  # the historical record, provenance included
     out = []
     for v in views:
         for ev in v.get("level_events") or []:
@@ -70,9 +70,9 @@ def served_events(records: list, *, old_rule: bool) -> list[dict]:
             new = ev.get("new_tier") if "tier" in str(ev.get("type")) else ev.get("new_level")
             old = ev.get("old_tier") if "tier" in str(ev.get("type")) else ev.get("old_level")
             old, new = _norm(old), _norm(new)
-            out.append(
-                {"date": _day(v), "who": who, "type": ev.get("type"), "old": old, "new": new, "key": [who, ev.get("type"), str(new)]}
-            )
+            row = {"date": _day(v), "who": who, "type": ev.get("type"), "old": old, "new": new, "key": [who, ev.get("type"), str(new)]}
+            row.update({k: ev[k] for k in CP.PROVENANCE_KEYS if k in ev})
+            out.append(row)
     return out
 
 
@@ -190,3 +190,46 @@ def event_comparison(before_records: list, after_records: list, badge_rungs: dic
         "level_badges": {bid: crossings[str(n)] for bid, n in badge_rungs.items()},
         "level_milestones": {f"level_{n}": crossings[str(n)] for n in milestone_rungs},
     }
+
+
+def annotate_provenance(after_blocks: dict, stored: dict, comparison: dict, reconstructed_at: str, method_version: str) -> int:
+    """Write the INTERNAL provenance onto the recomputed public blocks (``after_blocks``: {date: block}, in place) — owner
+    ruling 2026-11-26 23:50Z: every ADDED and MOVED event is ``event_provenance: "reconstructed"`` with
+    ``reconstructed_at`` and ``reconstructed_method`` (and ``redated_from`` when moved); a KEPT event carries none.
+
+    Idempotent: when the STORED block (``stored``: {date: stored item}) is already a corrected-chain variant holding the
+    same event, its provenance is copied exactly (present or absent) — so a dry run after an apply plans no write and a
+    second run never re-stamps an event. Returns the number of events marked reconstructed."""
+    status: dict = {}
+    for r in comparison["rows"]:
+        if r["status"] == "ADDED":
+            status[(r["date"], tuple(r["key"]))] = None
+        elif r["status"] == "MOVED":
+            status[(r["new_date"], tuple(r["key"]))] = r["date"]
+    marked = 0
+    for d, block in after_blocks.items():
+        old = (stored.get(d) or {}).get(CP.PUBLIC_KEY) or {}
+        old_list = list(old.get("level_events") or []) + list(old.get("recalculated_level_events") or [])
+        old_events = {_event_key(e): e for e in old_list if isinstance(e, dict)}
+        for ev in (block or {}).get("level_events") or []:
+            if not isinstance(ev, dict):
+                continue
+            key = _event_key(ev)
+            for k in CP.PROVENANCE_KEYS:
+                ev.pop(k, None)
+            if CP.is_corrected_chain(old) and key in old_events:
+                ev.update({k: old_events[key][k] for k in CP.PROVENANCE_KEYS if k in old_events[key]})
+            elif (d, key) in status:
+                ev.update(
+                    {"event_provenance": CP.RECONSTRUCTED, "reconstructed_at": reconstructed_at, "reconstructed_method": method_version}
+                )
+                if status[(d, key)]:
+                    ev["redated_from"] = status[(d, key)]
+            marked += 1 if CP.is_reconstructed(ev) else 0
+    return marked
+
+
+def _event_key(ev: dict) -> tuple:
+    who = str(ev.get("pillar") or "character").lower()
+    new = ev.get("new_tier") if "tier" in str(ev.get("type")) else ev.get("new_level")
+    return (who, ev.get("type"), str(_norm(new)))

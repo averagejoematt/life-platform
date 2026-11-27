@@ -467,15 +467,21 @@ def servable_event(entry: Any) -> bool:
     return bool(RP.RESTRAINT_DATA_PUBLISHED) or (entry.get("measurement") or {}).get("basis") == TIER0_STREAK_BASIS
 
 
-def read_announced_events(table, user_prefix: str) -> list[dict]:
+def read_announced_events(table, user_prefix: str, include_reconstructed: bool = False) -> list[dict]:
     """The consumer surface (#1628): announced events only, oldest first.
 
     Baseline and subsumed entries are consumed rungs, not announcements — a
     consumer must never surface them as news. #6224: neither is a streak rung written from the stored streak
-    (``servable_event``) — the digest's named recipients and the coach event triggers read this.
+    (``servable_event``) — the digest's named recipients and the coach event triggers read this. Nor, by default, is a
+    RECONSTRUCTED entry (owner ruling 2026-11-26 23:50Z: "avoid generating historical notifications, artificial feed
+    activity or subscriber emails") — a level rung the corrected public chain re-dates, or one the sweep consumed for a
+    historical crossing: it is history, visible to an internal reader that asks for it (``include_reconstructed``) and
+    silent to every outbound one.
     """
     events = [e for e in read_ledger(table, user_prefix)["events"] if e.get("announce") and e.get("event_date") and servable_event(e)]
     events = corrected_level_entries(events, _character_records(table, user_prefix))
+    if not include_reconstructed:
+        events = [e for e in events if not character_privacy.is_reconstructed(e)]
     return sorted(events, key=lambda e: str(e["event_date"]))
 
 
@@ -498,6 +504,22 @@ def _character_records(table, user_prefix: str) -> list:
         return []
 
 
+def _historical_level_silent(entry: dict, signals: dict, today: str) -> dict:
+    """#6224 (owner ruling 2026-11-26 23:50Z): a level rung whose FIRST crossing in the credited public level series is
+    earlier than the newest computed day is history (the corrected chain reached it on a past date) — written dated on
+    that crossing, unannounced, with internal provenance: never a notification today. A rung first crossed on the newest
+    day is a genuine new crossing and is announced as before."""
+    if entry.get("ladder") != "level" or not entry.get("announce"):
+        return entry
+    series = signals.get("character_level_series") or []
+    rule = RULES_BY_ID.get(str(entry.get("milestone_id")))
+    first = next((d for d, lv in series if d and rule and lv >= rule.threshold), None)
+    newest = series[-1][0] if series else None
+    if first and newest and first < newest:
+        return dict(entry, announce=False, event_date=first, event_provenance=character_privacy.RECONSTRUCTED, reconstructed_at=today)
+    return entry
+
+
 def corrected_level_entries(events: list, character_records: list) -> list:
     """#6224 (owner decision 2026-11-26: "Move milestones to their correct dates where necessary ... Do not retain
     achievements that no longer satisfy their actual eligibility rules. Do not invent replacement events"): a served
@@ -517,7 +539,10 @@ def corrected_level_entries(events: list, character_records: list) -> list:
         hit = next((d for d, lv in series if d and rule and lv >= rule.threshold), None)
         if hit is None:
             continue  # the corrected chain does not reach this rung: not served
-        out.append(e if hit == e.get("event_date") else dict(e, event_date=hit, redated_from=e.get("event_date")))
+        if hit == e.get("event_date"):
+            out.append(e)
+        else:  # re-dated history: internal provenance, never an announcement (``read_announced_events``)
+            out.append(dict(e, event_date=hit, redated_from=e.get("event_date"), event_provenance=character_privacy.RECONSTRUCTED))
     return out
 
 
@@ -705,6 +730,7 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
 
     chars_sorted = sorted(chars, key=lambda i: str(i.get("sk") or ""))
     character_level = character_privacy.event_level(chars_sorted)  # owner ruling 2026-11-06: public, never by recalculation
+    character_level_series = character_privacy.event_level_series(chars_sorted)  # #6224: dates a historical crossing
 
     # Training days + strength volume: hevy workout sub-records (DATE#d#WORKOUT#id)
     # union strava activity days (the spiral_breaker convention).
@@ -792,6 +818,7 @@ def collect_signals(table, user_prefix: str, phase_filter, today: str) -> dict:
         "tier0_streak_basis": TIER0_STREAK_BASIS if tier0_streak is not None else None,
         "days_tracked": len(habits_sorted),
         "character_level": character_level,
+        "character_level_series": character_level_series,
         # #1628 window-milestone signal families (pure inputs to process_milestones)
         "training_dates": sorted(training_days),
         "strength_volume_by_day": strength_volume_by_day,
@@ -934,6 +961,7 @@ def sweep(
         suppressed = _celebration_suppressed(table, today)
 
     result = evaluate(signals, ledger["existing_ids"], ledger["last_event_date"], today, suppressed=suppressed)
+    result["to_write"] = [_historical_level_silent(e, signals, today) for e in result["to_write"]]
     written = [e for e in result["to_write"] if _put_once(table, user_prefix, e, stamp)]
     written = baseline_written + written
     return {

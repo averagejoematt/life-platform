@@ -344,7 +344,18 @@ def _event_lines(lv: dict) -> list:
                 if proof
                 else ""
             )
-            out.append(f"  - {r['status']} {r['date']} {r['who']} {r['type']} {r['old']}→{r['new']}{tail}{vals}")
+            prov = (
+                " · provenance: reconstructed" + (f", redated_from {r['date']}" if r["status"] == "MOVED" else "")
+                if r["status"] in ("ADDED", "MOVED")
+                else ""
+            )
+            out.append(f"  - {r['status']} {r['date']} {r['who']} {r['type']} {r['old']}→{r['new']}{tail}{vals}{prov}")
+    out.append(
+        f"- Events stored with INTERNAL provenance `reconstructed` (reconstructed_at, reconstructed_method; redated_from when "
+        f"moved): {lv.get('reconstructed_events_marked', 0)}. Never served publicly, never an outbound event (no digest, coach "
+        "trigger, chronicle, buddy, character_stats.json or email); level badges / milestones MOVED or ADDED below are "
+        "reconstructed too (internal records only)."
+    )
     lost, mism = lv["verbatim_losses"], lv["stored_verbatim_mismatches"]
     out.append(
         f"- Public-input pillar (sleep/movement/nutrition/metabolic) events LOST: {len(lost)}"
@@ -758,6 +769,18 @@ def main(argv: list) -> int:
     }
     manifest["privacy_vs_timing"] = privacy_vs_timing(snap, privacy_only, full)
     manifest["level_credit"] = level_credit_changes(snap, char)
+    # #6224 (owner ruling 2026-11-26 23:50Z): the INTERNAL provenance of every reconstructed event, stored in the
+    # recomputed public projection (never served — character_privacy.public_sheet strips it and serves no reconstructed
+    # event as an event); idempotent against an already-applied block
+    import backfill_public_variant_events as EV
+
+    manifest["level_credit"]["reconstructed_events_marked"] = EV.annotate_provenance(
+        {d: r["public"] for d, r in char.items() if r.get("public")},
+        snap["sheets"],
+        manifest["level_credit"]["events"],
+        run_ts[:10],
+        character_privacy.PUBLIC_METHOD_VERSION,
+    )
     manifest["correlations_and_what_changed"] = correlation_aggregates(table, snap, grades)
     manifest["latest_surfaces"] = latest_surfaces(snap, char)
     h_rows = R.habit_pct_rows(snap["habitify"], snap["profile"].get("habit_registry") or {})
