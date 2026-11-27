@@ -45,6 +45,26 @@ CHAT_COACH_IDS = ["pattern_coach", "career_coach", "eli_marsh"]
 CONSULTING_COACH_IDS = ["glucose_coach", "labs_coach"]
 RETIRED_COACH_IDS = ["training_coach"]
 
+# The ONE registry of absorptions (#6312): a retired seat -> the operational seat that took
+# over its lane. A record addressed to the retired id (a correction logged to "training")
+# belongs to the absorbing coach; stored rows are never rewritten, the reader resolves.
+# Keys MUST equal RETIRED_COACH_IDS and every value MUST be operational
+# (tests/test_persona_registry.py); the prose twin is the retired persona's
+# `retirement_note` in config/personas.json.
+ABSORBED_BY = {"training_coach": "physical_coach"}
+
+
+def absorbing_coach_id(coach_id):
+    """The coach that now holds a retired seat's lane, in the SAME id form the caller passed
+    (bare in -> bare out, suffixed in -> suffixed out); any other id comes back unchanged."""
+    cid = (coach_id or "").strip().lower()
+    bare = cid.removesuffix("_coach")
+    target = ABSORBED_BY.get(f"{bare}_coach")
+    if target is None:
+        return coach_id
+    return target if cid.endswith("_coach") else target.removesuffix("_coach")
+
+
 # Every coach with a voice spec a texting surface may load (worker persona path).
 TEXTING_PERSONA_IDS = [c for c in OPERATIONAL_COACH_IDS if c not in CONSULTING_COACH_IDS] + CHAT_COACH_IDS
 

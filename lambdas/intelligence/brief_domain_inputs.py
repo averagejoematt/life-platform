@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from boto3.dynamodb.conditions import Key
 from common import constants as _constants
 from common.activity_overlap import HEVY_DEVICE
+from common.pacific_time import pacific_today, parse_day_key
 from common.strava_read_seam import STRAVA_SOURCE, strava_read_seam
 from experiment.phase_filter import singleton_visible, with_phase_filter
 from training import workout_identity
@@ -214,6 +215,49 @@ def withings_block(data: Dict[str, Any]) -> Dict[str, Any]:
     if weight is None or not row_date or row_date < genesis:
         return {"weight_lbs": None, "weight_lbs_date": None}
     return {"weight_lbs": round(weight, 1), "weight_lbs_date": row_date}
+
+
+def dexa_block(data: Dict[str, Any]) -> Dict[str, Any]:
+    """The newest DEXA scan, read WHERE IT IS STORED and DATED.
+
+    ``_build_physical_data`` read ``body_fat_pct`` / ``lean_mass_lb`` / ``visceral_fat_lb``
+    off the TOP LEVEL of the row; the stored row (``scripts/ingest_lab_report.py dexa``,
+    docs/SCHEMA.md "dexa") holds them under ``body_composition.*``, so the physical coach
+    got null and no scan date and said there was no baseline while one was on file.
+
+    A scan is a benchmark, not today's reading (#1924's lesson for weight): the scan's own
+    date and its age in days travel with the numbers, and the note labels it historical.
+    The age is measured to the brief's subject day (``data["date"]``), else the PT today.
+    No scan on file → null fields and a note that says so (absence stated as absence).
+    """
+    row: Dict[str, Any] = data.get("dexa") or {}
+    bc_raw = row.get("body_composition")
+    bc: Dict[str, Any] = bc_raw if isinstance(bc_raw, dict) else {}
+    scan_date = str(row.get("scan_date") or str(row.get("sk", ""))[len("DATE#") :])[:10] or None
+    out: Dict[str, Any] = {
+        "body_fat_pct": _num(bc.get("body_fat_pct")),
+        "lean_mass_lb": _num(bc.get("lean_mass_lb")),
+        "visceral_fat_lb": _num(bc.get("visceral_fat_lb")),
+        "dexa_scan_date": scan_date,
+        "dexa_scan_age_days": None,
+        "dexa_scan_note": "No DEXA scan on file - there is no body-composition baseline to cite.",
+    }
+    if not bc or scan_date is None:
+        return out
+    ref = parse_day_key(str(data.get("date") or pacific_today())[:10])
+    scanned = parse_day_key(scan_date)
+    if ref is None or scanned is None:
+        out["dexa_scan_note"] = (
+            f"DEXA scan dated {scan_date} - its age could not be computed; treat it as a historical benchmark, not today's reading."
+        )
+        return out
+    age = max(0, (ref - scanned).days)
+    out["dexa_scan_age_days"] = age
+    out["dexa_scan_note"] = (
+        f"DEXA scan of {scan_date}, {age} days old - a historical benchmark from that date, not today's body composition. "
+        "State the date when citing it; do not narrate it as current."
+    )
+    return out
 
 
 def _activity_entry(a: Dict[str, Any], day: Dict[str, Any]) -> Dict[str, Any]:

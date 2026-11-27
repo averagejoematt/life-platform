@@ -1261,7 +1261,6 @@ def _social_mind_signals(posts):
 
 def _build_physical_data(data):
     """Extract physical-domain data for the physical coach."""
-    dexa = data.get("dexa") or {}
     meas = data.get("measurements") or {}
     recency = data.get("weight_recency") or {}
     # #2104: `latest_weight` is the bare newest number from a window that, on the days
@@ -1275,9 +1274,9 @@ def _build_physical_data(data):
         # #4373: the subject day's Withings weigh-in, dated + genesis-guarded (weight only —
         # Withings body fat is owner-only; see brief_domain_inputs.withings_block).
         **brief_domain_inputs.withings_block(data),
-        "body_fat_pct": _safe_float(dexa, "body_fat_pct"),
-        "lean_mass_lb": _safe_float(dexa, "lean_mass_lb"),
-        "visceral_fat_lb": _safe_float(dexa, "visceral_fat_lb"),
+        # The newest DEXA scan, read from `body_composition.*` where it is stored, with its date
+        # and age (brief_domain_inputs.dexa_block) — the top-level read returned null for years.
+        **brief_domain_inputs.dexa_block(data),
         "waist_height_ratio": _safe_float(meas, "waist_height_ratio"),
         "latest_weight": latest_weight,
         # #1924: `latest_weight` and `weight_lbs` above are bare numbers. Handed to the
