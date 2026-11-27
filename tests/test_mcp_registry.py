@@ -37,7 +37,7 @@ REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")
 # Expected tool count range — update when consolidating or adding tools
 EXPECTED_MIN_TOOLS = 50  # #395 ER-04 prune (2026-07-08): registry cut 143 -> 60 against 30d usage telemetry
 EXPECTED_MAX_TOOLS = (
-    95  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
+    96  # #395 held 70; +2 Horizons (#1705); +1 log_coach_calibration (#1481); +1 mark_journal_quote (#1568);
     # +1 audit_coach_dossier (#1387); +1 manage_diary_claims (#1841) — deliberate additions.
     # +5 (#3668): describe_platform_surfaces + get_platform_surface (the index and the waiter — TWO tools
     # covering 59 unreachable owner-relevant endpoints, deliberately NOT 59 tools, because an oversized
@@ -92,6 +92,9 @@ EXPECTED_MAX_TOOLS = (
     # +1 (#6208): manage_research_finding — owner rulings 2026-11-22 (epic #6206): the owner-only research findings store
     # (verified sources, dedupe, append-only history). The store's sole writer, so a tool of its own; ONE tool with seven
     # actions (record / add_source / set_state / link / decide / correct / list), not seven tools.
+    # +1 (#6292): manage_personal_hypothesis — owner rulings 2026-11-26: revisable, evidence-linked hypotheses about him in
+    # the findings partition. A tool of its own (not more actions on manage_research_finding) because EVERY write of it is
+    # queue-only through the #6287 approval scope, while a finding is a direct owner write; ONE tool, nine actions.
 )
 
 

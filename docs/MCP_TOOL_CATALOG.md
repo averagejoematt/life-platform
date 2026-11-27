@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-23
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-11-27
 
-**Version:** v8.6.0 | **Last updated:** 2026-11-23 | **Total tools:** 96
+**Version:** v8.6.0 | **Last updated:** 2026-11-27 | **Total tools:** 97
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -21,7 +21,7 @@
 
 ---
 
-## All 96 Tools — by module
+## All 97 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -52,6 +52,7 @@
 | `mcp/tools_advice_links.py` | 1 |
 | `mcp/tools_coach_recommendations.py` | 1 |
 | `mcp/tools_research_findings.py` | 1 |
+| `mcp/tools_personal_hypotheses.py` | 1 |
 | `mcp/tools_advice_queue.py` | 1 |
 | `mcp/tools_hevy.py` | 2 |
 | `mcp/tools_hevy_routine.py` | 1 |
@@ -266,6 +267,12 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `manage_research_finding` | action, finding_id=, question=, dedupe_key=, sources=[], source=, evidence_summary=, evidence_strength=, applicability=, limitations=, risk_tier=, touches=[], clinical_review_required=, responsible_coach=, review_by=, origin=, surfaced_by=, date=, state=, reason=, superseded_by=, link_kind=, rec_id=, experiment_id=, verdict=, simulated=, words=, field=, value=, status=, publication_eligible=, risk_rationale=, words_are=, provenance=, authorizes=, observed_on=, observation_note=, include_simulated= | OWNER-ONLY. The research findings store (#6208): a finding's question, its identity-verified sources (the identifier resolves to this record; this does not show the source supports the finding), the evidence and its limits, and an append-only history. action='record': question, dedupe_key (lowercase slug), sources (1-12 objects printed by scripts/research_finding_verify.py, pasted UNEDITED — a stamp refuses an edited title; each carries claim_supported_by abstract_read\|full_text_read and supports_note, the reader's own assertion of support), evidence_summary, evidence_strength strong\|moderate\|weak\|insufficient ('strong' needs a full_text source), applicability {text, population_match direct\|partial\|poor}, limitations, risk_tier 1-5 (1 observational, 2 reversible behavioural, 3 training/nutrition, 4 supplement/electrolyte, 5 medication), touches, clinical_review_required, risk_rationale (why this tier, 20-400 chars), responsible_coach (persona id), review_by, origin prospective\|retrospective\|simulated, surfaced_by, date. A word tripwire (drugs, supplements, electrolytes, intake terms) refuses undeclared touches; it has known gaps and is not a classifier — the declared touches and rationale are the record, and a correction can only tighten risk. A live finding with the same dedupe_key is refused and named. action='add_source' (finding_id, source). action='set_state' (finding_id, state, reason; superseded_by; observed_on + observation_note for observation_recorded): transitions follow a fixed lifecycle, closed states are terminal, a tier-5 finding never reaches an experiment, an observation (observation_planned) is only for an observation-only tier<=2 finding after his decide authorizes='observation' and stays observation-only (no correction may add intervention risk); an evaluation must EQUAL its verdict (the experiment's copied result recorded after the experiment started, or his decide authorizes='verdict' on an observation); a tier-5 finding is never evaluated here (clinician_hold) — its exits are declined, rejected or superseded. action='link' (finding_id, link_kind recommendation + rec_id \| experiment + experiment_id \| personal_result + experiment_id: the verdict is COPIED from that experiment's analysis; simulated=true + verdict for a rehearsal). action='decide' (finding_id, words, words_are owner_verbatim\|owner_adopted_text\|session_summary, provenance, optional authorizes observation\|verdict — a verdict decision carries verdict supported\|contradicted\|inconclusive — optional publication_eligible). action='correct' (finding_id, field, value, reason). action='list' (status live\|stale\|closed\|all, state, finding_id, responsible_coach, include_simulated). Never set a state or a decision he did not state, and never store generated wording as owner_verbatim. Never quoted on the site, in an email or in a coach prompt. |
+
+### mcp.tools_personal_hypotheses (`mcp/tools_personal_hypotheses.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `manage_personal_hypothesis` | action, hypothesis_id=, question=, dedupe_key=, explanations=[], distinguishing=, confidence=, questions_worth_asking=[], proposed_by=, provenance=, wording_is=, date=, evidence=, session_ref=, view=, words=, words_are=, changes=, endorses=, status=, explanation=, reason= | OWNER-ONLY. Matthew's working hypotheses about himself (#6292): an open question with 2-5 competing explanations, the evidence for and against each, what would tell them apart, a confidence in WORDS (never a number), questions worth asking, his own view, and a status. An interpretation of a pattern, never a diagnosis: wording that diagnoses or names a condition as a claim is refused. READS (direct): action='list' (status all\|open\|closed) — a rejected hypothesis stays visible as rejected; flag 'propose retirement' after 3 conversations with no new evidence (never auto-retired); action='get' (hypothesis_id) — the full history in plain language. WRITES are QUEUE-ONLY: a direct call writes nothing — enqueue with manage_pending_writes(action='enqueue', target_tool='manage_personal_hypothesis', target_args=<these arguments>, summary) and approve/discard only on his explicit say-so. action='propose': question, dedupe_key (lowercase slug), explanations [{label, statement}] (2-5), distinguishing, confidence {word too_early\|mixed\|leaning\|fairly_clear, leaning_toward <key> for leaning/fairly_clear}, questions_worth_asking (<=5), proposed_by, provenance, wording_is owner_verbatim\|owner_adopted_text\|session_summary, date. Refused beyond 7 open hypotheses (retire or resolve one first) and for a dedupe_key already on record. action='add_evidence' (hypothesis_id, evidence {direction supports\|counts_against\|neutral, explanations [keys a..e], evidence_kind, source_ref, date YYYY\|YYYY-MM\|YYYY-<season>\|YYYY-MM-DD, statement}, optional confidence). action='note_conversation' (hypothesis_id, session_ref): discussed, no new evidence. action='owner_view' (hypothesis_id, view confirm\|correct\|reject\|not_interested, words + words_are; reject and not_interested need owner_verbatim and close it until HE reopens; correct carries changes {question?, distinguishing?, questions_worth_asking?, explanations? {<key>: {label?, statement?}}}; confirm may name endorses <key>). action='set_status' (hypothesis_id, status exploratory\|supported\|contradicted\|unresolved, reason; supported / contradicted name the explanation and need evidence in that direction). action='retire' (hypothesis_id, reason). action='reopen' (hypothesis_id, words, words_are owner_verbatim). Never record a view he did not state, never store generated wording as owner_verbatim. Never quoted on the site, in an email or in a coach prompt. |
 
 ### mcp.tools_advice_queue (`mcp/tools_advice_queue.py`)
 
