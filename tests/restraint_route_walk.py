@@ -103,6 +103,8 @@ def tokens() -> list:
     out += CP.withheld_public_tokens(_engine_config())
     # #6224 (owner ruling 2026-11-26 23:50Z): a reconstructed event's INTERNAL provenance never reaches a public body
     out += [k.lower() for k in CP.PROVENANCE_KEYS]
+    # #6293 planned_rest: the owner-only planned-pause detail never reaches a public body
+    out += [k.lower() for k in CP.PLANNED_REST_KEYS]
     return out
 
 

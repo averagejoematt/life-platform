@@ -154,7 +154,9 @@ def privacy_checks(public_dir: str) -> dict:
     plan = json.load(open(os.path.join(public_dir, "plan.json"), encoding="utf-8"))
     ledger = json.load(open(os.path.join(public_dir, "public_correction_ledger.json"), encoding="utf-8"))
     with open(os.path.join(ROOT, "config", "character_sheet.json"), encoding="utf-8") as fh:
-        tokens = [t.lower() for t in CP.withheld_public_tokens(json.load(fh))] + [k.lower() for k in CP.PROVENANCE_KEYS]
+        tokens = [t.lower() for t in CP.withheld_public_tokens(json.load(fh))] + [
+            k.lower() for k in CP.PROVENANCE_KEYS + CP.PLANNED_REST_KEYS
+        ]
     leaks, numbers, served = [], [], 0
     for w in plan:
         if not w["pk"].endswith("#SOURCE#character_sheet"):
@@ -373,7 +375,7 @@ def summary_md(c: dict, preliminary: bool) -> str:
         *_method_event_lines(att),
         "",
         "## Privacy and provenance verification",
-        f"- Planned public blocks checked as served: {pr['planned_blocks_served']}; withheld or provenance tokens: "
+        f"- Planned public blocks checked as served: {pr['planned_blocks_served']}; withheld, provenance or planned-rest tokens: "
         f"{len(pr['withheld_or_provenance_tokens'])}; Mind / Relationships numbers: {len(pr['unscored_pillar_numbers'])}.",
         f"- Route walk (offline, synthetic rows, corrected-chain variant planted): {c['route_walk']}.",
         f"- Public correction ledger per-date rows: {pr['ledger_rows']} (no difference table is public).",
@@ -388,6 +390,15 @@ def summary_md(c: dict, preliminary: bool) -> str:
         "",
         "## What still responds to a poor measured day (XP debt is 0)",
         *S.responsiveness_lines(c),
+        "",
+        "## Planned rest: the public trade-off (the owner's pending decision)",
+        *S.tradeoff_lines(c),
+        "",
+        "## The mood label",
+        *S.mood_lines(c),
+        "",
+        "## Interrupted apply, side by side",
+        *S.interrupted_apply_lines(),
         "",
         "## Write counts, baselines, backups, rollback, notification suppression and the approval commands",
         *S.operations_lines(c),

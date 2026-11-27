@@ -141,7 +141,7 @@ def final_state_lines(c: dict) -> list:
     else:
         priv = (
             f"- PRIVATE (supported reader): last ladder step == `planned_states` on every field (level, XP, composite, "
-            f"pillars, events): {len(fs.get('mismatches') or []) == 0}; composite verified on {fs.get('composite_verified')} "
+            f"mood, pillars, events): {len(fs.get('mismatches') or []) == 0}; composite verified on {fs.get('composite_verified')} "
             f"of {fs.get('dates')} dates. `planned_states` is computed by the tool from the planned items, not copied from "
             "the ladder. The independent site-API second opinion cannot be taken on the PRIVATE composite: the rule is "
             "inline in `web.site_api_character.character()` (no callable function) and that route serves only the public "
@@ -276,3 +276,70 @@ def baselines(pman: dict) -> dict:
 
 def final_state(pman: dict) -> Optional[dict]:
     return ((pman.get("attribution") or {}).get("method") or {}).get("final_state")
+
+
+def tradeoff_lines(c: dict) -> list:
+    """The planned-rest trade-off for the owner's pending decision: counts and ranges only (sick-day dates stay private)."""
+    t = (c.get("verification") or {}).get("rest_tradeoff") or {}
+    f = t.get("fields") or {}
+    lvl = (f.get("overall level") or {}).get("dates", 0)
+    mv = f.get("movement raw") or {}
+    worst = max((abs(x) for x in (mv.get("range") or [0])), default=0)
+    affected = max((v.get("dates", 0) for v in f.values()), default=0)
+    lines = [
+        f"As built, the public score does not apply the rest allowance (sick days are owner-only; the public day is "
+        f"restored as scored). In this window {t.get('dates_with_planned_rest', 0)} planned date(s) carry the private "
+        f"allowance; applying it publicly (a what-if, computed here only, NOT shipped) would change {affected} date(s), "
+        f"Movement raw by at most {worst}; "
+        + ("no public overall level differs" if not lvl else f"the public overall level differs on {lvl} date(s)")
+        + f"; level events added, removed or re-dated: {t.get('events_differ_dates', 0)} date(s)"
+        + (
+            f" (on {t.get('events_detail_only_dates')} date(s) the same event records a different detail)."
+            if t.get("events_detail_only_dates")
+            else "."
+        ),
+        "",
+        "| public quantity | dates that differ, (a) as built vs (b) with the allowance | range (b − a) |",
+        "|---|---|---|",
+    ]
+    for label, v in f.items():
+        lines.append(f"| {label} | {v.get('dates')} | {v.get('range')} |")
+    lines.append(
+        f"| level events added, removed or re-dated | {t.get('events_differ_dates', 0)} | by pillar: {t.get('events_differ_by_pillar') or {}} |"
+    )
+    lines.append(
+        f"| level events identical but a recorded detail differs (e.g. the event's level_score) | {t.get('events_detail_only_dates', 0)} | — |"
+    )
+    return lines
+
+
+def interrupted_apply_lines() -> list:
+    return [
+        "| | PRIVATE (`recompute_character_private.py`) | PUBLIC (`backfill_public_variant.py`) |",
+        "|---|---|---|",
+        "| pre-image | ONE per plan: `backups/character-private-recompute/<plan_id>/export.json` + local + sha256, written "
+        "once (IfNoneMatch) | one per phase: `backups/character-public-recompute/<public_plan_id>/export_<phase>.json` + "
+        "`.sha256` + local, written once (IfNoneMatch) |",
+        "| a second `--apply` of the same plan | re-verifies the existing pre-image, takes no second one, and COMPLETES only "
+        "if every exported row is exactly its pre-image or exactly its planned value; otherwise writes nothing and points "
+        "to rollback | continues only if the existing backup's content equals the export it is about to use — after any "
+        "partial write the live pre-images differ, so a resumed partial apply always STOPS (zero writes): roll back from "
+        "the S3 backup, then re-apply |",
+        "| rollback | `--rollback <export> --apply` (its local export) | `--rollback s3://…/export_<phase>.json --apply` "
+        "(sha256 verified first), post-merge phase before pre-merge |",
+    ]
+
+
+def mood_lines(c: dict) -> list:
+    m = (c.get("verification") or {}).get("mood") or {}
+    return [
+        f"- PRIVATE (stored → planned, the supported state readers): {m.get('private_rewritten')} label(s) rewritten — "
+        + ", ".join(f"{k}: {v}" for k, v in sorted((m.get("private_moves") or {}).items()))
+        + ".",
+        "- PUBLIC label on those dates after the recompute (v3 chain): "
+        + ", ".join(f"{k}: {v}" for k, v in sorted((m.get("public_label_on_those_dates") or {}).items()))
+        + f". Labels the public chain produces over the window: {', '.join(m.get('public_labels_produced') or [])}; "
+        f"'dormant' produced publicly: {m.get('dormant_public')}.",
+        f"- While the scores are pending, `/api/character` serves mood = {m.get('served_while_pending')} (the route's own "
+        "code on the planned records: suppressed with the rest of the headline).",
+    ]

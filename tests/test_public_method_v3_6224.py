@@ -130,3 +130,28 @@ def test_the_route_walk_plants_the_current_method():
     pv: dict = {}
     RW._plant_provenance(pv)
     assert pv["public_method_version"] == V3
+
+
+def test_character_config_describes_v3():
+    """/api/character_config's ``public_method`` block (``_public_method``, the function the route serves it from)."""
+    from web import site_api_character as ch
+
+    class _Empty:
+        def get_item(self, **_kw):
+            return {}
+
+    method = ch._public_method(_Empty())
+    assert method["version"] == V3 and set(method["unscored_pillars"]) == {"mind", "relationships"}
+    assert method["history"][-1]["version"] == V3
+
+
+def test_the_public_pages_never_show_dormant_and_never_call_silence_decline():
+    """/method/game/ (generated) and the character sheet's script: no "dormant" label is ever rendered, and the mood
+    copy says logging silence is unavailable, never decline (#6293 mood_label_presence)."""
+    page = open(os.path.join(ROOT, "site", "method", "game", "index.html"), encoding="utf-8").read().lower()
+    assert "dormant" not in page and "never read as decline" in page
+    js = open(os.path.join(ROOT, "site", "assets", "js", "evidence_character.js"), encoding="utf-8").read()
+    shown = [ln for ln in js.splitlines() if "`" in ln or '"' in ln]  # rendered strings, comments aside
+    assert not any("dormant</" in ln or ">dormant" in ln for ln in shown)
+    assert 'if (m === "dormant") return "unavailable";' in js  # a stored pre-amendment label reads unavailable
+    assert "unavailable — logging has been quiet" in js and "fading — the measured days are trending down" in js

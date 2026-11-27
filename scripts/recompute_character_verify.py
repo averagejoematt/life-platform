@@ -46,9 +46,8 @@ def final_state_check(last_step: dict, planned_states: Optional[dict]) -> dict:
     return {"status": "checked", "dates": len(dates), "mismatches": mism, "composite_verified": len(dates) - len(comp_bad)}
 
 
-def route_composite_of(record: dict) -> Optional[float]:
-    """The composite ``/api/character`` serves for ``record`` (a sheet carrying its planned ``public`` block), from the
-    route's own code: a stub table that returns only this record; scores served live (the post-switch state)."""
+def route_character_of(record: dict, pending: bool = False) -> dict:
+    """``/api/character``'s ``character`` block for ``record`` from the route's own code on a stub table."""
     from health import character_privacy as CP
     from web import site_api_vitals as vitals
 
@@ -60,12 +59,45 @@ def route_composite_of(record: dict) -> Optional[float]:
             return {}
 
     saved = (vitals.table, CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE)
-    vitals.table, CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = _Only(), False
+    vitals.table, CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = _Only(), pending
     try:
-        body = json.loads(vitals.handle_character()["body"])
+        return json.loads(vitals.handle_character()["body"]).get("character") or {}
     finally:
         vitals.table, CP.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = saved
-    return (body.get("character") or {}).get("composite_score")
+
+
+def mood_changes(stored_states: dict, planned_states: dict, c_rows: list, records: dict) -> dict:
+    """The mood label: stored → planned (PRIVATE, from the supported state readers), what the PUBLIC label is on those
+    dates after the recompute, and whether ``/api/character`` serves any mood while the scores are pending."""
+    moves: dict = {}
+    dates = []
+    for d in sorted(planned_states):
+        a, b = (stored_states.get(d) or {}).get("character_mood"), (planned_states.get(d) or {}).get("character_mood")
+        if a != b:
+            moves[f"{a} → {b}"] = moves.get(f"{a} → {b}", 0) + 1
+            dates.append(d)
+    public_after = {r["date"]: (r.get("character_mood") or [None, None])[1] for r in c_rows}
+    public_labels: dict = {}
+    for d in dates:
+        lab = str(public_after.get(d))
+        public_labels[lab] = public_labels.get(lab, 0) + 1
+    produced = sorted({str(v) for v in public_after.values()})
+    pending_moods = sorted({str(route_character_of(records[d], pending=True).get("character_mood")) for d in sorted(records)[-3:]})
+    return {
+        "private_rewritten": len(dates),
+        "private_moves": moves,
+        "public_label_on_those_dates": public_labels,
+        "public_labels_produced": produced,
+        "dormant_public": "dormant" in produced,
+        "served_while_pending": pending_moods,
+        "_dates": dates,
+    }
+
+
+def route_composite_of(record: dict) -> Optional[float]:
+    """The composite ``/api/character`` serves for ``record`` (a sheet carrying its planned ``public`` block), from the
+    route's own code: a stub table that returns only this record; scores served live (the post-switch state)."""
+    return route_character_of(record).get("composite_score")
 
 
 def public_composite_check(records: dict, reported: dict, route: Callable[[dict], Optional[float]] = route_composite_of) -> dict:
@@ -260,3 +292,97 @@ def manifest_checks(snap: dict, char: dict, c_rows: list, level_credit: dict) ->
         "public_composite": public_composite_check(records, {d: reported.get(d) for d in records}),
         "responsiveness": live_responsiveness(c_rows),
     }
+
+
+# ── the planned-rest trade-off (owner's pending decision; a what-if computed in the dry run only, never shipped) ─────
+
+
+TRADEOFF_FIELDS = (
+    ("movement raw", ("pillar_movement", "raw_score")),
+    ("movement level", ("pillar_movement", "level")),
+    ("overall level", ("character_level",)),
+    ("consistency raw", ("pillar_consistency", "raw_score")),
+    ("consistency level", ("pillar_consistency", "level")),
+)
+
+
+def _at(block: Optional[dict], path: tuple) -> Any:
+    node: Any = block or {}
+    for k in path:
+        node = node.get(k) if isinstance(node, dict) else None
+    return node
+
+
+def rest_tradeoff(cli: Any, snap: dict, config: dict, run_ts: str, char: dict) -> dict:
+    """(a) the public chain as built (the planned pause restored: no public rest allowance) vs (b) a WHAT-IF in which the
+    public chain keeps the private rest allowance. Counts and ranges only; the dates stay in the private manifest."""
+    from health import character_public
+
+    original = character_public.without_private_modifiers
+
+    def keep_allowance(raw: Any, details: Any) -> tuple:
+        d = dict(details or {})
+        d.pop("_planned_rest", None)
+        return original(raw, d)
+
+    character_public.without_private_modifiers = keep_allowance  # type: ignore[assignment]
+    try:
+        what_if = cli.run_replays(snap, config, run_ts, order_fix=True)[0]
+    finally:
+        character_public.without_private_modifiers = original  # type: ignore[assignment]
+    marked = sorted(d for d, s in snap["sheets"].items() if "_planned_rest" in ((s.get("pillar_movement") or {}).get("components") or {}))
+    out: dict = {"dates_with_planned_rest": len(marked), "fields": {}, "events_differ_dates": 0, "_dates": {}}
+    for label, path in TRADEOFF_FIELDS + (("composite", None),):
+        deltas, dates = [], []
+        for d in sorted(char):
+            a, b = (char.get(d) or {}).get("public"), (what_if.get(d) or {}).get("public")
+            if path is None:
+                va = cli.route_composite(cli.served_view(snap["sheets"][d], a)) if a else None
+                vb = cli.route_composite(cli.served_view(snap["sheets"][d], b)) if b else None
+            else:
+                va, vb = _at(a, path), _at(b, path)
+            if va != vb:
+                dates.append(d)
+                if isinstance(va, (int, float)) and isinstance(vb, (int, float)):
+                    deltas.append(round(float(vb) - float(va), 4))
+        out["fields"][label] = {"dates": len(dates), "range": [min(deltas), max(deltas)] if deltas else None}
+        out["_dates"][label] = dates
+    from health import character_privacy as CP
+
+    def events(block: Optional[dict]) -> list:  # the provenance the dry run marks on (a) is not an event difference
+        return [
+            {k: v for k, v in e.items() if k not in CP.PROVENANCE_KEYS}
+            for e in (_at(block, ("level_events",)) or [])
+            if isinstance(e, dict)
+        ]
+
+    ev = [d for d in sorted(char) if events((char.get(d) or {}).get("public")) != events((what_if.get(d) or {}).get("public"))]
+    out["events_differ_dates"], out["_dates"]["events"] = len(ev), ev
+
+    def keys(block: Optional[dict]) -> list:
+        return sorted(f"{e.get('pillar') or 'character'} {e.get('type')} {e.get('new_level') or e.get('new_tier')}" for e in events(block))
+
+    out["_event_diffs"] = {
+        d: {"as_built": keys((char.get(d) or {}).get("public")), "what_if": keys((what_if.get(d) or {}).get("public"))} for d in ev
+    }
+    keyed = [d for d in ev if set(out["_event_diffs"][d]["as_built"]) != set(out["_event_diffs"][d]["what_if"])]
+    out["events_detail_only_dates"] = len(ev) - len(keyed)  # same events, a recorded detail (e.g. level_score) differs
+    out["events_differ_dates"] = len(keyed)
+    kinds: dict = {}
+    for d in ev:
+        a, b = set(out["_event_diffs"][d]["as_built"]), set(out["_event_diffs"][d]["what_if"])
+        for k in a ^ b:
+            who = k.split()[0]
+            kinds[who] = kinds.get(who, 0) + 1
+    out["events_differ_by_pillar"] = kinds
+    out["_dates"]["planned_rest"] = marked
+    return out
+
+
+def mood_changes_from_plan(plan_path: str, c_rows: list, snap: dict, char: dict) -> dict:
+    """``mood_changes`` through the private tool's supported readers (``stored_states`` / ``planned_states``)."""
+    import backfill_public_variant as B
+    import recompute_character_private_apply as A
+
+    records = {d: dict(snap["sheets"][d], **{B.PUBLIC: char[d]["public"]}) for d in snap["sheets"] if (char.get(d) or {}).get("public")}
+    return mood_changes(A.stored_states(plan_path), A.planned_states(plan_path), c_rows, records)

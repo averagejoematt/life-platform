@@ -477,6 +477,10 @@ def _level(value: Any) -> int:
 # the dossier, the buddy page, character_stats.json, an email) can present it as new activity. The historical record
 # still shows it on its date: the timelines derive level-ups from the level series on ``public_event_sheets`` days.
 PROVENANCE_KEYS = ("event_provenance", "reconstructed_at", "reconstructed_method", "redated_from")
+# #6293 planned_rest: the private Movement detail that records a planned pause (a sick or travel day — owner-only). The
+# public method restores the day without it (``character_public.without_private_modifiers``); none of these keys may
+# reach a public body or the stored ``public`` projection (the route walk's leak tokens and the combined run check it).
+PLANNED_REST_KEYS = ("_planned_rest", "pre_rest_raw", "pre_rest_raw_unblended", "pre_rest_details")
 RECONSTRUCTED = "reconstructed"
 
 
