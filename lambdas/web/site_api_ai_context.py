@@ -34,6 +34,7 @@ from datetime import datetime, timedelta
 from boto3.dynamodb.conditions import Key
 from common import activity_publication as _activity_publication  # owner rulings 2026-11-03/05: private metrics off the wire
 from common.constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from common.query_pages import query_pages  # #6271: a window read follows every page
 from common.strava_read_seam import strava_read_seam  # #4419: multi-device strava duplicates removed at the read
 from experiment.phase_filter import singleton_visible, source_reads_cross_phase, with_phase_filter  # ADR-058 / #946 / #2109
 
@@ -349,11 +350,14 @@ def _recent_day_rows(source: str, days: int, today: str) -> list:
     """#4979: `source`'s DATE# rows over the trailing `days` (today inclusive), per-source cross-phase
     (#2109 — the watch partition is a raw timeseries, true in every cycle)."""
     start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
-    resp = _table().query(
+    # #6271: every page. An Apple Health row is up to ~90 KB, so the 30-day window passes DynamoDB's 1 MB page and a
+    # single query (oldest first) dropped the NEWEST days. A failed page raises into `_soft_block`: no watch block.
+    resp = query_pages(
+        _table(),
         **with_phase_filter(
             {"KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").between(f"DATE#{start}", f"DATE#{today}~")},
             include_pilot=source_reads_cross_phase(source),
-        )
+        ),
     )
     return strava_read_seam(source, _decimal_to_float(resp.get("Items", [])))
 
