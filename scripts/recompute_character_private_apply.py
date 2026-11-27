@@ -232,15 +232,24 @@ def ensure_preimage(store: Any, plan: dict, out_dir: str, now: str) -> dict:
     export = {"schema": EXPORT_SCHEMA, "plan_id": plan["plan_id"], "taken_at": now, "entries": entries}
     body = json.dumps(export, sort_keys=True, indent=1).encode()
     sha = hashlib.sha256(body).hexdigest()
-    with open(path, "wb") as fh:
-        fh.write(body)
+    # Staged as .pending: the local export takes its final name (and its .sha256) only once the S3 copy is written and
+    # read back verified. A failed or refused put leaves no local export that claims a backup exists.
+    pending = path + ".pending"
+    try:
+        with open(pending, "wb") as fh:
+            fh.write(body)
+        with open(pending, "rb") as fh:
+            if hashlib.sha256(fh.read()).hexdigest() != sha:
+                raise PlanGuardError("the local export does not read back to its hash — no write made")
+        _verified_export(open(pending, "rb").read(), plan)
+        put_verified_backup(store, key, body)
+    except BaseException:
+        if os.path.exists(pending):
+            os.remove(pending)
+        raise
+    os.replace(pending, path)
     with open(path + ".sha256", "w", encoding="utf-8") as fh:
         fh.write(sha + "\n")
-    with open(path, "rb") as fh:
-        if hashlib.sha256(fh.read()).hexdigest() != sha:
-            raise PlanGuardError("the local export does not read back to its hash — no write made")
-    _verified_export(open(path, "rb").read(), plan)
-    put_verified_backup(store, key, body)
     export.update(_local_path=path, _s3_key=key, _sha256=sha, _aborted_before_export=aborted, _resumed=False)
     return export
 
