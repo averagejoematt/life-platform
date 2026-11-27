@@ -309,6 +309,9 @@ _META_FIELDS = {
     "source_ref",
     "owner_reviewed_at",
     "reviewed_via",
+    # #6294 life-domain tags — read by the owner-only development profile, never rendered as text
+    "life_domains",
+    "life_direction",
 }
 
 # ── #6287: provenance for reviewed personal records ──────────────────────────
@@ -343,6 +346,54 @@ _SEASON_ALIASES = {"fall": "autumn"}
 
 #: Fields the approval path stamps — a caller can never supply them.
 APPROVAL_STAMPED_FIELDS = ("owner_reviewed_at", "reviewed_via")
+
+# ── #6294: the life domains a reviewed personal record may be tagged to ─────────
+#: The closed vocabulary = the keys of the development profile's domain registry
+#: (`health.development_profile.DOMAINS`; tests/test_development_profile_6294.py holds them equal).
+#: Kept here as a literal so this module keeps its zero-dep import. A SEPARATE field from
+#: `domains` (which names coach ids): `life_domains` says which part of his life the record
+#: speaks to, and nothing reads it but the owner-only profile.
+LIFE_DOMAINS = (
+    "physical_capacity",
+    "behavioural_consistency",
+    "learning_and_experimentation",
+    "self_understanding",
+    "emotional_wellbeing",
+    "social_connection",
+    "meaning_and_fulfilment",
+    "confidence_and_agency",
+    "coping_and_flexibility",
+)
+#: His own reading of which way the record points, in the domain(s) it is tagged to. Optional.
+LIFE_DIRECTIONS = ("better", "same", "harder", "unclear")
+#: Only a record in his own words, or one he confirmed, may be tagged to a life domain: an
+#: interpretation, a competing hypothesis, a rejected interpretation or an observed pattern is
+#: never evidence about how he is doing (owner rulings 2026-11-26).
+LIFE_DOMAIN_TAGGABLE_KINDS = frozenset({"owner_statement", "self_report", "confirmed_event", "recollection", "confirmed_insight"})
+
+
+def _validate_life_tags(fields: dict, kind: str) -> tuple[str | None, dict]:
+    """#6294: (error, normalized) for the optional ``life_domains`` / ``life_direction`` tags."""
+    domains, direction = fields.get("life_domains"), fields.get("life_direction")
+    if domains in (None, []) and direction is None:
+        return None, {}
+    if not isinstance(domains, list) or not domains:
+        return "life_direction needs life_domains — a non-empty list of life domains", {}
+    bad = [d for d in domains if d not in LIFE_DOMAINS]
+    if bad:
+        return f"unknown life domain(s) {bad} — valid: {list(LIFE_DOMAINS)}", {}
+    if kind not in LIFE_DOMAIN_TAGGABLE_KINDS:
+        return (
+            f"evidence_kind '{kind}' cannot be tagged to a life domain — only his own words or what he confirmed "
+            f"({sorted(LIFE_DOMAIN_TAGGABLE_KINDS)}) count as evidence about how he is doing",
+            {},
+        )
+    out: dict = {"life_domains": sorted(set(domains), key=LIFE_DOMAINS.index)}
+    if direction is not None:
+        if direction not in LIFE_DIRECTIONS:
+            return f"life_direction must be one of {list(LIFE_DIRECTIONS)}", {}
+        out["life_direction"] = direction
+    return None, out
 
 
 def _infer_precision(event_date: str) -> str | None:
@@ -414,7 +465,10 @@ def validate_provenance(fields: dict) -> tuple[str | None, dict]:
     err, event_date, precision = normalize_event_date(fields.get("event_date"), fields.get("event_date_precision"))
     if err:
         return err, {}
-    out = {"evidence_kind": kind}
+    err, tags = _validate_life_tags(fields, kind)
+    if err:
+        return err, {}
+    out = {"evidence_kind": kind, **tags}
     if event_date is not None:
         out["event_date"] = event_date
     if precision is not None:
