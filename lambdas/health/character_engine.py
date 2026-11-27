@@ -422,8 +422,73 @@ def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[flo
     return _weighted_pillar_score(scores, components)
 
 
+# #6293 final amendments (owner ruling 2026-11-26, "Finish the four outstanding scoring-method amendments"). Each is ONE
+# module switch, default on, so a method ladder (scripts/recompute_character_private.py) can turn exactly that behaviour
+# off to replay the step before it — never a second implementation.
+PLANNED_REST_PRORATES = True  # planned_rest: a recorded planned pause (sick / travel) leaves Movement's count windows
+LAB_AGE_TAPERS_WEIGHT = True  # lab_ageing: an ageing lab result loses WEIGHT (evidence), never score
+REST_DAY_COMPLETENESS = True  # rest_day_completeness: a day with no activity anywhere does not expect a Strava row
+MOOD_NOT_OBSERVED = True  # mood_label_presence: logging silence reads "unavailable", never "dormant"/"fading"
+
+# The Movement components that count sessions / days / minutes / kinds over the trailing 7-day window.
+MOVEMENT_WINDOW_COMPONENTS = ("training_frequency", "zone2_adequacy", "movement_diversity", "strength_sessions")
+MOVEMENT_WINDOW_DAYS = 7
+
+
+def planned_rest_in_window(data: dict[str, Any]) -> int:
+    """#6293 planned_rest: how many of the 7 days ending ``data["date"]`` are a recorded planned pause.
+
+    ``data["planned_rest_days_7d"]`` is the list of dates the caller found with a sick-day record (``SOURCE#sick_days``,
+    not cleared) or a travel log (``SOURCE#travel``) — exactly the set ``engagement_core`` excuses as a planned pause.
+    0 when the switch is off, the key is absent, or the date is unparseable."""
+    if not PLANNED_REST_PRORATES:
+        return 0
+    days = data.get("planned_rest_days_7d") or ()
+    try:
+        end = datetime.strptime(str(data.get("date"))[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return 0
+    window = {(end - timedelta(days=i)).isoformat() for i in range(MOVEMENT_WINDOW_DAYS)}
+    return len({str(d)[:10] for d in days} & window)
+
+
+def data_completeness_pct(present: dict[str, Any], activity_elsewhere: bool) -> Optional[float]:
+    """The day's data completeness (0-100) from ``present`` — {source: arrived?} for the sources the caller counts.
+
+    #6293 rest_day_completeness (owner ruling 2026-11-26): a day with no activity is not missing data. The ``strava``
+    row is expected only when another source shows a session that day (``activity_elsewhere``: Hevy, Whoop or the
+    Apple Watch, by ``training.session_count``); on a day no source shows activity it leaves the denominator. A Strava
+    row that did arrive always counts. With the switch off: the pre-amendment rule, every source always expected."""
+    expected = [s for s in present if not (REST_DAY_COMPLETENESS and s == "strava" and not present.get(s) and not activity_elsewhere)]
+    return round(sum(1 for s in expected if present.get(s)) / len(expected) * 100, 1) if expected else None
+
+
 def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
-    """Compute Movement pillar raw_score (0-100)."""
+    """Compute Movement pillar raw_score (0-100).
+
+    #6293 planned_rest (owner ruling 2026-11-26, "appropriate rest should not ... generate punitive character
+    mechanics"): the four window components' targets are prorated to the days of the window that were NOT a recorded
+    planned pause (``planned_rest_in_window``); a window made entirely of planned rest leaves them unknown. A session done
+    on a planned-rest day still counts. Unplanned inactivity is still a measured zero. When any planned-rest day falls in
+    the window, ``details["_planned_rest"]`` records the count and the pre-proration raw and details, so a reader that
+    may not use the (owner-only) sick/travel record — the public method — restores the day exactly."""
+    rest_days = planned_rest_in_window(data)
+    if not rest_days:
+        return _movement_scored(data, config, 1.0)
+    raw, details = _movement_scored(data, config, (MOVEMENT_WINDOW_DAYS - rest_days) / MOVEMENT_WINDOW_DAYS)
+    pre_raw, pre_details = _movement_scored(data, config, 1.0)
+    details["_planned_rest"] = {
+        "days": rest_days,
+        "pre_rest_raw": pre_raw,
+        "pre_rest_raw_unblended": pre_details.get("_raw_unblended"),
+        "pre_rest_details": pre_details,
+    }
+    return raw, details
+
+
+def _movement_scored(data: dict[str, Any], config: dict[str, Any], expect: float) -> tuple[float, dict[str, Any]]:
+    """Movement's (raw, details) with the window components' targets scaled by ``expect`` (1.0 = the full week; 0 = a
+    week of planned rest: those components are unknown)."""
     pillar_cfg = config.get("pillars", {}).get("movement", {})
     components = pillar_cfg.get("components", {})
     scores = {}
@@ -432,13 +497,13 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     # Hevy sessions that anchor them: one gym visit is one session (never Hevy's push + the ride inside it)
     strava_7d = data.get("strava_7d", [])
     week = session_count.count(strava=strava_7d, hevy=data.get("hevy_7d"))
-    freq_target = components.get("training_frequency", {}).get("target_sessions_week", 5)
-    scores["training_frequency"] = _pct_of_target(week["sessions"], freq_target, 1.4)
+    freq_target = components.get("training_frequency", {}).get("target_sessions_week", 5) * expect
+    scores["training_frequency"] = _pct_of_target(week["sessions"], freq_target, 1.4) if expect > 0 else None
 
     # Zone 2 adequacy
-    z2_target = components.get("zone2_adequacy", {}).get("target_minutes", 150)
+    z2_target = components.get("zone2_adequacy", {}).get("target_minutes", 150) * expect
     z2_minutes = character_zone2.zone2_minutes_7d(data)  # #5389: THE Zone 2 computation
-    scores["zone2_adequacy"] = _pct_of_target(z2_minutes, z2_target, 1.3)
+    scores["zone2_adequacy"] = _pct_of_target(z2_minutes, z2_target, 1.3) if expect > 0 else None
 
     # Training load balance (TSB)
     tsb = data.get("tsb")
@@ -468,8 +533,8 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     # Movement diversity — the kinds among the week's counted parts (#5387: a gym visit's lift, ride and
     # mobility block are three kinds; an echo of one of them is not a fourth)
     kinds = {str(k).lower() for k in week["by_sport"]}
-    diversity_target = components.get("movement_diversity", {}).get("target_types", 4)
-    scores["movement_diversity"] = _pct_of_target(len(kinds), diversity_target, 1.5)
+    diversity_target = components.get("movement_diversity", {}).get("target_types", 4) * expect
+    scores["movement_diversity"] = _pct_of_target(len(kinds), diversity_target, 1.5) if expect > 0 else None
 
     # Daily steps
     # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
@@ -489,7 +554,10 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
         # perfect at target+1 days (4/3 for the default target): a fourth
         # session maxes the component; more days add nothing (cap, anti-gaming)
         perfect = (strength_target + 1) / strength_target if strength_target else 1.0
-        scores["strength_sessions"] = _pct_of_target(len(strength_days), strength_target, perfect) if strength_days is not None else None
+        if strength_days is None or expect <= 0:
+            scores["strength_sessions"] = None
+        else:
+            scores["strength_sessions"] = _pct_of_target(len(strength_days), strength_target * expect, perfect)
 
     return _weighted_pillar_score(scores, components)
 
@@ -622,6 +690,11 @@ def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     # #2811 — the DEFAULT is the defect: it decided the lab-DECAY reference day, in UTC.
     compute_date = data.get("date", pacific_today())
     scores["lab_biomarkers"] = _compute_lab_score(labs_latest, compute_date, components.get("lab_biomarkers", {}))
+    # #6293 lab_ageing: an ageing result keeps its score and loses WEIGHT — the aged share of the evidence is unknown
+    # (still in the coverage denominator, out of the sum), never a decline. Past the horizon the score is None.
+    factor = lab_evidence_factor(labs_latest, compute_date) if LAB_AGE_TAPERS_WEIGHT else None
+    if factor is not None and isinstance(components.get("lab_biomarkers"), dict) and scores["lab_biomarkers"] is not None:
+        components = dict(components, lab_biomarkers=dict(components["lab_biomarkers"], evidence_weight=factor))
 
     # Blood pressure
     bp = data.get("bp_data") or {}
@@ -642,8 +715,8 @@ def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     return _weighted_pillar_score(scores, components)
 
 
-def _compute_lab_score(labs, compute_date, lab_cfg):
-    """Compute lab biomarker composite score with time decay."""
+def _lab_days_since(labs, compute_date):
+    """Days between the lab draw and the scored day (floored at 0), or None when either date is unreadable."""
     if not labs:
         return None
     lab_date_str = labs.get("date") or labs.get("draw_date")
@@ -652,21 +725,39 @@ def _compute_lab_score(labs, compute_date, lab_cfg):
     try:
         lab_date = datetime.strptime(lab_date_str[:10], "%Y-%m-%d").date()
         comp_date = datetime.strptime(compute_date[:10], "%Y-%m-%d").date()
-        days_since = (comp_date - lab_date).days
     except Exception:
         return None
-    if days_since < 0:
-        days_since = 0
+    return max(0, (comp_date - lab_date).days)
 
-    # Decay: 1.0 for 30d, to 0.5 at 90d, to 0.0 at 180d [F-07]
+
+def _lab_age_factor(days_since):
+    """The existing [F-07] ageing curve: 1.0 for 30d, to 0.5 at 90d, to 0.0 at 180d (the validity horizon)."""
     if days_since <= 30:
-        decay = 1.0
-    elif days_since <= 90:
-        decay = 1.0 - 0.5 * ((days_since - 30) / 60)
-    elif days_since <= 180:
-        decay = 0.5 - 0.5 * ((days_since - 90) / 90)
-    else:
-        decay = 0.0  # Fully expired — no contribution from stale labs
+        return 1.0
+    if days_since <= 90:
+        return 1.0 - 0.5 * ((days_since - 30) / 60)
+    if days_since <= 180:
+        return 0.5 - 0.5 * ((days_since - 90) / 90)
+    return 0.0
+
+
+def lab_evidence_factor(labs, compute_date):
+    """#6293 lab_ageing: the share of the lab component's weight a result of this age still carries (the [F-07] curve),
+    or None when there is no dated result."""
+    days_since = _lab_days_since(labs, compute_date)
+    return None if days_since is None else round(_lab_age_factor(days_since), 4)
+
+
+def _compute_lab_score(labs, compute_date, lab_cfg):
+    """Lab biomarker composite score. #6293 lab_ageing (``LAB_AGE_TAPERS_WEIGHT``): the score is the markers' own; age
+    tapers the component's WEIGHT instead (``lab_evidence_factor``), and past the horizon the score is None (unknown).
+    With the switch off: the pre-amendment rule, the score multiplied toward 0 by age."""
+    days_since = _lab_days_since(labs, compute_date)
+    if days_since is None:
+        return None
+    decay = _lab_age_factor(days_since)
+    if LAB_AGE_TAPERS_WEIGHT and decay <= 0:
+        return None  # past the validity horizon: no evidence, not a zero
 
     markers = {
         "apob": {"ideal_low": 40, "ideal_high": 90},
@@ -683,6 +774,8 @@ def _compute_lab_score(labs, compute_date, lab_cfg):
             marker_scores.append(_in_range_score(val, ranges["ideal_low"], ranges["ideal_high"], buffer=0.4))
     if not marker_scores:
         return None
+    if LAB_AGE_TAPERS_WEIGHT:
+        return round(sum(marker_scores) / len(marker_scores), 1)
     return round(sum(marker_scores) / len(marker_scores) * decay, 1)
 
 
@@ -967,9 +1060,15 @@ def _weighted_pillar_score(component_scores, components_config):
         # personal_baselines.apply_character_targets; never fabricated here.
         if isinstance(comp_cfg, dict) and isinstance(comp_cfg.get("target_provenance"), dict):
             details[comp_name]["target_provenance"] = comp_cfg["target_provenance"]
-        if score is not None and weight > 0:
-            weighted_sum += score * weight
-            total_weight += weight
+        # #6293 lab_ageing: ``evidence_weight`` (0..1, set by the caller for one day) is the share of the weight the
+        # evidence still carries — the rest is unknown: in the coverage denominator above, out of the sum.
+        ev = comp_cfg.get("evidence_weight") if isinstance(comp_cfg, dict) else None
+        if ev is not None and comp_name in details:
+            details[comp_name]["evidence_weight"] = ev
+        eff = weight * (float(ev) if ev is not None else 1.0)
+        if score is not None and eff > 0:
+            weighted_sum += score * eff
+            total_weight += eff
 
     details["_absent_behaviors"] = absent_behaviors
 
@@ -1034,8 +1133,11 @@ def compute_ema_level_score(raw_scores_history: list[float], config: dict[str, A
     return round(total / total_w, 1) if total_w > 0 else 50.0
 
 
-# #913: the four deterministic character moods, worst-first for readability.
-CHARACTER_MOODS = ("dormant", "fading", "steady", "thriving")
+# #913: the deterministic character moods. #6293 mood_label_presence: "unavailable" (the engine's existing word for a
+# no-signal state, ``character_public.UNAVAILABLE_NOTE``) replaces "dormant" — silence is not observed, not decline.
+# "dormant" stays listed only so a reader can recognise a record stored before the amendment.
+MOOD_UNAVAILABLE = "unavailable"
+CHARACTER_MOODS = (MOOD_UNAVAILABLE, "fading", "steady", "thriving", "dormant")
 
 
 def compute_character_mood(
@@ -1049,12 +1151,13 @@ def compute_character_mood(
     presence_class). Returns {"mood", "inputs"} where inputs carries the exact
     numbers the verdict came from.
 
-    Rules, first match wins:
-      dormant  — presence_class == "dark" (a real multi-day logging fall-off)
-      fading   — presence_class == "quiet", OR the 7d composite raw trend
-                 (mean of last 3 days minus mean of the 4 before) <= -5
-      thriving — actively logging (present/light), trend >= +3, composite >= 55
-      steady   — everything else
+    Rules, first match wins (#6293 mood_label_presence, ``MOOD_NOT_OBSERVED``):
+      fading      — the 7d composite raw trend over JUDGED days (mean of last 3 days minus mean of the 4 before) <= -5:
+                    measured values, whatever the presence class
+      unavailable — presence_class "dark" or "quiet": logging silence is not observed, never described as decline
+      thriving    — actively logging (present/light), trend >= +3, composite >= 55
+      steady      — everything else
+    With the switch off: the pre-amendment rules (dark ⇒ dormant; quiet or trend <= -5 ⇒ fading).
     """
     presence_class = (engagement or {}).get("presence_class") or "present"
     gap_days = (engagement or {}).get("gap_days")
@@ -1080,7 +1183,16 @@ def compute_character_mood(
     if scores:
         composite = round(sum(scores) / len(scores), 1)
 
-    if presence_class == "dark":
+    if MOOD_NOT_OBSERVED:
+        if trend is not None and trend <= -5:
+            mood = "fading"
+        elif presence_class in ("dark", "quiet"):
+            mood = MOOD_UNAVAILABLE
+        elif presence_class in ("present", "light") and trend is not None and trend >= 3 and composite is not None and composite >= 55:
+            mood = "thriving"
+        else:
+            mood = "steady"
+    elif presence_class == "dark":
         mood = "dormant"
     elif presence_class == "quiet" or (trend is not None and trend <= -5):
         mood = "fading"

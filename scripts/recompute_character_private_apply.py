@@ -168,25 +168,69 @@ def write_condition(pre: dict) -> list:
     return cond
 
 
-def export_and_verify(store: Any, plan: dict, rows: list, out_dir: str, phase: str, now: str) -> tuple:
-    """The pre-image of every row about to be written, to a local file AND S3 ``backups/``, each re-read and hashed.
-    Returns (export, path). Raises (no write happens) on any mismatch."""
+def backup_key(plan_id: str) -> str:
+    """THE pre-image of a plan: one S3 object per plan id, written once (IfNoneMatch), never replaced."""
+    return f"{BACKUP_PREFIX}/{plan_id}/export.json"
+
+
+def _verified_export(body: bytes, plan: dict) -> dict:
+    export = json.loads(body)
+    if export.get("schema") != EXPORT_SCHEMA or export.get("plan_id") != plan["plan_id"]:
+        raise PlanGuardError("the backup under this plan id is not this plan's export — nothing written")
+    if any(digest(e["preimage"]) != e["preimage_digest"] for e in export["entries"]):
+        raise PlanGuardError("an exported pre-image does not hash to its recorded digest — nothing written")
+    return export
+
+
+def existing_preimages(store: Any, plan: dict) -> dict:
+    """{(pk, sk): entry} of this plan's existing backup (an interrupted or phased apply), or {} when none exists."""
+    key = backup_key(plan["plan_id"])
+    if key not in store.list_backups(f"{BACKUP_PREFIX}/{plan['plan_id']}/"):
+        return {}
+    return {(e["pk"], e["sk"]): e for e in _verified_export(store.get_backup(key), plan)["entries"]}
+
+
+def ensure_preimage(store: Any, plan: dict, out_dir: str, now: str) -> dict:
+    """The plan's ONE pre-image, covering every row of every phase the plan writes.
+
+    First apply: every planned row is read; a row that still equals the plan's stored pre-image is exported (a row that
+    changed since the plan is left out and reported, never written); the export is written to ``export_<plan_id>.json``
+    (+ ``.sha256``) and to S3 ``backup_key`` with IfNoneMatch, and both copies are re-read and hashed before any write.
+    Later apply (a further phase, or a resume after an interruption): the existing S3 export is re-read and verified and
+    is the pre-image — no second pre-image is ever taken or written. A different local copy refuses."""
+    key = backup_key(plan["plan_id"])
+    prefix = f"{BACKUP_PREFIX}/{plan['plan_id']}/"
+    path = os.path.join(out_dir, f"export_{plan['plan_id']}.json")
+    keys = store.list_backups(prefix)
+    if keys and key not in keys:
+        raise PlanGuardError(f"unexpected objects under {prefix}: {keys[:3]} — nothing written; inspect before any apply")
+    if key in keys:
+        body = store.get_backup(key)
+        export = _verified_export(body, plan)
+        if os.path.exists(path) and open(path, "rb").read() != body:
+            raise PlanGuardError(f"the local {path} differs from the S3 pre-image — nothing written; restore it from S3")
+        if not os.path.exists(path):
+            with open(path, "wb") as fh:
+                fh.write(body)
+            with open(path + ".sha256", "w", encoding="utf-8") as fh:
+                fh.write(hashlib.sha256(body).hexdigest() + "\n")
+        export.update(_local_path=path, _s3_key=key, _sha256=hashlib.sha256(body).hexdigest(), _aborted_before_export=[], _resumed=True)
+        return export
     entries, aborted = [], []
-    for r in rows:
+    for r in rows_for(plan, "all"):
         cur = store.get(r["pk"], r["sk"])
         cur_t = to_typed(cur) if cur is not None else None
-        if cur_t is not None and digest(cur_t, exclude=(PROVENANCE,)) == r["planned_compare_digest"]:
-            continue  # already applied (resume): not exported again, not written again
+        if cur_t is not None and digest(cur_t) == r.get("planned_digest"):
+            raise PlanGuardError(f"{r['pk']} {r['sk']} already holds this plan's value but no backup exists — nothing written")
         if cur_t is None or digest(cur_t) != r["stored_digest"]:
             aborted.append({"pk": r["pk"], "sk": r["sk"], "reason": "the row changed since the plan"})
             continue
         entries.append(
             {"pk": r["pk"], "sk": r["sk"], "preimage": cur_t, "preimage_digest": r["stored_digest"], "planned_digest": r["planned_digest"]}
         )
-    export = {"schema": EXPORT_SCHEMA, "plan_id": plan["plan_id"], "phase": phase, "taken_at": now, "entries": entries}
+    export = {"schema": EXPORT_SCHEMA, "plan_id": plan["plan_id"], "taken_at": now, "entries": entries}
     body = json.dumps(export, sort_keys=True, indent=1).encode()
     sha = hashlib.sha256(body).hexdigest()
-    path = os.path.join(out_dir, f"export_{plan['plan_id']}_{phase}_{now.replace(':', '')}.json")
     with open(path, "wb") as fh:
         fh.write(body)
     with open(path + ".sha256", "w", encoding="utf-8") as fh:
@@ -194,15 +238,49 @@ def export_and_verify(store: Any, plan: dict, rows: list, out_dir: str, phase: s
     with open(path, "rb") as fh:
         if hashlib.sha256(fh.read()).hexdigest() != sha:
             raise PlanGuardError("the local export does not read back to its hash — no write made")
-    reread = json.loads(open(path, encoding="utf-8").read())
-    if any(digest(e["preimage"]) != e["preimage_digest"] for e in reread["entries"]):
-        raise PlanGuardError("an exported pre-image does not hash to its recorded digest — no write made")
-    key = f"{BACKUP_PREFIX}/{plan['plan_id']}/{phase}-{now.replace(':', '')}/export.json"
-    store.put_backup(key, body)
+    _verified_export(open(path, "rb").read(), plan)
+    store.put_backup(key, body)  # IfNoneMatch: never over an existing object
     if hashlib.sha256(store.get_backup(key)).hexdigest() != sha:
         raise PlanGuardError("the S3 backup does not read back to the export's hash — no write made")
-    export["_local_path"], export["_s3_key"], export["_sha256"], export["_aborted_before_export"] = path, key, sha, aborted
-    return export, path
+    export.update(_local_path=path, _s3_key=key, _sha256=sha, _aborted_before_export=aborted, _resumed=False)
+    return export
+
+
+def resume_state(store: Any, export: dict) -> list:
+    """Every exported row must be exactly its pre-image or exactly its planned value; the rows that are neither."""
+    bad = []
+    for e in export["entries"]:
+        cur = store.get(e["pk"], e["sk"])
+        if cur is None or digest(to_typed(cur)) not in (e["preimage_digest"], e["planned_digest"]):
+            bad.append(f"{e['pk']} {e['sk']}")
+    return bad
+
+
+class PreimageOverlay:
+    """A read-only view of the store in which a row that holds this plan's planned value reads as its exported pre-image
+    — so the approval check re-derives the plan an interrupted or phased apply started from, never the half state."""
+
+    def __init__(self, store: Any, preimages: dict):
+        self._store, self._pre = store, preimages
+
+    def _swap(self, item: Optional[dict]) -> Optional[dict]:
+        if not isinstance(item, dict):
+            return item
+        e = self._pre.get((item.get("pk"), item.get("sk")))
+        if e is not None and digest(to_typed(item)) == e["planned_digest"]:
+            return from_typed(e["preimage"])
+        return item
+
+    def query(self, pk: str, lo: str, hi: str) -> list:
+        return [self._swap(i) for i in self._store.query(pk, lo, hi)]
+
+    def get(self, pk: str, sk: str) -> Optional[dict]:
+        return self._swap(self._store.get(pk, sk))
+
+    def __getattr__(self, name: str) -> Any:
+        if name in ("put", "put_backup"):
+            raise RuntimeError(f"PreimageOverlay is read-only ({name} refused)")
+        return getattr(self._store, name)
 
 
 def apply_plan(
@@ -220,7 +298,15 @@ def apply_plan(
     if approved_plan_id is not None and approved_plan_id != plan.get("plan_id"):
         raise PlanGuardError(f"approved plan id {approved_plan_id} is not this plan's {plan.get('plan_id')} — nothing written")
     rows = rows_for(plan, phase, from_date, limit)
-    export, path = export_and_verify(store, plan, rows, out_dir, phase, now)
+    export = ensure_preimage(store, plan, out_dir, now)
+    path = export["_local_path"]
+    if export["_resumed"]:
+        bad = resume_state(store, export)
+        if bad:
+            raise PlanGuardError(
+                f"{len(bad)} exported row(s) are neither their pre-image nor this plan's value (e.g. {bad[0]}): a write outside "
+                f"this tool since the interrupted apply — nothing written. Roll back: --rollback {path} --apply"
+            )
     by_key = {(e["pk"], e["sk"]): e for e in export["entries"]}
     written, aborted = [], list(export["_aborted_before_export"])
     for r in rows:
@@ -228,6 +314,8 @@ def apply_plan(
         if e is None:
             continue
         cur = store.get(r["pk"], r["sk"])
+        if cur is not None and digest(to_typed(cur)) == e["planned_digest"]:
+            continue  # already applied (an earlier, interrupted or phased run of this same plan): written once only
         if cur is None or digest(to_typed(cur)) != e["preimage_digest"]:
             aborted.append({"pk": r["pk"], "sk": r["sk"], "reason": "the row changed after the export"})
             continue
@@ -242,6 +330,7 @@ def apply_plan(
     result = {
         "plan_id": plan["plan_id"],
         "phase": phase,
+        "resumed": export["_resumed"],
         "export": path,
         "s3_key": export["_s3_key"],
         "written": written,
@@ -294,7 +383,10 @@ def verify(store: Any, out_dir: str, start: str = EXPERIMENT_START_DATE, end: Op
     os.makedirs(refuse_in_repo(out_dir), exist_ok=True)
     work = tempfile.mkdtemp(prefix="verify-", dir=out_dir)
     trees = trees or {"new": ROOT}
-    res = run_ladder(child_inputs(snap), work, trees, (("plan", "missing_data", PLAN_SPEC),))["plan"]
+    import recompute_character_private as T
+
+    snap["raw_effects"] = T.collect_raw_effects(store, snap) if PLAN_SPEC.get("effects") else {"effects": {}, "reads": {}}
+    res = run_ladder(child_inputs(snap), work, trees, (("plan", "plan", PLAN_SPEC),))["plan"]
     engine_keys = {d: set(res["sheet_attrs"].get(d) or {}) for d in snap["sheets"]}
     rows = build_rows(snap, res, engine_keys)
     pending = [f"{r['partition']} {r['sk']}" for r in rows if r["action"] == "write"]

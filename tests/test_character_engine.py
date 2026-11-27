@@ -276,20 +276,22 @@ def test_lab_decay_full_value():
 
 
 def test_lab_decay_expires():
-    """Labs >180 days old get zero credit."""
+    """Labs >180 days old carry no evidence: unknown (#6293 lab_ageing), never a 0."""
     labs = {"date": "2025-06-01", "apob": 80}
     score = _compute_lab_score(labs, "2026-03-01", {})
-    assert score == 0.0  # 270+ days -> fully expired
+    assert score is None  # 270+ days -> past the validity horizon
 
 
 def test_lab_decay_at_90_days():
-    """Labs at 90 days get ~50% credit."""
+    """#6293 lab_ageing: at 90 days the SCORE is unchanged — the WEIGHT is about half (the evidence factor)."""
+    from health.character_engine import lab_evidence_factor
+
     labs = {"date": "2026-01-01", "apob": 80}
     score_fresh = _compute_lab_score(labs, "2026-01-15", {})
     score_90d = _compute_lab_score(labs, "2026-04-01", {})
-    assert score_90d is not None
     assert score_fresh is not None
-    assert score_90d < score_fresh
+    assert score_90d == score_fresh
+    assert 0.45 < lab_evidence_factor(labs, "2026-04-01") < 0.55
 
 
 # ── F-09: Neutral default ──

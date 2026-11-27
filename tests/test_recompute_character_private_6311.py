@@ -204,6 +204,9 @@ def plan_for(store: StubStore, tmp_path, name: str = "out", ladder=TEST_LADDER) 
     return T.dry_run(store, str(out), ladder=ladder, trees=TREES, planned_at="2026-11-26T00:00:00+00:00")
 
 
+RAW_NONE = {"effects": {}, "reads": {}}
+
+
 def saved_plan(plan: dict, tmp_path) -> dict:
     """The plan as --apply reads it: written, then loaded and integrity-checked."""
     (tmp_path / "out").mkdir(exist_ok=True)
@@ -546,9 +549,28 @@ def test_read_only_proxy_refuses_every_write_verb():
 
 def test_the_real_ladder_names_every_method_cause_in_order():
     causes = [c for _n, c, _s in T.LADDER]
-    assert [c for c in causes if c in T.METHOD_CAUSES] == list(T.METHOD_CAUSES[:5]) + ["relationships_exclusion", "missing_data"]
-    assert causes[0] == "replay_residual" and "tree_switch_residual" in causes
+    assert [c for c in causes if c in T.METHOD_CAUSES] == list(T.METHOD_CAUSES)
+    assert causes == [
+        "replay_residual",
+        "stress_days",
+        "journal_frequency",
+        "model_values",
+        "xp_debt",
+        "rest_decay",
+        "tree_switch_residual",
+        "relationships_exclusion",
+        "missing_data",
+        "final_switch_residual",
+        "planned_rest",
+        "lab_ageing",
+        "rest_day_completeness",
+        "mood_label_presence",
+    ]
     assert T.LADDER[-1][2] is T.PLAN_SPEC and set(T.CAUSES_LEGEND) >= set(causes) | set(T.STAMP_CAUSES)
+    assert set(T.CONTROL_CAUSES) == {"tree_switch_residual", "final_switch_residual"}
+    specs = {c: spec for _n, c, spec in T.LADDER}
+    assert specs["missing_data"]["tree"] == "amended" and specs["final_switch_residual"].get("switches") == []
+    assert specs["mood_label_presence"]["switches"] == list(T._SWITCHES) and specs["mood_label_presence"]["effects"] == list(T._EFFECTS)
 
 
 def test_planned_sheets_reader_gives_the_public_side_the_stored_shape(seeded, tmp_path):
@@ -603,7 +625,7 @@ def test_ladder_states_reconcile_to_the_plan_and_the_control_equals_its_predeces
     assert states["missing_data"] == {d: R.chain_state(sheets[d]) for d in sorted(sheets)}  # the last step IS the plan
     assert states["tree_switch_residual"] == states["replay_residual"]  # the control changes nothing
     one = states["missing_data"][_d(1)]
-    assert set(one) == {"character_level", "character_xp", "composite", "pillars", "events"}
+    assert set(one) == {"character_level", "character_xp", "composite", "character_mood", "pillars", "events"}
     assert one["pillars"]["relationships"] == {"raw_score": None, "level": None}
     assert set(one["pillars"]) == set(R.STATE_PILLARS)
     # the ablation question the public side asks: at which step did a value first change?
@@ -658,7 +680,7 @@ def test_stored_states_reader_refuses_a_plan_without_them(seeded, tmp_path):
 
 
 def _plan_path(plan, tmp_path):
-    (tmp_path / "out").mkdir(exist_ok=True)
+    (tmp_path / "out").mkdir(parents=True, exist_ok=True)
     return T.write_outputs(plan, str(tmp_path / "out"))["plan"]
 
 
@@ -784,3 +806,199 @@ def test_apply_plan_rechecks_a_given_approval_before_the_export(seeded, tmp_path
     assert store.writes == [] and store.s3_writes == []
     done = A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00", approved_plan_id=plan["plan_id"])
     assert done["written"] and done["aborted"] == []
+
+
+# ── the four final causes: raw-input effects as on/off DIFFERENCES ───────────────────────────────────────────────
+
+
+_FINAL_BASE = {"tree": "new", "rebuild": ["movement", "nutrition", "mind"], "loader": "held_skip", "relationships": "engine"}
+FINAL_LADDER = (
+    ("fidelity", "replay_residual", _STEP1),
+    ("md", "missing_data", dict(_FINAL_BASE)),
+    ("final0", "final_switch_residual", dict(_FINAL_BASE, switches=[])),
+    ("prest", "planned_rest", dict(_FINAL_BASE, switches=list(T._SWITCHES[:1]), effects=["planned_rest"])),
+    ("lab", "lab_ageing", dict(_FINAL_BASE, switches=list(T._SWITCHES[:2]), effects=["planned_rest", "lab_ageing"])),
+    ("comp", "rest_day_completeness", dict(_FINAL_BASE, switches=list(T._SWITCHES[:3]), effects=list(T._EFFECTS))),
+    ("plan", "mood_label_presence", T.PLAN_SPEC),
+)
+REST_DAY, COMP_DAY = 5, 8
+
+
+def _same(score):
+    return {c: score for c in ce.MOVEMENT_WINDOW_COMPONENTS}
+
+
+def drift_only_effects(n=N_DAYS):
+    """Raw recompute values that DIFFER from the stored ones (drift) but agree between the switch states: no effect."""
+    eff = {}
+    for i in range(n):
+        if i == SICK_DAY:
+            continue
+        eff[_d(i)] = {
+            "movement": {"days": 1 if i == REST_DAY else 0, "off": _same(11.0 + i), "on": _same(11.0 + i)},
+            "metabolic": {"off": {"lab_score": 33.0, "evidence_weight": None}, "on": {"lab_score": 33.0, "evidence_weight": None}},
+            "completeness": {"off": 20.0 + i, "on": 20.0 + i},
+        }
+    return {"effects": eff, "reads": {}}
+
+
+def real_effects(n=N_DAYS):
+    eff = drift_only_effects(n)
+    eff["effects"][_d(REST_DAY)]["movement"]["on"] = _same(2 * (11.0 + REST_DAY))  # proration doubles the window scores
+    eff["effects"][_d(COMP_DAY)]["completeness"]["on"] = 20.0 + COMP_DAY + 20.0  # a rest day leaves the denominator
+    return eff
+
+
+class EffectStore(StubStore):
+    effects: dict = {"effects": {}, "reads": {}}
+
+    def raw_effects_for(self, snap):
+        return copy.deepcopy(self.effects)
+
+
+def effect_store(effects) -> EffectStore:
+    st = EffectStore()
+    st.items = seed_store().items
+    st.effects = effects
+    return st
+
+
+@pytest.fixture(scope="module")
+def final_plans(tmp_path_factory):
+    out = tmp_path_factory.mktemp("final")
+    none = T.dry_run(
+        effect_store({"effects": {}, "reads": {}}),
+        str(out / "none"),
+        ladder=FINAL_LADDER,
+        trees=TREES,
+        planned_at="2026-11-26T00:00:00+00:00",
+    )
+    drift = T.dry_run(
+        effect_store(drift_only_effects()), str(out / "drift"), ladder=FINAL_LADDER, trees=TREES, planned_at="2026-11-26T00:00:00+00:00"
+    )
+    real = T.dry_run(
+        effect_store(real_effects()), str(out / "real"), ladder=FINAL_LADDER, trees=TREES, planned_at="2026-11-26T00:00:00+00:00"
+    )
+    return none, drift, real
+
+
+def test_a_raw_input_difference_with_the_switch_off_contributes_nothing(final_plans):
+    none, drift, _real = final_plans
+    assert [r.get("planned_compare_digest") for r in drift["rows"]] == [r.get("planned_compare_digest") for r in none["rows"]]
+    assert drift["plan_id"] == none["plan_id"]
+    assert all(not v for v in drift["raw_effects"]["applied_by_step"].values())
+    assert drift["raw_effects"]["dates_with_on_off_difference"] == {"planned_rest": [], "lab_ageing": [], "rest_day_completeness": []}
+
+
+def test_the_raw_dependent_steps_apply_only_their_on_off_difference(final_plans):
+    none, _drift, real = final_plans
+    assert real["raw_effects"]["dates_with_on_off_difference"] == {
+        "planned_rest": [_d(REST_DAY)],
+        "lab_ageing": [],
+        "rest_day_completeness": [_d(COMP_DAY)],
+    }
+    assert real["raw_effects"]["applied_by_step"]["planned_rest"] == {_d(REST_DAY): ["planned_rest"]}
+    tot = real["accounting"]["ladder_totals"]
+    assert tot["final_switch_residual"]["attributes"] == 0 and tot["lab_ageing"]["attributes"] == 0
+    assert tot["planned_rest"]["dates"] >= 1 and tot["rest_day_completeness"]["dates"] >= 1
+    first = {c: s for c, s in real["ladder_states"].items()}
+    assert first["planned_rest"][_d(REST_DAY)]["pillars"]["movement"] != first["final_switch_residual"][_d(REST_DAY)]["pillars"]["movement"]
+    # the stored window scores are SCALED by on/off (x2 here, capped at 100), never replaced by the raw value
+    by_none = {r["date"]: T.as_float(r["planned_item"]) for r in none["rows"] if r["pk"] == T.SHEET_PK}
+    by_real = {r["date"]: T.as_float(r["planned_item"]) for r in real["rows"] if r["pk"] == T.SHEET_PK}
+    mv0, mv1 = by_none[_d(REST_DAY)]["pillar_movement"]["components"], by_real[_d(REST_DAY)]["pillar_movement"]["components"]
+    for c in ce.MOVEMENT_WINDOW_COMPONENTS:
+        if (mv0.get(c) or {}).get("score") is not None and not mv0[c].get("absent"):
+            assert mv1[c]["score"] == min(100.0, round(mv0[c]["score"] * 2, 1)), c
+    c0 = by_none[_d(COMP_DAY)]["pillar_consistency"]["components"]["data_completeness"]["score"]
+    c1 = by_real[_d(COMP_DAY)]["pillar_consistency"]["components"]["data_completeness"]["score"]
+    assert c1 == min(100.0, c0 + 20.0)
+
+
+def test_planned_sheets_let_the_public_side_restore_a_planned_rest_day_unprorated(final_plans, tmp_path):
+    from health import character_public
+
+    none, _drift, real = final_plans
+    p_none, p_real = _plan_path(none, tmp_path / "a"), _plan_path(real, tmp_path / "b")
+    mv_none, mv_real = A.planned_sheets(p_none)[_d(REST_DAY)]["pillar_movement"], A.planned_sheets(p_real)[_d(REST_DAY)]["pillar_movement"]
+    rest = mv_real["components"]["_planned_rest"]
+    assert rest["days"] == 1 and rest["pre_rest_raw"] == mv_none["raw_score"]
+    raw, det = character_public.without_private_modifiers(mv_real["raw_score"], mv_real["components"])
+    assert raw == mv_none["raw_score"] and "_planned_rest" not in det
+    assert "_planned_rest" not in A.planned_sheets(p_real)[_d(REST_DAY + 1)]["pillar_movement"]["components"]
+
+
+def test_the_final_switch_control_and_mood_report(final_plans):
+    _none, _drift, real = final_plans
+    assert real["accounting"]["ladder_totals"]["final_switch_residual"] == {"dates": 0, "attributes": 0, "leaves": 0}
+    ml = real["mood_labels"]
+    assert set(ml) >= {"stored_labels_rewritten", "stored_to_planned", "stored_dormant", "planned_labels", "moved_by_mood_step"}
+    assert "dormant" not in ml["planned_labels"]
+
+
+def test_effects_are_not_applied_twice_after_an_apply(final_plans, tmp_path):
+    _none, _drift, real = final_plans
+    st = effect_store(real_effects())
+    A.apply_plan(
+        st, saved_plan(real, tmp_path), str(tmp_path / "out"), "all", "2026-11-26T01:00:00+00:00", approved_plan_id=real["plan_id"]
+    )
+    done = A.verify(st, str(tmp_path / "out"), trees=TREES)
+    assert done["planned_writes"] == 0, done["pending"]
+
+
+# ── an interrupted (or phased) apply: ONE pre-image per plan; resume completes against it, or stops for rollback ──
+
+
+def test_a_partial_apply_resumes_against_the_original_preimage_never_a_second(seeded, tmp_path):
+    store, plan = seeded
+    plan = saved_plan(plan, tmp_path)
+    pre = copy.deepcopy(store.items)
+    first = A.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00", limit=3)
+    assert len(first["written"]) == 3 and first["resumed"] is False and len(store.s3_writes) == 1
+    body = store.objects[A.backup_key(plan["plan_id"])]
+    second = A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T02:00:00+00:00")
+    assert second["resumed"] is True and second["aborted"] == []
+    assert len(store.s3_writes) == 1 and store.objects[A.backup_key(plan["plan_id"])] == body  # never a second pre-image
+    n_write = sum(1 for r in plan["rows"] if r["action"] == "write")
+    assert len(first["written"]) + len(second["written"]) == n_write
+    assert A.verify(store, str(tmp_path / "out"), trees=TREES)["planned_writes"] == 0
+    done = A.rollback(store, second["export"], apply=True)  # the ONE export rolls back the whole plan
+    assert done["refused"] == [] and done["verified"]["mismatches"] == []
+    assert {k: T.canonical(T.to_typed(v)) for k, v in store.items.items()} == {k: T.canonical(T.to_typed(v)) for k, v in pre.items()}
+
+
+def test_a_resume_after_an_outside_write_stops_and_directs_to_rollback(seeded, tmp_path):
+    store, plan = seeded
+    plan = saved_plan(plan, tmp_path)
+    A.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00", limit=2)
+    key = (T.SHEET_PK, f"DATE#{_d(0)}")  # written by the first run, then touched by something else
+    store.items[key]["run_id"] = "outside"
+    writes = list(store.writes)
+    with pytest.raises(T.PlanGuardError, match="--rollback"):
+        A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T02:00:00+00:00")
+    assert store.writes == writes and len(store.s3_writes) == 1
+
+
+def test_a_resume_refuses_a_local_export_that_differs_from_the_s3_preimage(seeded, tmp_path):
+    store, plan = seeded
+    plan = saved_plan(plan, tmp_path)
+    first = A.apply_plan(store, plan, str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00", limit=1)
+    with open(first["export"], "ab") as fh:
+        fh.write(b" ")
+    with pytest.raises(T.PlanGuardError, match="differs from the S3 pre-image"):
+        A.apply_plan(store, plan, str(tmp_path / "out"), "all", "2026-11-26T02:00:00+00:00")
+
+
+def test_the_approval_rederives_the_original_plan_through_the_preimage_overlay(seeded, tmp_path):
+    store, plan = seeded
+    plan_file = saved_plan(plan, tmp_path)
+    A.apply_plan(store, plan_file, str(tmp_path / "out"), "sheets", "2026-11-26T01:00:00+00:00")  # phase 1 of 2
+    plain = plan_for(store, tmp_path, "plain")
+    assert plain["plan_id"] != plan["plan_id"]  # the half-applied rows alone re-derive a different plan
+    overlay = A.PreimageOverlay(store, A.existing_preimages(store, plan_file))
+    out = tmp_path / "overlay"
+    out.mkdir()
+    again = T.dry_run(overlay, str(out), ladder=TEST_LADDER, trees=TREES, planned_at="2026-11-26T00:00:00+00:00", raw_effects=RAW_NONE)
+    assert again["plan_id"] == plan["plan_id"]
+    with pytest.raises(RuntimeError):
+        overlay.put({}, [])

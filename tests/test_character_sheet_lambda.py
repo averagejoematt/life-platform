@@ -744,8 +744,30 @@ class TestAssembleData:
         assert by_pk[PREFIX + "hevy"] == [f"DATE#{DATE}#WORKOUT#h1"]
 
     def test_partial_day_reports_a_partial_percentage(self, monkeypatch, frozen_clock):
+        """#6293 rest_day_completeness: no source shows a session, so the absent Strava row is not expected (2 of 4)."""
         _install(monkeypatch, _PkTable([_row("whoop", "DATE#" + DATE, date=DATE), _row("apple_health", "DATE#" + DATE, date=DATE)]))
+        assert csl.assemble_data(DATE)["data_completeness_pct"] == 50.0
+
+    def test_a_missing_strava_sync_on_a_training_day_still_counts_missing(self, monkeypatch, frozen_clock):
+        """#6293: when another source shows a session that day, the absent Strava row is a missing sync (2 of 5)."""
+        _install(monkeypatch, _PkTable([_row("whoop", "DATE#" + DATE, date=DATE), _row("apple_health", "DATE#" + DATE, date=DATE)]))
+        monkeypatch.setattr(csl, "activity_elsewhere", lambda data, day: True)
         assert csl.assemble_data(DATE)["data_completeness_pct"] == 40.0
+
+    def test_activity_elsewhere_reads_the_session_count_without_strava(self, monkeypatch):
+        from training import session_count
+
+        seen = {}
+
+        def _count(**kw):
+            seen.update(kw)
+            return {"sessions": 1}
+
+        monkeypatch.setattr(session_count, "count", _count)
+        assert csl.activity_elsewhere({"hevy_7d": ["h"], "whoop_7d": ["w"], "apple_7d": ["a"], "strava_7d": ["s"]}, DATE) is True
+        assert "strava" not in seen and seen["start_date"] == seen["end_date"] == DATE
+        monkeypatch.setattr(session_count, "count", lambda **kw: {"sessions": 0})
+        assert csl.activity_elsewhere({}, DATE) is False
 
     def test_empty_platform_yields_honest_nulls(self, monkeypatch, frozen_clock):
         _install(monkeypatch, _PkTable([]))

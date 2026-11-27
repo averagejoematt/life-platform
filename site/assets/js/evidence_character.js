@@ -39,17 +39,17 @@ export const chDelta = (v, unit = "") => {
 };
 
 /* #913 · the deterministic mood — engine-computed on the daily record
-   (thriving/steady/fading/dormant). Records computed before v1.3.0 carry no
-   mood, so /api/presence is the honest fallback: dark → dormant, any lull →
-   fading. Never derived from prose, always from the presence instrument. */
-export const CH_MOODS = ["thriving", "steady", "fading", "dormant"];
+   (thriving/steady/fading/unavailable). #6293: logging silence is not
+   observed, never decline — the engine says "unavailable" where it said
+   "dormant", and "fading" only on a measured falling trend. A record stored
+   before the amendment ("dormant") and the pre-v1.3.0 /api/presence fallback
+   (a dark or quiet presence) both read as "unavailable". */
+export const CH_MOODS = ["thriving", "steady", "fading", "unavailable"];
 export const chMood = (ch, pres) => {
   const m = ch && ch.character_mood;
+  if (m === "dormant") return "unavailable";
   if (CH_MOODS.includes(m)) return m;
-  if (pres && pres.available) {
-    if (pres.presence_class === "dark") return "dormant";
-    if (pres.in_lull) return "fading";
-  }
+  if (pres && pres.available && (pres.presence_class === "dark" || pres.in_lull)) return "unavailable";
   return "steady";
 };
 
@@ -70,8 +70,9 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
   /* #913 · neglect states: the hero carries data-state, and during a lull the
      arcs of pillars that are decaying / whose behaviors aren't happening dim —
      the figure literally fades where the life went quiet. */
-  const state = CH_MOODS.includes(mood) ? mood : (CH_MOODS.includes(ch.character_mood) ? ch.character_mood : "steady");
-  const lull = state === "fading" || state === "dormant";
+  const stored = ch.character_mood === "dormant" ? "unavailable" : ch.character_mood;
+  const state = CH_MOODS.includes(mood) ? mood : (CH_MOODS.includes(stored) ? stored : "steady");
+  const lull = state === "fading"; // #6293: only a measured falling trend dims the figure — silence does not
   const ringPillars = lull
     ? pillars.map((p) => (((p.neglect_decay && p.neglect_decay.applied) || (p.absent_behaviors || []).length) ? Object.assign({}, p, { dim: true }) : p))
     : pillars;
@@ -91,13 +92,13 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
   /* #913 · the state, said plainly under the class line — and no celebratory
      share copy while the sheet is in a lull (the level was earned earlier;
      framing it as a win next to a dark stretch would be a lie of emphasis). */
-  const moodLine = state === "dormant"
-    ? `<p class="ch-mood label">dormant — manual logging has gone dark; the levels below are decaying, not paused</p>`
+  const moodLine = state === "unavailable"
+    ? `<p class="ch-mood label">unavailable — logging has been quiet; the levels below hold where the measured days put them</p>`
     : state === "fading"
-      ? `<p class="ch-mood label">fading — a quiet stretch is pulling the sheet down</p>`
+      ? `<p class="ch-mood label">fading — the measured days are trending down</p>`
       : "";
   const shareText = lull
-    ? `Level ${level} ${tier} — the character sheet during a quiet stretch: absent behaviors score zero and the levels atrophy. Honest, not flattering`
+    ? `Level ${level} ${tier} — the character sheet while the measured days trend down. Honest, not flattering`
     : `Level ${level} ${tier} — my life as an RPG character sheet, scored nightly from real data`;
   return `<section class="rd-sec ch-hero" data-tier="${esc(tier.toLowerCase())}" data-state="${esc(state)}">
     <div class="ch-stage">

@@ -25,6 +25,7 @@ from recompute_character_private import (  # noqa: E402
     digest,
     refuse_in_repo,
 )
+from recompute_character_private_raw import RAW_READ_PARTITIONS, changed_effects  # noqa: E402,F401 — re-exported for the plan
 
 # ── reports: served baseline, events, challenge XP, stress days ─────────────────────────────────────────────────────
 
@@ -284,7 +285,8 @@ PRELIMINARY_BANNER = (
 OWNER_GATE = (
     "1. the public dry run over this plan (its --plan-in) · 2. the owner approves the exact combined plan ids · 3. the "
     "method PR (#6299) merges and deploys · 4. a re-run of this dry run on the deployed tree reproduces the approved plan "
-    "id (--apply refuses otherwise) · 5. --apply --plan-in plan.json --phase sheets, then --phase receipts · 6. the public "
+    "id (--apply refuses otherwise) · 5. --preflight, then --apply --plan-in plan.json --approved-plan-id <id> --phase "
+    "sheets, then the same with --phase receipts · 6. the public "
     "apply · 7. both --verify runs report 0 planned writes"
 )
 
@@ -344,8 +346,22 @@ def summary_md(plan: dict, preliminary: bool = False) -> str:
         f"planned carries stored: {ch['planned_carries_stored']}",
         f"## Served baseline unchanged by the private apply on {sum(1 for v in served.values() if v['unchanged_by_private_apply'])} of {len(served)} dates",
         "",
+        f"## Mood labels: stored labels rewritten {plan['mood_labels']['stored_labels_rewritten']} "
+        f"({', '.join(f'{k} {v}' for k, v in sorted(plan['mood_labels']['stored_to_planned'].items())) or 'none'}); stored "
+        f"'dormant' {plan['mood_labels']['stored_dormant']}; moved by the mood step "
+        f"{sum(plan['mood_labels']['moved_by_mood_step'].values())}",
+        f"## Raw-dependent steps (source: {plan['raw_effects'].get('source')}): dates whose engine output differs between the switch "
+        "states — " + "; ".join(f"{k} {len(v)}" for k, v in plan["raw_effects"]["dates_with_on_off_difference"].items()),
+        "",
+        "## An interrupted or phased apply",
+        "- One pre-image per plan (S3 backups/character-private-recompute/<plan_id>/export.json + OUT/export_<plan_id>.json), "
+        "written once before the first write. A later --apply of the same plan re-verifies it, re-derives the approval from "
+        "it, skips rows already holding their planned value and writes the rest; if any exported row is neither its "
+        "pre-image nor its planned value it writes nothing and directs to --rollback <that export> --apply.",
+        "",
         "## Controls",
         f"- tree_switch_residual (must be 0): {a['ladder_totals'].get('tree_switch_residual', {}).get('attributes', 'n/a')} attributes",
+        f"- final_switch_residual (must be 0): {a['ladder_totals'].get('final_switch_residual', {}).get('attributes', 'n/a')} attributes",
         "- replay_residual: what the stored method's own replay does not reproduce — never a method change; read its "
         "attributes in plan.json `attribution` before approving",
         f"- method tree {'DIRTY: re-run from the committed, deployed tree' if plan['method']['tree']['dirty'] else 'clean'}",
@@ -382,6 +398,7 @@ def chain_state(rec: Optional[dict]) -> Optional[dict]:
         "character_level": num(rec.get("character_level")),
         "character_xp": num(rec.get("character_xp")),
         "composite": round(sum(raws) / len(raws), 1) if raws else None,
+        "character_mood": rec.get("character_mood"),
         "pillars": pillars,
         "events": events,
     }
@@ -392,7 +409,7 @@ def ladder_states(ladder_f: list) -> dict:
     return {cause: {d: chain_state(r) for d, r in sorted(recs.items())} for cause, recs in ladder_f}
 
 
-STATE_FIELDS = ("character_level", "character_xp", "composite", "pillars", "events")
+STATE_FIELDS = ("character_level", "character_xp", "composite", "character_mood", "pillars", "events")
 
 
 def check_final_state(ladder_states: dict, planned_states: dict) -> None:
@@ -431,3 +448,31 @@ def check_stress_days(sd: dict, rows: list) -> dict:
     if problems:
         raise PlanGuardError(f"stress-day accounting fails: {'; '.join(problems)}")
     return out
+
+
+def mood_report(stored_f: dict, planned_f: dict, ladder_f: list) -> dict:
+    """The stored mood labels the plan rewrites ({"from->to": dates}) and the labels the mood step itself moves."""
+    pairs: dict = {}
+    for d in sorted(planned_f):
+        a, b = (stored_f.get(d) or {}).get("character_mood"), (planned_f.get(d) or {}).get("character_mood")
+        if a != b:
+            pairs[f"{a}->{b}"] = pairs.get(f"{a}->{b}", 0) + 1
+    steps = dict(ladder_f)
+    order = [c for c, _r in ladder_f]
+    by_mood_step: dict = {}
+    if "mood_label_presence" in steps and order.index("mood_label_presence") > 0:
+        prev = steps[order[order.index("mood_label_presence") - 1]]
+        for d, r in steps["mood_label_presence"].items():
+            a, b = (prev.get(d) or {}).get("character_mood"), (r or {}).get("character_mood")
+            if a != b:
+                by_mood_step[f"{a}->{b}"] = by_mood_step.get(f"{a}->{b}", 0) + 1
+    return {
+        "stored_labels_rewritten": sum(pairs.values()),
+        "stored_to_planned": pairs,
+        "stored_dormant": sum(1 for r in stored_f.values() if (r or {}).get("character_mood") == "dormant"),
+        "planned_labels": {
+            m: sum(1 for r in planned_f.values() if (r or {}).get("character_mood") == m)
+            for m in sorted({(r or {}).get("character_mood") for r in planned_f.values()}, key=str)
+        },
+        "moved_by_mood_step": by_mood_step,
+    }
