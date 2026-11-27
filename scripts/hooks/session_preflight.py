@@ -137,12 +137,21 @@ def _chronicle_queue() -> list[str]:
 
         cfg = Config(connect_timeout=3, read_timeout=5, retries={"max_attempts": 1})
         table = boto3.resource("dynamodb", region_name="us-west-2", config=cfg).Table("life-platform")
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#"),
-            ProjectionExpression="sk, #s, generated_at, week_number, tombstone, phase",
-            ExpressionAttributeNames={"#s": "status"},
-        )
-        return chronicle_queue_lines(list(resp.get("Items") or []), _dt.datetime.now(_dt.timezone.utc))
+        # Every page: the 1 MB page limit applies BEFORE the projection, so page 1 stopped at DATE#2026-11-17 and the
+        # week-12 draft never reached the boot line (2026-11-26).
+        kw = {
+            "KeyConditionExpression": Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#"),
+            "ProjectionExpression": "sk, #s, generated_at, week_number, tombstone, phase",
+            "ExpressionAttributeNames": {"#s": "status"},
+        }
+        items: list = []
+        while True:
+            resp = table.query(**kw)
+            items += list(resp.get("Items") or [])
+            if not resp.get("LastEvaluatedKey"):
+                break
+            kw["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+        return chronicle_queue_lines(items, _dt.datetime.now(_dt.timezone.utc))
     except Exception as exc:  # noqa: BLE001 — fail open, say so
         return [f"  chronicle   UNVERIFIED ({type(exc).__name__}: {exc})"]
 
