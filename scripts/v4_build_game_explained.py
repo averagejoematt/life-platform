@@ -11,7 +11,7 @@ hand-typed — so a tuning change regenerates the page instead of drifting past 
 Two drift guards (enforced by tests/test_game_explained.py):
   1. The committed site/method/game/index.html must equal this generator's
      output byte-for-byte — config edits without a regen go red.
-  2. The page's PROSE describes engine mechanics (up-gates, neglect decay,
+  2. The page's PROSE describes engine mechanics (up-gates, the held-day rule,
      the confidence blend). RECORDED_ENGINE_FINGERPRINT below hashes the
      mechanics functions' live source; if the engine changes, the test goes
      red until a human re-reads the prose and updates the fingerprint —
@@ -73,15 +73,19 @@ MECHANICS_FUNCTIONS = (
     "get_tier",
     "_compute_xp",
     "_roll_xp_buffer",
+    "xp_day_verdict",
+    "xp_shield_delta",
     "_weighted_pillar_score",
+    "day_is_held",
     "compute_ema_level_score",
-    "_behavioral_weight_share",
-    "neglect_decay_state",
     "compute_character_mood",
+    "planned_rest_in_window",
+    "lab_evidence_factor",
+    "data_completeness_pct",
     "_level_step",
     "evaluate_level_changes",
 )
-RECORDED_ENGINE_FINGERPRINT = "f1d96247c11a"  # re-read 2026-10-23 (#5129: owner-only components held out of _weighted_pillar_score — the table labels them); prior e56973e1c2ee, engine v1.7.0 + #1412, 2026-07-19
+RECORDED_ENGINE_FINGERPRINT = "9520396c988f"  # re-read 2026-11-26 (#6293 final amendments: planned rest, lab ageing as weight, rest-day completeness, mood 'unavailable'); prior b75287942475 (#6293 amendment: no XP decay/debt, shield on measured verdicts, held days, no neglect atrophy, only habits two-state); prior f1d96247c11a, re-read 2026-10-23 (#5129: owner-only components held out of _weighted_pillar_score — the table labels them); prior e56973e1c2ee, engine v1.7.0 + #1412, 2026-07-19
 
 
 def engine_fingerprint() -> str:
@@ -248,18 +252,29 @@ def _tbl(headers: list[str], rows: list[list[str]], aria: str) -> str:
 _UNRENDERED_KEYS = ("weight", "behavioral", "owner_only_input", "in_pillar_score")
 
 
+def _weight_label(name: str, p: dict) -> str:
+    """#6293: an uninstrumented pillar's configured weight is not part of the headline — never print it as if it were."""
+    if name in ce.UNINSTRUMENTED_PILLARS:
+        return "not instrumented — out of the headline"
+    return f"{pct(p.get('weight', 0))} of the headline"
+
+
 def _pillars_section(config: dict) -> str:
     pillars = config.get("pillars", {})
-    neglect = (config.get("leveling", {}) or {}).get("neglect_decay", {})
-    min_share = neglect.get("min_behavioral_share", 0.3)
-    weight_sum = sum(p.get("weight", 0) for p in pillars.values())
+    weight_sum = sum(p.get("weight", 0) for n, p in pillars.items() if n not in ce.UNINSTRUMENTED_PILLARS)
     cards = []
     for name, p in pillars.items():
         rows = []
         for comp, cfg in p.get("components", {}).items():
             cfg = cfg if isinstance(cfg, dict) else {"weight": cfg}
             behavioral = bool(cfg.get("behavioral"))
-            kind = '<span class="gx-kind gx-kind-b">behavior</span>' if behavioral else '<span class="gx-kind gx-kind-s">sensor</span>'
+            # #6293: only the T0/T1 habits are two-state (absent = 0); any other logged behavior with no input is unknown
+            if behavioral and comp in ce.HABIT_TWO_STATE_COMPONENTS:
+                kind = '<span class="gx-kind gx-kind-b">habit — unlogged scores 0</span>'
+            elif behavioral:
+                kind = '<span class="gx-kind gx-kind-b">behavior</span>'
+            else:
+                kind = '<span class="gx-kind gx-kind-s">sensor</span>'
             # #5129: an owner-only input is held out of the published score — say so, never as a parameter dump
             if ce.character_privacy.component_visibility(comp, cfg)[1]:
                 kind = '<span class="gx-kind gx-kind-s">held out — owner-only input</span>'
@@ -272,28 +287,27 @@ def _pillars_section(config: dict) -> str:
                     f'<span class="gx-params">{params or "—"}</span>',
                 ]
             )
-        share = ce._behavioral_weight_share(p)
-        atrophies = share >= min_share
-        share_note = f"{pct(share)} of this pillar's weight is behavior — " + (
-            "it atrophies under sustained logging silence (see the dark rules below)."
-            if atrophies
-            else "below the atrophy threshold; a quiet stretch here reads as a sensor gap, not detraining."
+        # #6293: a pillar with no components (Relationships) is not instrumented — its note, never an empty table
+        body = (
+            _tbl(["component", "weight", "kind", "parameters"], rows, f"{name} components")
+            if rows
+            else f'<p class="gx-note">{esc(p.get("not_instrumented_note") or "Not instrumented: no component is scored.")}</p>'
         )
         cards.append(
             f'<article class="gx-pillar" id="pillar-{esc(name)}">'
             f'<div class="gx-pillar-head"><h3 class="gx-pillar-name">{esc(name.capitalize())}</h3>'
-            f'<span class="gx-pillar-meta">{esc(pct(p.get("weight", 0)))} of the headline · smoothing λ {esc(num(p.get("ema_lambda", "")))} · owner {esc(p.get("owner", "—"))}</span></div>'
-            + _tbl(["component", "weight", "kind", "parameters"], rows, f"{name} components")
-            + f'<p class="gx-note">{esc(share_note)}</p>'
-            "</article>"
+            f'<span class="gx-pillar-meta">{esc(_weight_label(name, p))} · smoothing λ {esc(num(p.get("ema_lambda", "")))} · owner {esc(p.get("owner", "—"))}</span></div>'
+            + body
+            + "</article>"
         )
     intro = (
-        '<p class="rd-prose">Every night the engine scores seven pillars, each 0–100, from weighted components. '
-        "Each component is either a <strong>behavior</strong> (something that is done or not done — logging food, training, journaling) "
-        "or a <strong>sensor</strong> (something a device measures). The distinction is load-bearing: when a behavior has no data, "
-        "the behavior didn't happen and it scores <strong>0 at full weight</strong>; when a sensor has no data, the engine has no "
-        "evidence either way, so the component drops out of the weight sum instead (ADR-104). "
-        f"The pillar weights below sum to {esc(pct(weight_sum))} of the headline character level.</p>"
+        '<p class="rd-prose">Every night the engine scores the instrumented pillars, each 0–100, from weighted components. '
+        "Each component is a <strong>habit</strong>, another <strong>behavior</strong> (training, logging food, reading) or a "
+        "<strong>sensor</strong> (something a device measures). Only the daily habits are two-state: an unlogged habit is a habit that "
+        "didn't happen, so it scores <strong>0 at full weight</strong>. Any other component with no data is <strong>unknown</strong> — "
+        "the engine has no evidence either way, so it drops out of the weight sum and lowers the day's coverage instead (ADR-104, "
+        "narrowed in 2026-11). Missing information is never read as decline. "
+        f"The instrumented pillars' weights below sum to {esc(pct(weight_sum))}; the headline renormalizes over them.</p>"
         '<p class="rd-prose">A handful of component targets — sleep duration, deep and REM share — are not fixed '
         "opinions: once at least 30 observations of Matthew's own history exist, the target is re-derived monthly as the 75th "
         "percentile of his own distribution, clamped inside documented safety bounds (ADR-105 rule 4: thresholds come from "
@@ -308,42 +322,38 @@ def _pillars_section(config: dict) -> str:
 
 def _xp_section(config: dict) -> str:
     leveling = config.get("leveling", {})
-    bands = config.get("xp_bands", [])
-    decay = leveling.get("daily_xp_decay", ce.DEFAULT_DAILY_XP_DECAY)
+    bands = config.get("xp_bands", ce.DEFAULT_XP_BANDS)
     per_level = leveling.get("xp_per_level", ce.DEFAULT_XP_PER_LEVEL)
-    debt_cap = leveling.get("xp_debt_cap", per_level)
     buf_threshold = leveling.get("xp_buffer_threshold", ce.DEFAULT_XP_BUFFER_THRESHOLD)
     buf_cap = leveling.get("xp_buffer_cap", per_level)
-    grace = leveling.get("grace_period_days", 14)  # engine default when absent from config
 
     rows = []
     ordered = sorted(bands, key=lambda b: -b.get("min_raw_score", 0))
     for i, b in enumerate(ordered):
         lo = b.get("min_raw_score", 0)
         hi = ordered[i - 1].get("min_raw_score", 100) - 1 if i > 0 else 100
-        net = b.get("xp", 0) - decay
+        verdict = ce.xp_day_verdict(lo, config)
         rows.append(
             [
                 f'<span class="gx-fig">{lo}–{hi}</span>',
-                f'<span class="gx-fig">{b.get("xp", 0):+d}</span>',
-                f'<span class="gx-fig">{net:+g}</span>',
+                f'<span class="gx-fig">{max(0, verdict):+d}</span>',
+                f'<span class="gx-fig">{verdict:+g}</span>',
             ]
         )
     intro = (
-        '<p class="rd-prose">Each pillar\'s daily raw score converts to XP through fixed bands, and a daily decay of '
-        f"<strong>{esc(num(decay))} XP</strong> is charged against it — so the <em>net</em> column is what a day actually pays. "
-        "The zero point is deliberately set at a decent-but-unremarkable day (ADR-134): coasting neither builds nor bleeds.</p>"
+        '<p class="rd-prose">On a day the engine could actually judge, each pillar\'s raw score lands in a fixed band. A good day '
+        "<strong>earns</strong> XP; a decent-but-unremarkable day earns nothing (ADR-134's zero point); a low day also earns nothing. "
+        "<strong>XP never goes down</strong>: there is no daily decay, no negative balance and no debt — missing data, inactivity and rest "
+        "cost no XP at all, and a day with too little evidence carries no XP judgment in either direction.</p>"
     )
     after = (
-        f'<p class="rd-prose">A level is <strong>{esc(num(per_level))} XP</strong> deep. When the balance would go below zero it shows as visible '
-        f"<strong>debt</strong> instead of hiding under a floor, capped at {esc(num(debt_cap))} XP so a long dark stretch stays climbable; "
-        "good days pay debt down before XP grows again. XP earned also fills a small <strong>buffer</strong> "
-        f"(capped at {esc(num(buf_cap))} XP) that acts as demotion insurance: a level-down can only land once the buffer is under "
-        f"{esc(num(buf_threshold))} XP — and a confirmed multi-day dark stretch bypasses the buffer entirely, because banked XP is "
-        "flip-flop insurance against noisy data, never a shield against a provable absence. In the first "
-        f"{esc(num(grace))} days of a cycle the decay phases in linearly, so a fresh start isn't punished before the data stabilizes.</p>"
+        f'<p class="rd-prose">A level is <strong>{esc(num(per_level))} XP</strong> deep. The band\'s signed value — the '
+        "<em>shield</em> column — moves a small <strong>shield</strong> (capped at "
+        f"{esc(num(buf_cap))}) that acts as demotion insurance: good days fill it, measured low days drain it, and a day without "
+        f"evidence leaves it alone. A level-down can only land once the shield is under {esc(num(buf_threshold))}. It is "
+        "flip-flop insurance against noisy data; silence never drains it.</p>"
     )
-    return _sec("xp", "A day becomes XP", intro + _tbl(["day's raw score", "XP earned", "net after decay"], rows, "XP bands") + after)
+    return _sec("xp", "A day becomes XP", intro + _tbl(["day's raw score", "XP earned", "shield"], rows, "XP bands") + after)
 
 
 def _levels_section(config: dict) -> str:
@@ -367,7 +377,7 @@ def _levels_section(config: dict) -> str:
         "<li><strong>The streak gate.</strong> The target must hold above the current level for a full streak of days to climb (longer to fall — see the tier ladder). One great or terrible day moves nothing.</li>"
         "<li><strong>The lived-day gate.</strong> A climb also requires <em>today's own measured performance</em> to be at the target — the pre-blend, pre-boost number. EMA momentum after the behavior stopped can't buy a level, and in total logging silence the measured day is 0, so no dark day ever supports a climb (ADR-104).</li>"
         f"<li><strong>The coverage gate.</strong> Below {esc(pct(min_cov))} data coverage the day carries no leveling signal at all: streaks hold, levels freeze in both directions. Thin data is smoothed toward neutral for display, and neutral must never be climbable — nor should a pillar crash on no information.</li>"
-        "<li><strong>The XP buffer.</strong> A level-down additionally waits until the XP buffer is depleted (see above) — unless the stretch is confirmed dark.</li>"
+        "<li><strong>The shield.</strong> A level-down additionally waits until the shield is depleted (see above) — which only measured low days can do.</li>"
         "</ul>"
         '<p class="rd-prose">When a gate finally opens, the step size scales with the honest gap, so a pillar far from its target converges instead of marching one level at a time:</p>'
     )
@@ -448,28 +458,31 @@ def _effects_section(config: dict) -> str:
 
 
 def _dark_section(config: dict) -> str:
-    leveling = config.get("leveling", {})
-    nd = leveling.get("neglect_decay", {})
-    grace = nd.get("n_grace_days", 3)
-    rate = nd.get("rate", 0.98)
-    min_share = nd.get("min_behavioral_share", 0.3)
-    pillars = config.get("pillars", {})
-    qualifying = [n for n, p in pillars.items() if ce._behavioral_weight_share(p) >= min_share]
-    persistent = nd.get("persistent_down_streak", False)
+    uninstrumented = ", ".join(n.capitalize() for n in ce.UNINSTRUMENTED_PILLARS)
     prose = (
-        '<p class="rd-prose">The game\'s hardest honesty rules are about absence (ADR-104). The sheet must respond truthfully when the logging '
-        "stops — it can never coast on silence, and it can never punish a sensor outage as if it were a lapse.</p>"
+        '<p class="rd-prose">The game\'s hardest honesty rules are about absence (ADR-104, amended 2026-11). The sheet can never coast on '
+        "silence — and it can never read silence, inactivity or rest as decline.</p>"
         '<ul class="rd-tierlist">'
-        "<li><strong>Absent behaviors score zero.</strong> An unlogged habit is a habit that didn't happen: behavior components score 0 at full weight. A quiet device just drops out of the weight sum — a wearable gap is not a failure.</li>"
-        "<li><strong>Thin days blend toward neutral — for display only.</strong> As data coverage falls, the day's score is blended toward a neutral 50 (full confidence at 80% coverage). The blend smooths the EMA and the display; it is uncertainty, not performance, so the level gates always judge the unblended measured number.</li>"
-        "<li><strong>A never-instrumented pillar is a placeholder, not a reading.</strong> With zero components reporting, the pillar shows a mathematical neutral 50 and is excluded from the headline until it earns its first level — after that it counts forever, and going dark later drags honestly instead of vanishing.</li>"
-        f"<li><strong>Neglect atrophies.</strong> After {esc(num(grace))} consecutive dark days of manual-logging silence (with no planned pause — sick days and travel never decay), behavioral pillars start to atrophy: the smoothed score multiplies by {esc(num(rate))} per additional dark day, floored at what each day actually measured. Only pillars whose weight is at least {esc(pct(min_share))} behavioral qualify — currently <strong>{esc(', '.join(qualifying))}</strong> — because a dark stretch detrains behaviors, not blood panels.</li>"
-        + (
-            "<li><strong>A confirmed dark stretch falls day by day.</strong> The anti-flip-flop streak reset exists for noisy engaged data; a provable multi-day absence is not noise. In a confirmed dark stretch the down-streak persists across drops and the XP buffer stops shielding, so the level keeps stepping down toward what the data earns.</li>"
-            if persistent
-            else ""
-        )
-        + "<li><strong>XP bleeds visibly.</strong> Silence pays the daily decay with nothing earned; the hole shows as debt on the sheet rather than disappearing under a zero floor.</li>"
+        "<li><strong>Unlogged habits score zero; everything else missing is unknown.</strong> A daily habit not logged is a habit that "
+        "didn't happen. Any other missing input — a quiet wearable, an unlogged meal, no reading session, no workout log — drops out of the "
+        "weight sum instead of scoring zero.</li>"
+        "<li><strong>Missing qualitative information is unknown, not decline.</strong> How often the journal is written is not scored, and "
+        "nothing a language model reads into the journal is scored: a day without an entry moves no score.</li>"
+        "<li><strong>A day with no evidence moves nothing.</strong> When a pillar has no data, or too little to judge, that day is "
+        "<em>held</em>: it is left out of the smoothed score, the cross-pillar variance, the all-pillars streak and the mood, and it earns "
+        "or costs no XP. Thin days still show a value blended toward neutral, for display only.</li>"
+        "<li><strong>No neglect decay.</strong> A quiet stretch — a planned rest, a trip, a week off logging — does not shrink any score "
+        "and does not push a level down. A level falls only when measured days, sustained over the streak gate, say it should.</li>"
+        "<li><strong>Planned rest is not inactivity.</strong> A day recorded as a sick day or a travel day leaves Movement's weekly "
+        "windows: the week's session, strength, Zone 2 and variety targets shrink to the days that were not planned rest, and a week of "
+        "nothing but planned rest is unknown, not zero. An unplanned week off still counts as a week without training.</li>"
+        "<li><strong>A rest day is not missing data.</strong> The day's data completeness expects a Strava row only when another source "
+        "(Hevy, Whoop, the watch) shows a session that day.</li>"
+        "<li><strong>Old lab results fade as evidence, not as health.</strong> As a blood panel ages its weight in Metabolic tapers — "
+        "full for 30 days, half at 90, none at 180 — and the aged share is unknown; the markers' score itself never drops with age.</li>"
+        f"<li><strong>An uninstrumented pillar is out, not a placeholder.</strong> {esc(uninstrumented)} has no defensible, approved "
+        "assessment yet, so it is not scored: no number stands in for it anywhere — not in the headline, the consistency variance, the "
+        "effects or the mood.</li>"
         "</ul>"
     )
     return _sec("dark", "When the data goes dark", prose)
@@ -477,12 +490,13 @@ def _dark_section(config: dict) -> str:
 
 def _headline_section(config: dict) -> str:
     prose = (
-        '<p class="rd-prose">The headline <strong>Character Level</strong> is the weight-averaged mean of the seven pillar levels, '
-        "renormalized over the pillars that have ever been instrumented, then <strong>floored</strong> — never rounded up. "
+        '<p class="rd-prose">The headline <strong>Character Level</strong> is the weight-averaged mean of the pillar levels, '
+        "renormalized over the pillars that are instrumented and have earned a level, then <strong>floored</strong> — never rounded up. "
         "It understates by construction.</p>"
-        '<p class="rd-prose">The character\'s <strong>mood</strong> — dormant · fading · steady · thriving — is equally deterministic '
-        "(ADR-105): pure code over the presence signal and the 7-day composite raw-score trend. <em>Dormant</em> is a confirmed dark stretch; "
-        "<em>fading</em> is quiet logging or a trend of −5 or worse; <em>thriving</em> demands active logging, a trend of +3 or better, "
+        '<p class="rd-prose">The character\'s <strong>mood</strong> — unavailable · fading · steady · thriving — is equally deterministic '
+        "(ADR-105): pure code over the presence signal and the 7-day composite raw-score trend of the measured days. <em>Fading</em> "
+        "needs the measured days themselves to fall (a trend of −5 or worse); when logging has simply gone quiet the mood is "
+        "<em>unavailable</em> — not observed, never read as decline; <em>thriving</em> demands active logging, a trend of +3 or better, "
         "and a composite of at least 55; everything else is <em>steady</em>. No model ever decides how the character feels.</p>"
     )
     return _sec("headline", "The headline number — and the mood", prose)
@@ -490,7 +504,7 @@ def _headline_section(config: dict) -> str:
 
 def _honesty_section(config: dict) -> str:
     prose = (
-        '<p class="rd-prose"><strong>Deterministic:</strong> everything on this page. Scores, XP, levels, tiers, effects, atrophy, and mood are '
+        '<p class="rd-prose"><strong>Deterministic:</strong> everything on this page. Scores, XP, levels, tiers, effects and mood are '
         "pure code over logged data — the same inputs always produce the same character, and no language model sits anywhere in the loop "
         "(ADR-104/105).</p>"
         '<p class="rd-prose"><strong>Judged:</strong> only the words around the numbers. The coaches\' commentary, the weekly chronicle, and the '

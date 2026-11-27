@@ -313,41 +313,58 @@ def privacy_vs_timing(snap: dict, privacy_only: dict, full: dict) -> dict:
 
 
 def level_credit_changes(snap: dict, char: dict) -> dict:
-    """F(4): what the level badges, the level milestones and the served level events credit, before and after. Both read
-    ``character_privacy.event_level_series`` (scores live: the state once the switch flips after the recompute)."""
+    """F(4) + the owner's 2026-11-26 correction: the EVENT COMPARISON (``backfill_public_variant_events``) — every event
+    served before vs after (KEPT / MOVED / REMOVED / ADDED, with reasons and the per-date values that prove each), the level
+    badges' and the level milestone ladder's first-crossing dates, and the zero-loss check for the public-input pillars."""
+    import backfill_public_variant_events as EV
     from health import achievement_rules, milestone_ledger
 
-    before_recs = [snap["sheets"][d] for d in sorted(snap["sheets"])]
+    dates = sorted(snap["sheets"])
+    before_recs = [snap["sheets"][d] for d in dates]
     after_recs = [
-        dict(snap["sheets"][d], **{B.PUBLIC: char[d]["public"]}) if char.get(d, {}).get("public") else snap["sheets"][d]
-        for d in sorted(snap["sheets"])
+        dict(snap["sheets"][d], **{B.PUBLIC: char[d]["public"]}) if char.get(d, {}).get("public") else snap["sheets"][d] for d in dates
     ]
-    keep = character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE
-    character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = False
-    try:
-        series = {"before": character_privacy.event_level_series(before_recs), "after": character_privacy.event_level_series(after_recs)}
-        events = {
-            "before": [(v.get("date"), _events(v)) for v in character_privacy.public_event_sheets(before_recs)],
-            "after": [(v.get("date"), _events(v)) for v in character_privacy.public_event_sheets(after_recs)],
-        }
-    finally:
-        character_privacy.PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE = keep
+    badges = {r.id: r.threshold for r in achievement_rules.BADGE_RULES if r.signal == "current_level"}
+    ladder = sorted(r.threshold for r in milestone_ledger.MILESTONE_RULES if r.signal == "character_level")
+    return EV.event_comparison(before_recs, after_recs, badges, ladder)
 
-    def first_crossing(s: list, n: int):
-        return next((d for d, lv in s if lv >= n), None)
 
-    rungs = sorted({r.threshold for r in achievement_rules.BADGE_RULES if r.signal == "current_level"})
-    rungs += sorted({r.threshold for r in milestone_ledger.MILESTONE_RULES if r.signal == "character_level"} - set(rungs))
-    crossings = {n: [first_crossing(series["before"], n), first_crossing(series["after"], n)] for n in sorted(set(rungs))}
-    return {
-        "level_rungs_first_crossed": {str(n): v for n, v in crossings.items()},
-        "level_rungs_that_change": [n for n, v in crossings.items() if v[0] != v[1]],
-        "level_badges": [r.id for r in achievement_rules.BADGE_RULES if r.signal == "current_level"],
-        "level_events_served": events,
-        "level_event_dates_disappearing": sorted({d for d, _ in events["before"]} - {d for d, _ in events["after"]}),
-        "note": "badges and milestones credit event_level_series; while PUBLIC_CHARACTER_SCORES_PENDING_RECOMPUTE is on, none "
-        "is credited and level badges are served as pending",
-    }
+def _event_lines(lv: dict) -> list:
+    """The SUMMARY.md lines of the event comparison (totals by kind, the zero-loss check, badges and milestones)."""
+    totals, out = lv["events"]["totals"], []
+    for who in sorted(totals):
+        t = totals[who]
+        out.append(f"- {who}: KEPT {t['KEPT']} · MOVED {t['MOVED']} · REMOVED {t['REMOVED']} · ADDED {t['ADDED']}")
+    for r in lv["events"]["rows"]:
+        if r["status"] != "KEPT":
+            tail = f" → {r['new_date']}" if r["status"] == "MOVED" else f" ({r.get('reason')})" if r["status"] == "REMOVED" else ""
+            proof = r.get("corrected_values") or {}
+            vals = (
+                f" [corrected: {proof.get('previous_day')} {proof.get('level_before')} → {r['date']} {proof.get('level_on_date')}]"
+                if proof
+                else ""
+            )
+            prov = (
+                " · provenance: reconstructed" + (f", redated_from {r['date']}" if r["status"] == "MOVED" else "")
+                if r["status"] in ("ADDED", "MOVED")
+                else ""
+            )
+            out.append(f"  - {r['status']} {r['date']} {r['who']} {r['type']} {r['old']}→{r['new']}{tail}{vals}{prov}")
+    out.append(
+        f"- Events stored with INTERNAL provenance `reconstructed` (reconstructed_at, reconstructed_method; redated_from when "
+        f"moved): {lv.get('reconstructed_events_marked', 0)}. Never served publicly, never an outbound event (no digest, coach "
+        "trigger, chronicle, buddy, character_stats.json or email); level badges / milestones MOVED or ADDED below are "
+        "reconstructed too (internal records only)."
+    )
+    lost, mism = lv["verbatim_losses"], lv["stored_verbatim_mismatches"]
+    out.append(
+        f"- Public-input pillar (sleep/movement/nutrition/metabolic) events LOST: {len(lost)}"
+        + (" — none." if not lost else f": {', '.join(r['date'] + ' ' + r['who'] for r in lost)}")
+        + f" Stored per-date pillar events differing: {len(mism)}."
+    )
+    for name, group in (("Level badges", lv["level_badges"]), ("Level milestones", lv["level_milestones"])):
+        out.append(f"- {name}: " + "; ".join(f"{k} {v['before']} → {v['after']} ({v['status']})" for k, v in group.items()))
+    return out
 
 
 def summary_md(manifest: dict, notice: str, out_dir: str) -> str:
@@ -357,6 +374,8 @@ def summary_md(manifest: dict, notice: str, out_dir: str) -> str:
         "# Public character recompute — dry run (#6224)",
         "",
         f"Generated {manifest['generated_at']} · method {manifest['public_method_version']} · mode {manifest['mode']}",
+        f"Public plan id `{plan.get('public_plan_id')}` · private plan id `{plan.get('private_plan_id')}` · method-1 basis: "
+        f"{plan.get('method1_basis')}",
         "",
         "## What changes for readers (before = what the public routes serve today, the stored `public` block)",
         f"- Character dates: {s['character_dates']}. Overall level changes on {len(s['level_changed_dates'])} dates "
@@ -376,13 +395,11 @@ def summary_md(manifest: dict, notice: str, out_dir: str) -> str:
         + ".",
         "- A privacy-only apply: `--no-order-fix` (the per-date table is `manifest.json` → `privacy_vs_timing`).",
         "",
-        "## Levels, badges, milestones, level events",
-        f"- Level rungs whose first-crossing date changes: {lv['level_rungs_that_change'] or 'none'} "
-        f"(badges {', '.join(lv['level_badges'])}; milestone level ladder).",
-        f"- Served level-event dates that disappear: {', '.join(lv['level_event_dates_disappearing']) or 'none'}.",
+        "## Event comparison (before = what the public routes served before the containment switch)",
+        *_event_lines(lv),
         "",
         "## The correction notice readers will see",
-        f"> {notice}",
+        *(f"> {ln}" if ln else ">" for ln in notice.split("\n")),
         "",
         "## What the write touches",
         f"- Planned writes: {plan['writes']} ({', '.join(f'{k.split(chr(35) + 'SOURCE' + chr(35))[-1]} {v}' for k, v in plan['by_partition'].items())}); "
@@ -694,12 +711,15 @@ def write_csv(path: str, rows: list) -> None:
             w.writerow({k: json.dumps(v, default=str) if isinstance(v, (list, dict)) else v for k, v in r.items()})
 
 
-def main(argv: list) -> int:
+def _parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", help="directory for the manifest / export (OUTSIDE the repo: it carries real values)")
     ap.add_argument("--to", default=(datetime.now(timezone.utc).date()).isoformat())
     ap.add_argument("--apply", action="store_true", help="WRITE: export the pre-image, then SET `public` (owner act)")
-    ap.add_argument("--rollback", help="an export file: restore its pre-image (dry run unless --apply)")
+    ap.add_argument(
+        "--rollback", help="an export (local file or s3://…/export_<phase>.json): restore its pre-image (dry run unless --apply)"
+    )
+    ap.add_argument("--preflight", action="store_true", help="read-only: the public backup's preconditions for this plan id")
     ap.add_argument("--skip-routes", action="store_true", help="skip the route-handler before/after evaluation")
     ap.add_argument(
         "--no-order-fix",
@@ -712,6 +732,32 @@ def main(argv: list) -> int:
         default="all",  # dry runs plan everything; an --apply must name its phase (below)
         help="pre-merge: sheets + day grades + the ledger (inert on the old code); post-merge: the receipts (after the deploy)",
     )
+    ap.add_argument(
+        "--plan-in",
+        help="#6224/#6311: a private recompute plan (character-private-recompute-plan-v1) — the public dry run reads its "
+        "PLANNED character rows instead of the stored ones, and the public apply requires exactly those rows live",
+    )
+    ap.add_argument("--approved-public-plan-id", help="with --plan-in --apply: the public_plan_id the owner approved (must reproduce)")
+    return ap
+
+
+def _rollback(args: Any, table: Any, backups: Any) -> int:
+    import backfill_public_variant_backup as BK
+
+    try:
+        export = BK.load_export(args.rollback, backups)  # its recorded sha256 verified first
+    except BK.BackupError as exc:
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return 5
+    result = B.rollback(table, export, apply=args.apply)
+    print(json.dumps({k: (len(v) if isinstance(v, list) else v) for k, v in result.items()}, indent=1))
+    if args.out:
+        _write(os.path.join(args.out, "rollback_result.json"), result)
+    return 0 if not result["refused"] else 2
+
+
+def main(argv: list) -> int:
+    ap = _parser()
     args = ap.parse_args(argv)
     if args.apply and not args.rollback and args.phase == "all":
         ap.error("--apply needs --phase pre-merge or post-merge: a receipt written before the merge is served early by the old code")
@@ -722,19 +768,23 @@ def main(argv: list) -> int:
     table = boto3.resource("dynamodb", region_name=region).Table(os.environ["TABLE_NAME"])
     run_ts = datetime.now(timezone.utc).isoformat()
 
+    import backfill_public_variant_backup as BK
+
+    backups = BK.S3Backups(boto3.client("s3", region_name=region), os.environ["S3_BUCKET"])
     if args.rollback:
-        with open(args.rollback, encoding="utf-8") as fh:
-            export = json.load(fh)
-        result = B.rollback(table, export, apply=args.apply)
-        print(json.dumps({k: (len(v) if isinstance(v, list) else v) for k, v in result.items()}, indent=1))
-        if args.out:
-            _write(os.path.join(args.out, "rollback_result.json"), result)
-        return 0 if not result["refused"] else 2
+        return _rollback(args, table, backups)
 
     if not args.out:
         ap.error("--out is required (a directory outside the repo)")
     os.makedirs(args.out, exist_ok=True)
     snap = load_snapshot(table, args.to)
+    import backfill_public_variant_planin as PI
+
+    try:
+        private_plan, expected = PI.load_into_snapshot(args.plan_in, snap)
+    except PI.PlanInError as exc:
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return 3
     config = load_config(table, boto3.client("s3", region_name=region))
     char, receipts, grades = run_replays(snap, config, run_ts, order_fix=not args.no_order_fix)
     privacy_only = char if args.no_order_fix else run_replays(snap, config, run_ts, order_fix=False)[0]
@@ -754,6 +804,27 @@ def main(argv: list) -> int:
     }
     manifest["privacy_vs_timing"] = privacy_vs_timing(snap, privacy_only, full)
     manifest["level_credit"] = level_credit_changes(snap, char)
+    # #6224 (owner ruling 2026-11-26 23:50Z): the INTERNAL provenance of every reconstructed event, stored in the
+    # recomputed public projection (never served — character_privacy.public_sheet strips it and serves no reconstructed
+    # event as an event); idempotent against an already-applied block
+    import backfill_public_variant_events as EV
+
+    manifest["level_credit"]["reconstructed_events_marked"] = EV.annotate_provenance(
+        {d: r["public"] for d, r in char.items() if r.get("public")},
+        snap["sheets"],
+        manifest["level_credit"]["events"],
+        run_ts[:10],
+        character_privacy.PUBLIC_METHOD_VERSION,
+    )
+    import recompute_character_verify as VF
+
+    manifest["verification"] = VF.manifest_checks(snap, char, c_rows, manifest["level_credit"])  # #6224 owner conditions A/B
+    manifest["verification"]["rest_tradeoff"] = VF.rest_tradeoff(sys.modules[__name__], snap, config, run_ts, char)  # what-if
+    if private_plan is not None:  # #6224: which named change moves each public number (order-dependent, stated)
+        import recompute_character_attribution as ATT
+
+        manifest["attribution"] = ATT.public_attribution(sys.modules[__name__], snap, config, run_ts, args.plan_in, char)
+        manifest["verification"]["mood"] = VF.mood_changes_from_plan(args.plan_in, c_rows, snap, char)
     manifest["correlations_and_what_changed"] = correlation_aggregates(table, snap, grades)
     manifest["latest_surfaces"] = latest_surfaces(snap, char)
     h_rows = R.habit_pct_rows(snap["habitify"], snap["profile"].get("habit_registry") or {})
@@ -776,7 +847,12 @@ def main(argv: list) -> int:
     stored.update({(B.RECEIPT_PK, f"DATE#{d}"): r for d, r in snap["receipts"].items()})
     stored.update({(B.GRADE_PK, f"DATE#{d}"): r for d, r in snap["grades"].items()})
     plan, skipped_unchanged = narrow_plan(plan_all, stored)  # #6224 F(8): only the projections that change are written
+    plan = PI.attach_expected(plan, expected)  # #6311: each write requires the PLANNED private row's fingerprint
+    private_plan_id = (private_plan or {}).get("plan_id")
     manifest["plan"] = {
+        "private_plan_id": private_plan_id,
+        "public_plan_id": PI.public_plan_id(private_plan_id, character_privacy.PUBLIC_METHOD_VERSION, plan),
+        "method1_basis": "the private plan's PLANNED rows (--plan-in)" if private_plan else "the stored rows",
         "writes": len(plan),
         "skipped_unchanged": skipped_unchanged,
         "touches": "only the `public` attribute of existing character_sheet / character_receipt / day_grade items, plus the "
@@ -798,20 +874,30 @@ def main(argv: list) -> int:
     write_csv(os.path.join(args.out, "manifest_day_grade.csv"), g_rows)
     _write(os.path.join(args.out, "plan.json"), plan)
     print(json.dumps(manifest["summary"], indent=1, default=str))
+    if args.preflight:
+        pf = BK.preflight(backups, manifest["plan"]["public_plan_id"])
+        _write(os.path.join(args.out, "preflight.json"), pf)
+        print(json.dumps(pf, indent=1))
+        return 0 if pf["ok"] else 1
     if not args.apply:
         print(f"DRY RUN — nothing written. {len(plan)} planned writes, {len(phase_plan)} in phase {args.phase}; manifest in {args.out}")
         return 0
+    refusal = PI.apply_refusal(private_plan, args.approved_public_plan_id, manifest["plan"]["public_plan_id"], table, phase_plan)
+    if refusal:
+        print(f"REFUSED: {refusal}", file=sys.stderr)
+        return 3
     export = B.build_export(lambda key: table.get_item(Key=key).get("Item"), phase_plan, run_ts)
     export["phase"] = args.phase
-    export_path = os.path.join(args.out, f"export_{args.phase}_{run_ts.replace(':', '')}.json")
     if B.PHASE_WRITES_LEDGER[args.phase]:
         B.record_ledger_preimage(table, export)
-    _write(export_path, export)  # the pre-image exists on disk BEFORE the first write
-    result = B.apply_plan(table, phase_plan, export)
-    if B.PHASE_WRITES_LEDGER[args.phase]:
-        B.put_public_ledger(table, ledger_item)
+    ledger = ledger_item if B.PHASE_WRITES_LEDGER[args.phase] else None
+    try:  # #6224: the pre-image is backed up locally AND to S3 (conditional put, verified) BEFORE the first write
+        result = BK.apply_phase(table, backups, export, phase_plan, manifest["plan"]["public_plan_id"], args.phase, args.out, ledger)
+    except BK.BackupError as exc:
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return 5
     _write(os.path.join(args.out, "apply_result.json"), result)
-    print(json.dumps({"written": result["written"], "skipped": len(result["skipped"]), "export": export_path}, indent=1))
+    print(json.dumps({"written": result["written"], "skipped": len(result["skipped"]), "backup": result["backup"]}, indent=1))
     return 0 if not result["skipped"] else 2
 
 

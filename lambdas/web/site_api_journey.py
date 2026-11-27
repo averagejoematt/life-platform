@@ -810,6 +810,9 @@ def achievements(*, _g) -> dict:
     signals["current_streak"] = tier0["streak"] if tier0 else 0
     streak_badges = {r.id for r in achievement_rules.BADGE_RULES if r.signal == "current_streak"}
     first_earns = {k: v for k, v in first_earns.items() if k not in streak_badges}
+    # #6224 (owner decision 2026-11-26): a level badge follows the corrected public level — its date is where that chain
+    # first crosses the rung, and a rung it never reaches is not earned (a stored first-earn from the old level is not kept)
+    first_earns = achievement_rules.with_corrected_level_badges(first_earns, inputs.get("chars") or [])
 
     achievements = achievement_rules.render(signals, first_earns)
     level_pending = character_privacy.scores_pending()

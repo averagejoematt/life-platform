@@ -48,7 +48,16 @@ logger = logging.getLogger(__name__)
 _config_cache: dict[str, Any] = {"data": None, "ts": 0}  # dict[str, Any]: heterogeneous, see #2638
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.8.0"  # #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
+ENGINE_VERSION = "1.10.0"  # #6293: Mind without journaling frequency or model-counted values; Relationships not instrumented
+# v1.10.0 — #6293 (owner rulings 2026-11-26): `journal_consistency` and `values_alignment` leave Mind (sum AND coverage);
+# Relationships scores nothing (no defensible, owner-approved assessment exists) and returns the not-instrumented state.
+# Journal and flourishing rows stay stored and readable as interpretation; they feed no score. Habit components are
+# unchanged. (1.9.0 is draft PR #6096's exact-boundary headline; the two compose — see docs/engines/CHARACTER.md.)
+# v1.10.0 amendment (owner ruling 2026-11-26, before any deploy — same version): Relationships (``UNINSTRUMENTED_PILLARS``)
+# leaves every aggregate, and a held pillar-day (no signal, or coverage below the floor) reaches none — no 50 stands in;
+# XP never falls (no daily decay, no debt); the #913 neglect atrophy and the #959 dark down-streak are removed; only the
+# T0/T1 habits score 0 when absent. See docs/engines/CHARACTER.md "Method revision v1.10.0".
+# v1.8.0 — #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
 # #1412 (no version bump — no transition-formula change): component targets may arrive
 # personalized via personal_baselines.apply_character_targets; _weighted_pillar_score
 # surfaces each target's derivation provenance into component details. Target values
@@ -63,9 +72,20 @@ ENGINE_VERSION = "1.8.0"  # #1411: fitted-not-authored — active effects carry 
 # ── ADR-104: coverage floor below which a day carries no leveling signal ──
 DEFAULT_LEVEL_CHANGE_MIN_COVERAGE = 0.5
 
+# #6293 amendment (owner ruling 2026-11-26, "Amend the calculation so uninstrumented Relationships is excluded entirely
+# from consistency, variance and related aggregate calculations. Do not substitute a neutral value of 50 for missing
+# evidence."): pillars the METHOD does not instrument. The engine leaves them out of the whole state chain, as it does a
+# caller's ``unscored_pillars`` — no raw score, EMA, level, XP or event, no place in the consistency variance, the
+# effects, the mood or the headline mean — and stores the not-instrumented shape (the reason, no number) in their place.
+UNINSTRUMENTED_PILLARS = ("relationships",)
+
+# #6293 amendment: the ONLY components whose absent input scores 0 at full weight — the habit two-state rule (an
+# unlogged habit is a failed habit; owner rulings, unchanged). Every other component with no input is unknown: out of
+# the sum, and it lowers the coverage like a device gap — whatever its config ``behavioral`` flag says.
+HABIT_TWO_STATE_COMPONENTS = ("t0_habit_compliance", "t1_habit_compliance")
+
 # ── XP defaults (also in config) [F-02] ──
 DEFAULT_XP_PER_LEVEL = 100
-DEFAULT_DAILY_XP_DECAY = 1  # #958/ADR-134: zero-point at "a decent day" (raw 40-59 nets 0, 60+ positive)
 DEFAULT_XP_BUFFER_THRESHOLD = 20
 
 # ── Tier definitions (also in config, but hardcoded as fallback) ──
@@ -198,88 +218,76 @@ def get_tier(level: int, config: Optional[dict[str, Any]] = None) -> dict[str, A
     return tiers[-1] if level > 80 else tiers[0]
 
 
-def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0, bonus_xp=0):
-    """Compute XP delta with daily decay.
+# #6293 amendment (owner ruling 2026-11-26): the net value a MEASURED day's raw score earns, signed. Bands are net of the
+# old daily decay (the zero-point stays "a decent day": raw 40-59 nets 0). XP itself only ever credits the positive part.
+DEFAULT_XP_BANDS = [
+    {"min_raw_score": 80, "xp": 2},
+    {"min_raw_score": 60, "xp": 1},
+    {"min_raw_score": 40, "xp": 0},
+    {"min_raw_score": 20, "xp": -1},
+    {"min_raw_score": 0, "xp": -2},
+]
 
-    Returns (xp_earned, xp_delta, new_xp_total, new_xp_debt). [F-02, #913]
-    C2: Grace period — decay scales linearly over first 14 days to avoid
-    punishing new users before data stabilizes.
 
-    #913 XP debt: the old ``max(0, ...)`` floor made sustained decay invisible —
-    5 of 7 pillars sat at 0 XP and every further bad day looked identical. The
-    signed balance is now split into xp_total (the positive part, so every
-    downstream ``% xp_per_level`` consumer is untouched) and xp_debt (the hole
-    dug below zero, capped at leveling.xp_debt_cap — default one level's worth —
-    so a long dark stretch stays climbable). Good days pay debt down before XP
-    grows again; the UI renders the debt as the visible bleed.
+def xp_day_verdict(raw_score, config):
+    """The signed net value of a MEASURED day (#6293 amendment): the band's ``xp`` less any legacy ``daily_xp_decay``.
 
-    #958 zero-point (ADR-134): with the config's daily_xp_decay of 1, XP breaks
-    even on a 40-59 day and goes positive at 60+ — "a decent day" is the neutral
-    point, not raw 80. The old decay of 2 made every realistic-good trajectory
-    (slow improver, oscillator, post-dark recovery) bleed permanent debt while
-    levels climbed — a 420-day simulated Mastery character wore a maxed debt
-    badge forever. Debt is now a dark-stretch signal a recovery arc visibly
-    repays, never a one-way ratchet.
-
-    #961: ``bonus_xp`` (challenge completions) enters the signed balance like
-    any other XP, so it pays existing debt before growing the total — it can
-    never teleport past the paydown contract or perturb the demotion buffer
-    behind the gates' backs the way the old post-engine ``xp_total +=`` did."""
-    bands = config.get(
-        "xp_bands",
-        [
-            {"min_raw_score": 80, "xp": 3},
-            {"min_raw_score": 60, "xp": 2},
-            {"min_raw_score": 40, "xp": 1},
-            {"min_raw_score": 20, "xp": 0},
-            {"min_raw_score": 0, "xp": -1},
-        ],
-    )
-    leveling = config.get("leveling", {})
-    daily_decay = leveling.get("daily_xp_decay", DEFAULT_DAILY_XP_DECAY)
-
-    # C2: Grace period — scale decay linearly over first 14 days
-    grace_period = leveling.get("grace_period_days", 14)
-    if day_number is not None and day_number < grace_period:
-        daily_decay = daily_decay * min(1.0, day_number / grace_period)
-
-    earned = -1
+    The decay is retired (owner ruling 2026-11-26: inactivity, missing data or rest must not generate punitive character
+    mechanics). A stale config that still carries the old gross bands (+3..-1) with ``daily_xp_decay: 1`` yields the same
+    verdict as the net bands config v1.7.0 carries with no decay, so the two cannot disagree. The verdict is never
+    charged to XP: a low measured day earns zero (``_compute_xp``); its negative part only drains the demotion shield
+    (``xp_shield_delta``), so a level can still fall on sustained MEASURED evidence."""
+    bands = config.get("xp_bands", DEFAULT_XP_BANDS)
+    offset = (config.get("leveling", {}) or {}).get("daily_xp_decay", 0) or 0
+    earned = bands[-1]["xp"] if bands else 0
     for band in bands:
         if raw_score >= band["min_raw_score"]:
             earned = band["xp"]
             break
+    return earned - offset
 
-    xp_delta = earned - daily_decay + (bonus_xp or 0)
-    # Signed balance: pay existing debt first, then grow XP; a shortfall deepens
-    # the debt instead of vanishing under a silent 0-floor. [#913]
-    debt_cap = leveling.get("xp_debt_cap", leveling.get("xp_per_level", DEFAULT_XP_PER_LEVEL))
-    balance = (previous_xp or 0) - (previous_debt or 0) + xp_delta
-    new_xp = max(0, balance)
-    new_debt = min(debt_cap, max(0, -balance))
 
-    return earned, xp_delta, new_xp, new_debt
+def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0, bonus_xp=0):
+    """A measured day's XP. Returns (xp_earned, xp_delta, new_xp_total, new_xp_debt). [F-02, #913, #6293]
+
+    #6293 amendment (owner ruling 2026-11-26, "Inactivity, missing journals or appropriate rest should not automatically
+    imply psychological deterioration or generate punitive character mechanics"): XP never falls. There is no daily
+    decay, no negative balance and no debt: a genuinely low measured day earns zero. ``xp_earned`` is the positive part
+    of ``xp_day_verdict``; ``xp_delta`` adds a completed challenge's ``bonus_xp`` (#961). ``new_xp_debt`` is always 0 —
+    the field stays in the record's shape, retired. ``previous_debt`` (a pre-amendment record's) is forgiven, never
+    collected; ``day_number`` is accepted for old callers and unused (the grace period scaled the retired decay)."""
+    earned = max(0, xp_day_verdict(raw_score, config))
+    xp_delta = earned + max(0, bonus_xp or 0)
+    return earned, xp_delta, (previous_xp or 0) + xp_delta, 0
 
 
 def pillar_xp_transition(raw_score, prev_xp, prev_debt, bonus_xp, xp_hold, config, day_number=None):
-    """The ONE pillar-day XP transition rule (#964 hold semantics + #913 debt).
+    """The ONE pillar-day XP transition rule (#964 hold semantics, #6293 no debt).
 
     Extracted from compute_character_sheet so the #1373 progression-receipt
     replay exercises the IDENTICAL code path the nightly compute ran — never a
     reimplementation that could drift. Returns (xp_earned, xp_delta, new_xp,
-    new_debt).
+    new_debt); new_debt is always 0 (#6293).
 
     xp_hold=True (coverage below the floor, or not instrumented at all): the
-    day carries no XP judgment in either direction — but a completed challenge
-    still credits, debt-first (#961)."""
+    day carries no XP judgment — but a completed challenge still credits (#961)."""
     if xp_hold:
-        xp_earned, xp_delta = 0, 0
-        new_xp, new_debt = prev_xp, prev_debt
-        if bonus_xp:  # a completed challenge still credits, debt-first
-            balance = prev_xp - prev_debt + bonus_xp
-            new_xp, new_debt = max(0, balance), max(0, -balance)
-            xp_delta = bonus_xp
-        return xp_earned, xp_delta, new_xp, new_debt
+        bonus = max(0, bonus_xp or 0)
+        return 0, bonus, (prev_xp or 0) + bonus, 0
     return _compute_xp(raw_score, prev_xp, config, day_number=day_number, previous_debt=prev_debt, bonus_xp=bonus_xp)
+
+
+def xp_shield_delta(raw_score, xp_hold, bonus_xp, config):
+    """How far today moves the level-down shield (``xp_buffer``, #954), #6293 amendment.
+
+    The shield used to roll with the XP total; XP can no longer fall, so a shield rolled from it would only ever fill and
+    once past the threshold block every demotion for good. It rolls instead with the day's signed MEASURED verdict
+    (``xp_day_verdict``) plus any challenge bonus: a held day (no signal) moves it only by the bonus, a measured low day
+    drains it, exactly as the old XP drain did on a measured day. Silence never drains it."""
+    bonus = max(0, bonus_xp or 0)
+    if xp_hold or raw_score is None:
+        return bonus
+    return xp_day_verdict(raw_score, config) + bonus
 
 
 def _roll_xp_buffer(prev_buffer, prev_xp, new_xp, xp_per_level, buffer_cap=None):
@@ -414,8 +422,73 @@ def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[flo
     return _weighted_pillar_score(scores, components)
 
 
+# #6293 final amendments (owner ruling 2026-11-26, "Finish the four outstanding scoring-method amendments"). Each is ONE
+# module switch, default on, so a method ladder (scripts/recompute_character_private.py) can turn exactly that behaviour
+# off to replay the step before it — never a second implementation.
+PLANNED_REST_PRORATES = True  # planned_rest: a recorded planned pause (sick / travel) leaves Movement's count windows
+LAB_AGE_TAPERS_WEIGHT = True  # lab_ageing: an ageing lab result loses WEIGHT (evidence), never score
+REST_DAY_COMPLETENESS = True  # rest_day_completeness: a day with no activity anywhere does not expect a Strava row
+MOOD_NOT_OBSERVED = True  # mood_label_presence: logging silence reads "unavailable", never "dormant"/"fading"
+
+# The Movement components that count sessions / days / minutes / kinds over the trailing 7-day window.
+MOVEMENT_WINDOW_COMPONENTS = ("training_frequency", "zone2_adequacy", "movement_diversity", "strength_sessions")
+MOVEMENT_WINDOW_DAYS = 7
+
+
+def planned_rest_in_window(data: dict[str, Any]) -> int:
+    """#6293 planned_rest: how many of the 7 days ending ``data["date"]`` are a recorded planned pause.
+
+    ``data["planned_rest_days_7d"]`` is the list of dates the caller found with a sick-day record (``SOURCE#sick_days``,
+    not cleared) or a travel log (``SOURCE#travel``) — exactly the set ``engagement_core`` excuses as a planned pause.
+    0 when the switch is off, the key is absent, or the date is unparseable."""
+    if not PLANNED_REST_PRORATES:
+        return 0
+    days = data.get("planned_rest_days_7d") or ()
+    try:
+        end = datetime.strptime(str(data.get("date"))[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return 0
+    window = {(end - timedelta(days=i)).isoformat() for i in range(MOVEMENT_WINDOW_DAYS)}
+    return len({str(d)[:10] for d in days} & window)
+
+
+def data_completeness_pct(present: dict[str, Any], activity_elsewhere: bool) -> Optional[float]:
+    """The day's data completeness (0-100) from ``present`` — {source: arrived?} for the sources the caller counts.
+
+    #6293 rest_day_completeness (owner ruling 2026-11-26): a day with no activity is not missing data. The ``strava``
+    row is expected only when another source shows a session that day (``activity_elsewhere``: Hevy, Whoop or the
+    Apple Watch, by ``training.session_count``); on a day no source shows activity it leaves the denominator. A Strava
+    row that did arrive always counts. With the switch off: the pre-amendment rule, every source always expected."""
+    expected = [s for s in present if not (REST_DAY_COMPLETENESS and s == "strava" and not present.get(s) and not activity_elsewhere)]
+    return round(sum(1 for s in expected if present.get(s)) / len(expected) * 100, 1) if expected else None
+
+
 def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
-    """Compute Movement pillar raw_score (0-100)."""
+    """Compute Movement pillar raw_score (0-100).
+
+    #6293 planned_rest (owner ruling 2026-11-26, "appropriate rest should not ... generate punitive character
+    mechanics"): the four window components' targets are prorated to the days of the window that were NOT a recorded
+    planned pause (``planned_rest_in_window``); a window made entirely of planned rest leaves them unknown. A session done
+    on a planned-rest day still counts. Unplanned inactivity is still a measured zero. When any planned-rest day falls in
+    the window, ``details["_planned_rest"]`` records the count and the pre-proration raw and details, so a reader that
+    may not use the (owner-only) sick/travel record — the public method — restores the day exactly."""
+    rest_days = planned_rest_in_window(data)
+    if not rest_days:
+        return _movement_scored(data, config, 1.0)
+    raw, details = _movement_scored(data, config, (MOVEMENT_WINDOW_DAYS - rest_days) / MOVEMENT_WINDOW_DAYS)
+    pre_raw, pre_details = _movement_scored(data, config, 1.0)
+    details["_planned_rest"] = {
+        "days": rest_days,
+        "pre_rest_raw": pre_raw,
+        "pre_rest_raw_unblended": pre_details.get("_raw_unblended"),
+        "pre_rest_details": pre_details,
+    }
+    return raw, details
+
+
+def _movement_scored(data: dict[str, Any], config: dict[str, Any], expect: float) -> tuple[float, dict[str, Any]]:
+    """Movement's (raw, details) with the window components' targets scaled by ``expect`` (1.0 = the full week; 0 = a
+    week of planned rest: those components are unknown)."""
     pillar_cfg = config.get("pillars", {}).get("movement", {})
     components = pillar_cfg.get("components", {})
     scores = {}
@@ -424,13 +497,13 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     # Hevy sessions that anchor them: one gym visit is one session (never Hevy's push + the ride inside it)
     strava_7d = data.get("strava_7d", [])
     week = session_count.count(strava=strava_7d, hevy=data.get("hevy_7d"))
-    freq_target = components.get("training_frequency", {}).get("target_sessions_week", 5)
-    scores["training_frequency"] = _pct_of_target(week["sessions"], freq_target, 1.4)
+    freq_target = components.get("training_frequency", {}).get("target_sessions_week", 5) * expect
+    scores["training_frequency"] = _pct_of_target(week["sessions"], freq_target, 1.4) if expect > 0 else None
 
     # Zone 2 adequacy
-    z2_target = components.get("zone2_adequacy", {}).get("target_minutes", 150)
+    z2_target = components.get("zone2_adequacy", {}).get("target_minutes", 150) * expect
     z2_minutes = character_zone2.zone2_minutes_7d(data)  # #5389: THE Zone 2 computation
-    scores["zone2_adequacy"] = _pct_of_target(z2_minutes, z2_target, 1.3)
+    scores["zone2_adequacy"] = _pct_of_target(z2_minutes, z2_target, 1.3) if expect > 0 else None
 
     # Training load balance (TSB)
     tsb = data.get("tsb")
@@ -460,8 +533,8 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     # Movement diversity — the kinds among the week's counted parts (#5387: a gym visit's lift, ride and
     # mobility block are three kinds; an echo of one of them is not a fourth)
     kinds = {str(k).lower() for k in week["by_sport"]}
-    diversity_target = components.get("movement_diversity", {}).get("target_types", 4)
-    scores["movement_diversity"] = _pct_of_target(len(kinds), diversity_target, 1.5)
+    diversity_target = components.get("movement_diversity", {}).get("target_types", 4) * expect
+    scores["movement_diversity"] = _pct_of_target(len(kinds), diversity_target, 1.5) if expect > 0 else None
 
     # Daily steps
     # #4630: the day's steps through the ONE resolver (registry METRIC_TRUTH facet).
@@ -481,7 +554,10 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
         # perfect at target+1 days (4/3 for the default target): a fourth
         # session maxes the component; more days add nothing (cap, anti-gaming)
         perfect = (strength_target + 1) / strength_target if strength_target else 1.0
-        scores["strength_sessions"] = _pct_of_target(len(strength_days), strength_target, perfect) if strength_days is not None else None
+        if strength_days is None or expect <= 0:
+            scores["strength_sessions"] = None
+        else:
+            scores["strength_sessions"] = _pct_of_target(len(strength_days), strength_target * expect, perfect)
 
     return _weighted_pillar_score(scores, components)
 
@@ -614,6 +690,11 @@ def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     # #2811 — the DEFAULT is the defect: it decided the lab-DECAY reference day, in UTC.
     compute_date = data.get("date", pacific_today())
     scores["lab_biomarkers"] = _compute_lab_score(labs_latest, compute_date, components.get("lab_biomarkers", {}))
+    # #6293 lab_ageing: an ageing result keeps its score and loses WEIGHT — the aged share of the evidence is unknown
+    # (still in the coverage denominator, out of the sum), never a decline. Past the horizon the score is None.
+    factor = lab_evidence_factor(labs_latest, compute_date) if LAB_AGE_TAPERS_WEIGHT else None
+    if factor is not None and isinstance(components.get("lab_biomarkers"), dict) and scores["lab_biomarkers"] is not None:
+        components = dict(components, lab_biomarkers=dict(components["lab_biomarkers"], evidence_weight=factor))
 
     # Blood pressure
     bp = data.get("bp_data") or {}
@@ -634,8 +715,8 @@ def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     return _weighted_pillar_score(scores, components)
 
 
-def _compute_lab_score(labs, compute_date, lab_cfg):
-    """Compute lab biomarker composite score with time decay."""
+def _lab_days_since(labs, compute_date):
+    """Days between the lab draw and the scored day (floored at 0), or None when either date is unreadable."""
     if not labs:
         return None
     lab_date_str = labs.get("date") or labs.get("draw_date")
@@ -644,21 +725,39 @@ def _compute_lab_score(labs, compute_date, lab_cfg):
     try:
         lab_date = datetime.strptime(lab_date_str[:10], "%Y-%m-%d").date()
         comp_date = datetime.strptime(compute_date[:10], "%Y-%m-%d").date()
-        days_since = (comp_date - lab_date).days
     except Exception:
         return None
-    if days_since < 0:
-        days_since = 0
+    return max(0, (comp_date - lab_date).days)
 
-    # Decay: 1.0 for 30d, to 0.5 at 90d, to 0.0 at 180d [F-07]
+
+def _lab_age_factor(days_since):
+    """The existing [F-07] ageing curve: 1.0 for 30d, to 0.5 at 90d, to 0.0 at 180d (the validity horizon)."""
     if days_since <= 30:
-        decay = 1.0
-    elif days_since <= 90:
-        decay = 1.0 - 0.5 * ((days_since - 30) / 60)
-    elif days_since <= 180:
-        decay = 0.5 - 0.5 * ((days_since - 90) / 90)
-    else:
-        decay = 0.0  # Fully expired — no contribution from stale labs
+        return 1.0
+    if days_since <= 90:
+        return 1.0 - 0.5 * ((days_since - 30) / 60)
+    if days_since <= 180:
+        return 0.5 - 0.5 * ((days_since - 90) / 90)
+    return 0.0
+
+
+def lab_evidence_factor(labs, compute_date):
+    """#6293 lab_ageing: the share of the lab component's weight a result of this age still carries (the [F-07] curve),
+    or None when there is no dated result."""
+    days_since = _lab_days_since(labs, compute_date)
+    return None if days_since is None else round(_lab_age_factor(days_since), 4)
+
+
+def _compute_lab_score(labs, compute_date, lab_cfg):
+    """Lab biomarker composite score. #6293 lab_ageing (``LAB_AGE_TAPERS_WEIGHT``): the score is the markers' own; age
+    tapers the component's WEIGHT instead (``lab_evidence_factor``), and past the horizon the score is None (unknown).
+    With the switch off: the pre-amendment rule, the score multiplied toward 0 by age."""
+    days_since = _lab_days_since(labs, compute_date)
+    if days_since is None:
+        return None
+    decay = _lab_age_factor(days_since)
+    if LAB_AGE_TAPERS_WEIGHT and decay <= 0:
+        return None  # past the validity horizon: no evidence, not a zero
 
     markers = {
         "apob": {"ideal_low": 40, "ideal_high": 90},
@@ -675,6 +774,8 @@ def _compute_lab_score(labs, compute_date, lab_cfg):
             marker_scores.append(_in_range_score(val, ranges["ideal_low"], ranges["ideal_high"], buffer=0.4))
     if not marker_scores:
         return None
+    if LAB_AGE_TAPERS_WEIGHT:
+        return round(sum(marker_scores) / len(marker_scores), 1)
     return round(sum(marker_scores) / len(marker_scores) * decay, 1)
 
 
@@ -706,14 +807,9 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
     else:
         scores["t1_habit_compliance"] = None
 
-    # Journal consistency (14d)
-    j14d_count = data.get("journal_14d_count")
-    if j14d_count is not None:
-        scores["journal_consistency"] = _clamp(round((j14d_count / 14) * 100, 1))
-    elif data.get("journal_entries"):
-        scores["journal_consistency"] = 50.0
-    else:
-        scores["journal_consistency"] = None
+    # #6293 (owner ruling 2026-11-26): journaling FREQUENCY is not psychological progress — `journal_consistency`
+    # (entries in 14 days / 14) is no longer computed, so it is in neither the sum nor the coverage, and a day without
+    # a journal entry is unknown, never a zero.
 
     # State of Mind valence — HAE writes the daily aggregate as som_avg_valence
     # (-1..+1) on the apple_health record; legacy field names kept as a fallback.
@@ -762,128 +858,23 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
         reading_target = components.get("reading_practice", {}).get("target_days_week", 4)
         scores["reading_practice"] = _pct_of_target(len(reading_days), reading_target, 1.25) if reading_days is not None else None
 
-    # Values alignment (#1403): distinct values-in-action the enrichment pass
-    # found in the day's journal (SOURCE#flourishing row). Config-gated like
-    # reading_practice; a journaled day with zero values evidenced is a REAL low
-    # (20), a day with no flourishing row is uninstrumented (None) — ADR-104.
-    if "values_alignment" in components:
-        from health.flourishing import values_alignment_score
-
-        flourishing = data.get("flourishing") or {}
-        scores["values_alignment"] = values_alignment_score(
-            _safe_float(flourishing, "values_lived_count"),
-            bool(flourishing),
-        )
-
-    raw, details = _weighted_pillar_score(scores, components)
-    if "values_alignment" in components and (data.get("flourishing") or {}).get("enrichment_model"):
-        from health.flourishing import provenance_line
-
-        details["_flourishing_provenance"] = provenance_line((data.get("flourishing") or {}).get("enrichment_model"))
-    return raw, details
-
-
-# Ordered rungs of the categorical `enriched_social_quality` field emitted by
-# journal_enrichment_lambda. Rank spacing maps linearly onto the 0–10 scale.
-_SOCIAL_QUALITY_RANK = {"alone": 0, "surface": 1, "meaningful": 2, "deep": 3}
-
-
-def _social_quality_to_10(raw):
-    """Map the categorical `enriched_social_quality`
-    (`alone|surface|meaningful|deep`) onto the 0–10 scale
-    `compute_relationships_raw` already handles for `social_score`.
-
-    #910: `journal_enrichment_lambda` only ever writes the *categorical*
-    `enriched_social_quality`; the numeric `social_connection_score` /
-    `enriched_social_connection` fields the consumer reads are never produced by
-    any code, so `social_score` was always None and both
-    `social_interaction_frequency` (`social_score * 10`) and
-    `social_mood_correlation` (gated on `social_score is not None`) stayed dead.
-
-    The four ordered rungs are spread evenly across the 0–10 range by rank,
-    `rank / 3 * 10`: alone→0, surface→3.33, meaningful→6.67, deep→10. The
-    consumer's `social_interaction_frequency = social_score * 10` then lands them
-    at the intuitive quartiles 0 / 33 / 67 / 100 %. Unknown / `null` / missing →
-    None, preserving the falsy contract (a day with no recognizable social signal
-    stays uninstrumented). The numeric fields remain the primary path; this is
-    only the read-time fallback, mirroring #902's `enriched_mood`→`mood_avg`
-    bridge. Returns None on unrecognized / non-string input.
-    """
-    if not isinstance(raw, str):
-        return None
-    rank = _SOCIAL_QUALITY_RANK.get(raw.strip().lower())
-    if rank is None:
-        return None
-    return rank / 3 * 10
+    # #6293 (owner ruling 2026-11-26): `values_alignment` — a model's count of values it found in the journal's prose
+    # (SOURCE#flourishing) — is no longer scored. The flourishing row stays stored and readable as interpretation.
+    return _weighted_pillar_score(scores, components)
 
 
 def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
-    """Compute Relationships pillar raw_score (0-100)."""
-    pillar_cfg = config.get("pillars", {}).get("relationships", {})
-    components = pillar_cfg.get("components", {})
-    scores = {}
+    """Relationships — NOT INSTRUMENTED (#6293, owner ruling 2026-11-26: "Relationships should remain uninstrumented
+    until a defensible, owner-approved assessment exists").
 
-    journal = data.get("journal") or {}
-    entries = data.get("journal_entries") or []
-
-    # Social interaction frequency.
-    # #1403 primary path: the day's SOURCE#flourishing row — the aggregated,
-    # provenance-stamped projection of the same enrichment (already averaged
-    # across the day's entries at write time). First-class input, so the
-    # Relationships pillar is no longer wired only through a read-time fallback.
-    flourishing = data.get("flourishing") or {}
-    social_score = _safe_float(flourishing, "social_quality_score")
-    # Legacy numeric path: social_connection_score / enriched_social_connection
-    # (no producer writes them yet, first-found wins as before).
-    quality_scores = []
-    for entry in entries:
-        if social_score is not None:
-            break
-        sc = _safe_float(entry, "social_connection_score") or _safe_float(entry, "enriched_social_connection")
-        if sc is not None:
-            social_score = sc
-            break
-        mapped = _social_quality_to_10(entry.get("enriched_social_quality"))
-        if mapped is not None:
-            quality_scores.append(mapped)
-    if social_score is None and quality_scores:
-        social_score = sum(quality_scores) / len(quality_scores)
-    if social_score is not None:
-        scores["social_interaction_frequency"] = _clamp(round(social_score * 10, 1)) if social_score <= 10 else _clamp(social_score)
-    else:
-        scores["social_interaction_frequency"] = None
-
-    # Interaction quality
-    themes = journal.get("themes", [])
-    social_themes = [t for t in themes if any(k in t.lower() for k in ["social", "friend", "family", "partner", "relationship"])]
-    if social_themes:
-        scores["interaction_quality"] = min(100, len(social_themes) * 33)
-    elif themes:
-        scores["interaction_quality"] = 30.0
-    else:
-        scores["interaction_quality"] = None
-
-    # Buddy engagement: REMOVED (#962, B-3 precedent — same disease as the
-    # body-fat component). No producer ever wrote buddy_freshness_days, so the
-    # component could never score and structurally capped relationships
-    # coverage at 0.85. Gone from character_sheet.json too; re-add via a real
-    # producer + config entry if a buddy system ever ships.
-
-    # Social mood correlation
-    mood = _safe_float(journal, "mood_avg")
-    if mood is not None and social_score is not None:
-        scores["social_mood_correlation"] = _clamp(round((mood / 10) * 100, 1)) if mood <= 10 else _clamp(mood)
-    else:
-        scores["social_mood_correlation"] = None
-
-    raw, details = _weighted_pillar_score(scores, components)
-    # #1403 provenance: when the social input came from the flourishing row, say
-    # so — these are LLM-coded readings of prose, never sensor data (ADR-104).
-    if _safe_float(flourishing, "social_quality_score") is not None:
-        from health.flourishing import provenance_line
-
-        details["_flourishing_provenance"] = provenance_line(flourishing.get("enrichment_model"))
-    return raw, details
+    Every input it used to read was a model's reading of journal prose: the enrichment's categorical
+    `enriched_social_quality` (and the flourishing row's `social_quality_score` projected from it), a keyword match over
+    `enriched_themes`, and the model's mood rescaled (a "correlation" that never correlated anything). None is scored.
+    The pillar returns the engine's existing no-signal state whatever the day's data or the config's component list
+    holds — neutral 50 flagged `_not_instrumented`, XP held, levels frozen, out of the headline mean while it has never
+    earned a level (#747/#960/#964). A stale config that still lists the retired components cannot revive them: no
+    component is computed here, and `_weighted_pillar_score` only weighs computed components."""
+    return _weighted_pillar_score({}, {})
 
 
 #  Primary pillars whose raw scores feed the derived consistency inputs (#962).
@@ -899,8 +890,10 @@ def derive_consistency_inputs(dated_records: list[dict[str, Any]], as_of_date: s
     - streak_all_above_30th — consecutive days ending the day before
       ``as_of_date`` where every instrumented primary pillar's raw_score held
       ≥ 30 (the "no pillar below 30" floor the consistency protocols coach).
-      A missing day breaks the streak (a gap is not a floor held); pillars
-      flagged not_instrumented that day are skipped, never counted against.
+      #6293 amendment: a pillar-day with no judgeable evidence (``day_is_held``)
+      is skipped, never counted against; a day on which NO pillar was judged —
+      or with no stored record — neither extends nor breaks the streak (silence
+      is not a floor dropped). The walk covers the records the caller passed.
     - weekend_weekday_ratio — mean composite raw on weekend days / weekday
       days over the trailing 14 records; None below 2 weekend + 4 weekday
       days of data (no ratio from nothing, ADR-105).
@@ -918,7 +911,7 @@ def derive_consistency_inputs(dated_records: list[dict[str, Any]], as_of_date: s
         raws = []
         for p in _STREAK_PILLARS:
             pd = rec.get(f"pillar_{p}") or {}
-            if pd.get("not_instrumented"):
+            if day_is_held(pd):
                 continue
             raw = pd.get("raw_score")
             if raw is not None:
@@ -933,18 +926,19 @@ def derive_consistency_inputs(dated_records: list[dict[str, Any]], as_of_date: s
     except (ValueError, TypeError):
         return {"streak_all_above_30th": None, "weekend_weekday_ratio": None}
 
-    # ── streak: walk back day by day from yesterday; any gap or sub-30 day breaks ──
+    # ── streak: walk back day by day from yesterday; a judged sub-30 day breaks, a silent day is skipped (#6293) ──
     streak = 0
     cursor = as_of - timedelta(days=1)
-    while True:
+    earliest = min(by_date) if by_date else None
+    while earliest is not None and cursor.isoformat() >= earliest:
         rec = by_date.get(cursor.isoformat())
-        if not rec:
-            break
-        raws = _day_raws(rec)
-        if not raws or min(raws) < 30:
+        raws = _day_raws(rec) if rec else []
+        cursor -= timedelta(days=1)
+        if not raws:
+            continue
+        if min(raws) < 30:
             break
         streak += 1
-        cursor -= timedelta(days=1)
         if streak >= 60:  # nothing downstream distinguishes past this; bound the walk
             break
 
@@ -987,14 +981,15 @@ def compute_consistency_raw(
     else:
         scores["cross_pillar_variance"] = None
 
-    # Data completeness
+    # Data completeness. #6293 amendment: a day on which NO expected source arrived is unknown, never a 0% — total
+    # silence is the absence of evidence, not evidence of inconsistency (owner ruling 2026-11-26).
     completeness = data.get("data_completeness_pct")
     if completeness is not None:
-        scores["data_completeness"] = _clamp(completeness)
+        scores["data_completeness"] = _clamp(completeness) if float(completeness) > 0 else None
     else:
         expected = ["sleep", "macrofactor", "apple", "habitify", "strava"]
         present = sum(1 for k in expected if data.get(k))
-        scores["data_completeness"] = round((present / len(expected)) * 100, 1)
+        scores["data_completeness"] = round((present / len(expected)) * 100, 1) if present else None
 
     # Streak maintenance
     streak = data.get("streak_all_above_30th")
@@ -1030,12 +1025,10 @@ def compute_consistency_raw(
 def _weighted_pillar_score(component_scores, components_config):
     """Weighted average with data completeness confidence penalty. [F-01]
 
-    ADR-104: components flagged ``behavioral: true`` in config measure a
-    behavior the owner either did or didn't do (logging, journaling, training).
-    When such a component has no data, the behavior didn't happen — it scores
-    0 at full weight instead of dropping out of the weight sum. Only *measured*
-    components (device readings) revert toward neutral when absent; a device
-    gap is not a failure, but an unlogged habit is.
+    ADR-104, narrowed by #6293 (owner ruling 2026-11-26: missing data must not imply deterioration): only the T0/T1
+    habit components (``HABIT_TWO_STATE_COMPONENTS``, flagged ``behavioral``) score 0 at full weight when absent — an
+    unlogged habit is a failed habit. Any other component with no input (a reading log, a food log, a lifting log) is
+    unknown: it drops out of the weighted sum and lowers the coverage, as a device gap always did.
     """
     weighted_sum = 0.0
     total_weight = 0.0
@@ -1055,7 +1048,7 @@ def _weighted_pillar_score(component_scores, components_config):
             if held_out:
                 continue
         max_possible_weight += weight
-        if score is None and behavioral and weight > 0:
+        if score is None and behavioral and weight > 0 and comp_name in HABIT_TWO_STATE_COMPONENTS:
             score = 0.0
             absent_behaviors.append(comp_name)
             details[comp_name] = {"score": 0.0, "weight": weight, "absent": True}
@@ -1067,9 +1060,15 @@ def _weighted_pillar_score(component_scores, components_config):
         # personal_baselines.apply_character_targets; never fabricated here.
         if isinstance(comp_cfg, dict) and isinstance(comp_cfg.get("target_provenance"), dict):
             details[comp_name]["target_provenance"] = comp_cfg["target_provenance"]
-        if score is not None and weight > 0:
-            weighted_sum += score * weight
-            total_weight += weight
+        # #6293 lab_ageing: ``evidence_weight`` (0..1, set by the caller for one day) is the share of the weight the
+        # evidence still carries — the rest is unknown: in the coverage denominator above, out of the sum.
+        ev = comp_cfg.get("evidence_weight") if isinstance(comp_cfg, dict) else None
+        if ev is not None and comp_name in details:
+            details[comp_name]["evidence_weight"] = ev
+        eff = weight * (float(ev) if ev is not None else 1.0)
+        if score is not None and eff > 0:
+            weighted_sum += score * eff
+            total_weight += eff
 
     details["_absent_behaviors"] = absent_behaviors
 
@@ -1134,65 +1133,11 @@ def compute_ema_level_score(raw_scores_history: list[float], config: dict[str, A
     return round(total / total_w, 1) if total_w > 0 else 50.0
 
 
-def _behavioral_weight_share(pillar_cfg: dict[str, Any]) -> float:
-    """Fraction of a pillar's component weight that is flagged ``behavioral``.
-
-    #913: neglect atrophy only applies to pillars that are substantially made of
-    behaviors Matthew either does or doesn't do — sleep/metabolic keep their
-    device-measured semantics (a wearable gap is not detraining).
-    """
-    components = (pillar_cfg or {}).get("components", {})
-    total = 0.0
-    behavioral = 0.0
-    for cfg in components.values():
-        if not isinstance(cfg, dict):
-            continue
-        w = cfg.get("weight", 0) or 0
-        total += w
-        if cfg.get("behavioral"):
-            behavioral += w
-    return behavioral / total if total > 0 else 0.0
-
-
-def neglect_decay_state(engagement: Optional[dict[str, Any]], config: dict[str, Any]) -> Optional[dict[str, Any]]:
-    """#913: derive the day's atrophy multiplier from the presence signal.
-
-    Returns None when no decay applies (engaged / short gap / planned pause /
-    no presence record), else {"multiplier", "gap_days", "n_grace_days", "rate"}.
-
-    ADR-104 framing: this models real detraining and evidence loss — after a
-    sustained dark stretch the platform genuinely knows less and the body
-    genuinely detrains — never punishment. Knobs live in config
-    leveling.neglect_decay: n_grace_days (dark days before decay starts), rate
-    (per-day multiplier), floor (absolute level_score floor; the day's own
-    raw_score is always a floor too), min_behavioral_share (which pillars
-    qualify). A planned pause (sick/travel per engagement_core) never decays.
-    """
-    if not engagement:
-        return None
-    nd = (config.get("leveling", {}) or {}).get("neglect_decay", {}) or {}
-    n_grace = nd.get("n_grace_days", 3)
-    rate = nd.get("rate", 0.98)
-    if engagement.get("presence_class") != "dark" or engagement.get("planned_pause"):
-        return None
-    gap = engagement.get("gap_days")
-    try:
-        gap = float(gap)
-    except (TypeError, ValueError):
-        return None
-    if gap <= n_grace:
-        return None
-    multiplier = rate ** (gap - n_grace)
-    return {
-        "multiplier": round(multiplier, 4),
-        "gap_days": gap,
-        "n_grace_days": n_grace,
-        "rate": rate,
-    }
-
-
-# #913: the four deterministic character moods, worst-first for readability.
-CHARACTER_MOODS = ("dormant", "fading", "steady", "thriving")
+# #913: the deterministic character moods. #6293 mood_label_presence: "unavailable" (the engine's existing word for a
+# no-signal state, ``character_public.UNAVAILABLE_NOTE``) replaces "dormant" — silence is not observed, not decline.
+# "dormant" stays listed only so a reader can recognise a record stored before the amendment.
+MOOD_UNAVAILABLE = "unavailable"
+CHARACTER_MOODS = (MOOD_UNAVAILABLE, "fading", "steady", "thriving", "dormant")
 
 
 def compute_character_mood(
@@ -1206,12 +1151,13 @@ def compute_character_mood(
     presence_class). Returns {"mood", "inputs"} where inputs carries the exact
     numbers the verdict came from.
 
-    Rules, first match wins:
-      dormant  — presence_class == "dark" (a real multi-day logging fall-off)
-      fading   — presence_class == "quiet", OR the 7d composite raw trend
-                 (mean of last 3 days minus mean of the 4 before) <= -5
-      thriving — actively logging (present/light), trend >= +3, composite >= 55
-      steady   — everything else
+    Rules, first match wins (#6293 mood_label_presence, ``MOOD_NOT_OBSERVED``):
+      fading      — the 7d composite raw trend over JUDGED days (mean of last 3 days minus mean of the 4 before) <= -5:
+                    measured values, whatever the presence class
+      unavailable — presence_class "dark" or "quiet": logging silence is not observed, never described as decline
+      thriving    — actively logging (present/light), trend >= +3, composite >= 55
+      steady      — everything else
+    With the switch off: the pre-amendment rules (dark ⇒ dormant; quiet or trend <= -5 ⇒ fading).
     """
     presence_class = (engagement or {}).get("presence_class") or "present"
     gap_days = (engagement or {}).get("gap_days")
@@ -1237,7 +1183,16 @@ def compute_character_mood(
     if scores:
         composite = round(sum(scores) / len(scores), 1)
 
-    if presence_class == "dark":
+    if MOOD_NOT_OBSERVED:
+        if trend is not None and trend <= -5:
+            mood = "fading"
+        elif presence_class in ("dark", "quiet"):
+            mood = MOOD_UNAVAILABLE
+        elif presence_class in ("present", "light") and trend is not None and trend >= 3 and composite is not None and composite >= 55:
+            mood = "thriving"
+        else:
+            mood = "steady"
+    elif presence_class == "dark":
         mood = "dormant"
     elif presence_class == "quiet" or (trend is not None and trend <= -5):
         mood = "fading"
@@ -1283,7 +1238,6 @@ def evaluate_level_changes(
     raw_score: Optional[float] = None,
     unadjusted_level_score: Optional[float] = None,
     raw_score_unblended: Optional[float] = None,
-    presence_dark: bool = False,
 ) -> dict[str, Any]:
     """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]
 
@@ -1340,17 +1294,9 @@ def evaluate_level_changes(
       EMA/display path; it just isn't performance, so it can't buy a climb.
       Legacy callers that don't pass it fall back to the blended raw.
 
-      #959 dark persistence (ADR-134): the fresh-streak-per-drop cadence
-      (streak_below resets to 0 after every level_down) is anti-flip-flop
-      machinery for NOISY ENGAGED data — it exists so one bad week can't
-      saw-tooth a level. A confirmed multi-day dark stretch is not noise; it
-      is a provable sustained absence, and re-demanding a fresh 7-day streak
-      between each single drop let a silent month cost the headline only ~2
-      levels (the cycle-4 failure mode). When the caller passes
-      ``presence_dark=True`` (atrophy-qualifying pillar, presence_class=dark
-      past grace, never a planned pause) the down-streak PERSISTS across
-      drops, so the level keeps stepping down toward the crashed target day
-      by day. Config kill-switch: leveling.neglect_decay.persistent_down_streak.
+      #6293 amendment (owner ruling 2026-11-26): the #959 dark persistence is retired. A level falls only on the
+      sustained MEASURED streak below (and past the XP shield) — never because the presence signal reads dark: silence,
+      inactivity or rest alone never lowers a level. A held day (coverage below the floor) holds both streaks.
     """
     leveling = config.get("leveling", {})
 
@@ -1437,11 +1383,9 @@ def evaluate_level_changes(
         streak_below += 1
         streak_above = 0
         if streak_below >= down_streak_needed:
-            # XP buffer gate: can't lose a level until XP buffer is depleted.
-            # #959: a confirmed dark stretch bypasses the buffer — banked XP
-            # is flip-flop insurance for noisy engaged data, never a shield
-            # against a provable sustained absence (ADR-134).
-            if xp_buffer >= xp_buffer_threshold and not presence_dark:
+            # XP buffer gate: can't lose a level until the shield is depleted (it drains only on measured low days,
+            # ``xp_shield_delta``). #6293: the #959 dark bypass is retired.
+            if xp_buffer >= xp_buffer_threshold:
                 pass  # Buffer absorbs the pressure — hold level
             else:
                 delta = current_level - target_level
@@ -1455,11 +1399,7 @@ def evaluate_level_changes(
                 else:
                     old_level = current_level
                     current_level = max(current_level - step, 1)
-                    # #959: in a confirmed dark stretch the streak persists —
-                    # a provable absence is not noise, so the anti-flip-flop
-                    # reset must not throttle the honest fall (ADR-134).
-                    if not presence_dark:
-                        streak_below = 0
+                    streak_below = 0
                     events.append(
                         {
                             "type": "level_down",
@@ -1726,12 +1666,46 @@ def _pillar_raw_and_details(name, compute_fn, data, config, *extra):
 # The (pillar, computer) pairs the day scores. #6224: ``data["unscored_pillars"]`` names a pillar the caller does not
 # score at all (the public method's Mind, owner rulings 2026-11-26) — left out of the whole state chain: no raw score,
 # level, XP or event, no place in the consistency variance, the effects' conditions, the mood's composite or the
-# headline mean; never scored at a placeholder. Method 1 sets none. The ``_modifier`` record's
+# headline mean; never scored at a placeholder. Method 1 sets none of its own; both methods add the METHOD's
+# ``UNINSTRUMENTED_PILLARS`` (#6293 amendment). The ``_modifier`` record's
 # ``pre_modifier_raw_unblended`` is the day's unblended raw before a modifier, so a reader that may not apply it (the
 # public method, when its source is not public) restores the day exactly — never by dividing it back out.
 def _scored_computers(data: dict[str, Any]) -> list:
-    unscored = {str(p) for p in (data.get("unscored_pillars") or ())}
+    unscored = {str(p) for p in (data.get("unscored_pillars") or ())} | set(UNINSTRUMENTED_PILLARS)
     return [(name, fn) for name, fn in PILLAR_COMPUTERS.items() if name not in unscored]
+
+
+def day_is_held(pillar: Any, min_coverage: float = DEFAULT_LEVEL_CHANGE_MIN_COVERAGE) -> bool:
+    """#6293 amendment: whether a pillar-day carried no judgeable evidence — not instrumented that day, or coverage below
+    the leveling floor (ADR-104's coverage hold). Works on a stored pillar block (``not_instrumented``/``coverage_hold``/
+    ``data_coverage``) or on engine details (``_not_instrumented``/``_data_coverage``). A held day contributes nothing to
+    any aggregate: not the EMA history, the consistency variance or streak, nor the mood's composite. A pillar with no
+    block at all (unscored, uninstrumented, or a missing day) is held."""
+    if not isinstance(pillar, dict) or not pillar:
+        return True
+    if pillar.get("not_instrumented") or pillar.get("_not_instrumented") or pillar.get("not_scored") or pillar.get("coverage_hold"):
+        return True
+    cov = pillar.get("_data_coverage", pillar.get("data_coverage"))
+    try:
+        return cov is not None and float(cov) < float(min_coverage)
+    except (TypeError, ValueError):
+        return False
+
+
+def uninstrumented_pillar(name: str, config: dict[str, Any]) -> dict[str, Any]:
+    """#6293 amendment: the stored shape of a pillar the method does not instrument — the reason and the held flags every
+    renderer's held branch engages on, and NO number (no score, level, tier or XP key), so no reader can show or default
+    one. The public method stores ``character_privacy.not_scored_pillar`` instead (the same flags, its own note)."""
+    note = ((config.get("pillars") or {}).get(name) or {}).get("not_instrumented_note") or "Not instrumented."
+    return {
+        "not_scored": True,
+        "not_scored_note": note,
+        "not_instrumented": True,
+        "not_instrumented_note": note,
+        "coverage_hold": True,
+        "absent_behaviors": [],
+        "drivers": {"top": [], "dragging": [], "absent": [], "no_data": []},
+    }
 
 
 def compute_character_sheet(
@@ -1792,25 +1766,43 @@ def compute_character_sheet(
         pillar_details[pillar_name] = details
         _attach_not_instrumented_note(pillar_name, details)
 
-    # Step 2: Consistency meta-pillar
-    consistency_raw, consistency_details = _pillar_raw_and_details("consistency", compute_consistency_raw, data, config, pillar_raw_scores)
+    # #6293 amendment: which pillar-days carry no judgeable evidence (``day_is_held``). Their placeholder (the 50 of a
+    # pillar with no signal, or a thin day blended toward it) reaches no aggregate below.
+    _min_cov = (config.get("leveling", {}) or {}).get("level_change_min_coverage", DEFAULT_LEVEL_CHANGE_MIN_COVERAGE)
+    held_today = {n for n, d in pillar_details.items() if day_is_held(d, _min_cov)}
+    judged_raw_scores = {n: v for n, v in pillar_raw_scores.items() if n not in held_today}
+
+    # Step 2: Consistency meta-pillar (its cross-pillar variance reads judged pillars only — #6293)
+    consistency_raw, consistency_details = _pillar_raw_and_details("consistency", compute_consistency_raw, data, config, judged_raw_scores)
     pillar_raw_scores["consistency"] = consistency_raw
     pillar_details["consistency"] = consistency_details
     _attach_not_instrumented_note("consistency", consistency_details)
+    if day_is_held(consistency_details, _min_cov):
+        held_today.add("consistency")
+    else:
+        judged_raw_scores["consistency"] = consistency_raw
 
-    # Step 3: EMA level scores — per-pillar lambda [F-03]
+    # Step 3: EMA level scores — per-pillar lambda [F-03]. #6293 amendment: a held day is not appended — silence never
+    # moves the EMA (the caller's histories already leave out stored held days, ``character_sheet_lambda``). A pillar with
+    # no judged day in its window has no EMA evidence; its placeholder level score reaches no effect condition.
     pillar_level_scores = {}
     histories_with_today = {}
+    no_ema_evidence = set()
     for pillar_name in pillar_raw_scores:
         history = list(raw_score_histories.get(pillar_name, []))
-        history.append(pillar_raw_scores[pillar_name])
+        if pillar_name not in held_today:
+            history.append(pillar_raw_scores[pillar_name])
+        if not history:
+            no_ema_evidence.add(pillar_name)
         histories_with_today[pillar_name] = history
         pillar_level_scores[pillar_name] = compute_ema_level_score(history, config, pillar_name)
 
     # Step 4: Cross-pillar effects — ALL modifiers multiplicative [F-05]
     # #962: vice_streaks (lifted from habit_scores by the caller) makes the
     # any_vice_streak conditions data-driven instead of hardcoded-False.
-    active_effects, modifiers = compute_cross_pillar_effects(pillar_level_scores, config, vice_streaks=data.get("vice_streaks"))
+    active_effects, modifiers = compute_cross_pillar_effects(
+        {n: v for n, v in pillar_level_scores.items() if n not in no_ema_evidence}, config, vice_streaks=data.get("vice_streaks")
+    )
     adjusted_level_scores = {}
     for pillar_name, ls in pillar_level_scores.items():
         mod = modifiers.get(pillar_name, 0)
@@ -1820,36 +1812,10 @@ def compute_character_sheet(
         else:
             adjusted_level_scores[pillar_name] = ls
 
-    # Step 4.5 (#913): neglect atrophy — a sustained dark stretch (presence
-    # signal from adaptive_mode's engagement_state, passed in via
-    # data["engagement_state"]) drags behavioral-heavy pillars' level scores
-    # DOWN, floored at the day's own raw score (the decay can never say less
-    # than the day itself measured) and at the configured absolute floor.
-    # Models real detraining + evidence loss (ADR-104), never punishment.
+    # #6293 amendment (owner ruling 2026-11-26): the #913 neglect atrophy (a dark presence stretch multiplying behavioral
+    # pillars' level scores down) and the #959 dark down-streak persistence are retired — silence, inactivity or rest
+    # alone never lowers a level or its EMA. ``neglect_decay`` stays in the record's shape, always None.
     engagement = data.get("engagement_state")
-    decay = neglect_decay_state(engagement, config)
-    neglect_cfg = (config.get("leveling", {}) or {}).get("neglect_decay", {}) or {}
-    min_share = neglect_cfg.get("min_behavioral_share", 0.3)
-    abs_floor = neglect_cfg.get("floor", 0)
-    pillar_neglect = {}
-    # #959 (ADR-134): pillars whose down-streak persists across drops today —
-    # the same atrophy-qualifying set (dark past grace, behavioral-heavy,
-    # never a planned pause), behind the persistent_down_streak config switch.
-    dark_persist_pillars = set()
-    if decay:
-        persist_enabled = bool(neglect_cfg.get("persistent_down_streak", False))
-        for pillar_name, ls in adjusted_level_scores.items():
-            share = _behavioral_weight_share(pillar_configs.get(pillar_name, {}))
-            if share < min_share:
-                continue
-            if persist_enabled:
-                dark_persist_pillars.add(pillar_name)
-            raw = pillar_raw_scores.get(pillar_name)
-            floor = max(abs_floor, raw if raw is not None else 0)
-            decayed = max(floor, ls * decay["multiplier"])
-            if decayed < ls:
-                adjusted_level_scores[pillar_name] = round(decayed, 1)
-                pillar_neglect[pillar_name] = dict(decay, applied=True, behavioral_share=round(share, 3))
 
     # Step 5: Level changes per pillar
     prev_pillars = {}
@@ -1862,12 +1828,11 @@ def compute_character_sheet(
                 "streak_above": pp.get("streak_above", 0),
                 "streak_below": pp.get("streak_below", 0),
                 "xp_total": pp.get("xp_total", 0),
-                "xp_debt": pp.get("xp_debt", 0),  # #913: the visible bleed carries over
+                "xp_debt": 0,  # #6293: debt is retired — a pre-amendment record's debt is forgiven, never collected
                 "xp_buffer": pp.get("xp_buffer"),  # #954: explicit buffer state (None = legacy, seeds from % remainder)
             }
 
-    # #961: challenge bonus XP arrives as an engine input ({pillar: xp}) and
-    # flows through _compute_xp's signed balance — debt pays down first.
+    # #961: challenge bonus XP arrives as an engine input ({pillar: xp}) and credits through _compute_xp.
     challenge_bonus = data.get("challenge_bonus_xp") or {}
 
     all_events = []
@@ -1891,12 +1856,10 @@ def compute_character_sheet(
             # #957: the up-gate judges the day's UNBLENDED raw (0 in silence) —
             # the confidence blend smooths uncertainty, it never buys a climb.
             raw_score_unblended=pillar_details[pillar_name].get("_raw_unblended"),
-            # #959: a confirmed dark stretch keeps the down-streak armed.
-            presence_dark=pillar_name in dark_persist_pillars,
         )
 
         prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
-        prev_debt = prev_state.get("xp_debt", 0) if prev_state else 0
+        prev_debt = 0  # #6293: retired
         bonus_xp = challenge_bonus.get(pillar_name, 0) or 0
         # #964 (ADR-134): XP mirrors the level gate — a day with no signal for
         # this pillar (coverage below the floor, or not instrumented at all)
@@ -1911,14 +1874,14 @@ def compute_character_sheet(
             pillar_raw_scores[pillar_name], prev_xp, prev_debt, bonus_xp, xp_hold, config, day_number=_day_number
         )
         level_state["xp_total"] = new_xp
-        # #954: roll the demotion buffer forward with today's XP change — fills
-        # on gain, drains on loss, never the wrap-prone % of lifetime XP.
+        # #954: roll the demotion buffer forward — never the wrap-prone % of lifetime XP. #6293: by the day's signed
+        # MEASURED verdict (``xp_shield_delta``), since XP itself no longer falls.
         _leveling_cfg = config.get("leveling", {}) or {}
         xp_per_level_cfg = _leveling_cfg.get("xp_per_level", DEFAULT_XP_PER_LEVEL)
         level_state["xp_buffer"] = _roll_xp_buffer(
             prev_state.get("xp_buffer") if prev_state else None,
             prev_xp,
-            new_xp,
+            prev_xp + xp_shield_delta(pillar_raw_scores[pillar_name], xp_hold, bonus_xp, config),
             xp_per_level_cfg,
             buffer_cap=_leveling_cfg.get("xp_buffer_cap"),
         )
@@ -1938,7 +1901,6 @@ def compute_character_sheet(
                 "raw_score": pillar_raw_scores[pillar_name],
                 "raw_score_unblended": pillar_details[pillar_name].get("_raw_unblended"),
                 "data_coverage": pillar_details[pillar_name].get("_data_coverage"),
-                "presence_dark": pillar_name in dark_persist_pillars,
                 "not_instrumented": bool(pillar_details[pillar_name].get("_not_instrumented", False)),
                 "bonus_xp": bonus_xp,
             },
@@ -1973,12 +1935,9 @@ def compute_character_sheet(
             # raw_score (None when none applied) and any challenge bonus XP.
             "raw_modifier": pillar_details[pillar_name].get("_modifier"),
             "challenge_bonus_xp": bonus_xp,
-            # #913: the visible bleed — XP owed below the 0-floor, paid down
-            # before xp_total grows again. 0 on healthy days.
+            # #6293: retired — always 0 and None; kept in the shape for readers of older records.
             "xp_debt": new_debt,
-            # #913: presence-driven atrophy applied to this pillar today (None
-            # when engaged / planned pause / not a behavioral-heavy pillar).
-            "neglect_decay": pillar_neglect.get(pillar_name),
+            "neglect_decay": None,
             "confidence": pillar_details[pillar_name].get("_confidence"),
             "data_coverage": pillar_details[pillar_name].get("_data_coverage"),
             # #747: deterministic, engine-computed — True only when every
@@ -2023,7 +1982,7 @@ def compute_character_sheet(
     # forever — going dark later drags honestly instead of vanishing.
     weighted_level_sum = 0.0
     total_weight = 0.0
-    headline_excluded = []
+    headline_excluded = [p for p in UNINSTRUMENTED_PILLARS if p not in pillar_results]  # #6293: never in the mean
     for pillar_name, result in pillar_results.items():
         if result.get("not_instrumented") and result["level"] <= 1:
             headline_excluded.append(pillar_name)
@@ -2074,7 +2033,8 @@ def compute_character_sheet(
 
     # #913: deterministic character mood — thriving/steady/fading/dormant from
     # the presence signal + the 7d composite raw trend. Pure code, ADR-105.
-    mood_verdict = compute_character_mood(engagement, pillar_raw_scores, histories_with_today)
+    # #6293: the mood's composite reads judged pillars only (no placeholder raw).
+    mood_verdict = compute_character_mood(engagement, judged_raw_scores, histories_with_today)
 
     # Confidence stats [F-01]
     confidences: list[float] = [pr["confidence"] for pr in pillar_results.values() if pr.get("confidence") is not None]
@@ -2087,10 +2047,10 @@ def compute_character_sheet(
         "character_tier": character_tier["name"],
         "character_tier_emoji": character_tier.get("emoji", "🔨"),
         "character_xp": total_xp,
-        "character_xp_debt": total_xp_debt,  # #913: the visible bleed, summed
+        "character_xp_debt": total_xp_debt,  # #6293: retired, always 0
         "character_mood": mood_verdict["mood"],  # #913: deterministic, never narrated
         "character_mood_inputs": mood_verdict["inputs"],
-        "neglect_decay": decay,  # #913: today's atrophy state (None when engaged)
+        "neglect_decay": None,  # #6293: retired (atrophy removed), kept in the shape
         "min_confidence": min_confidence,
         "avg_confidence": avg_confidence,
         "active_effects": active_effects,
@@ -2108,6 +2068,13 @@ def compute_character_sheet(
         record["challenge_bonus_xp"] = dict(challenge_bonus)
     for pillar_name, result in pillar_results.items():
         record[f"pillar_{pillar_name}"] = result
+    # #6293 amendment: a method-uninstrumented pillar is stored as its reason, with no number (a caller's own unscored
+    # pillar is the caller's to fill — the public method stores ``character_privacy.not_scored_pillar``).
+    caller_unscored = {str(p) for p in (data.get("unscored_pillars") or ())}
+    for name in UNINSTRUMENTED_PILLARS:
+        if name not in caller_unscored:
+            record[f"pillar_{name}"] = uninstrumented_pillar(name, config)
+    record["uninstrumented_pillars"] = list(UNINSTRUMENTED_PILLARS)
 
     return record
 

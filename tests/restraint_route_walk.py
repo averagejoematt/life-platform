@@ -101,6 +101,10 @@ def tokens() -> list:
     from health import character_privacy as CP
 
     out += CP.withheld_public_tokens(_engine_config())
+    # #6224 (owner ruling 2026-11-26 23:50Z): a reconstructed event's INTERNAL provenance never reaches a public body
+    out += [k.lower() for k in CP.PROVENANCE_KEYS]
+    # #6293 planned_rest: the owner-only planned-pause detail never reaches a public body
+    out += [k.lower() for k in CP.PLANNED_REST_KEYS]
     return out
 
 
@@ -140,9 +144,29 @@ def _restraint_done(i: int, k: int) -> bool:
     return state == "high"
 
 
+PROVENANCE: dict = {"plant": False}  # #6224: --provenance plants a corrected-chain variant with reconstructed events
+
+
+def _plant_provenance(pv: dict) -> None:
+    """The stored row as a CURRENT-method (corrected-chain) variant whose events carry internal provenance: one original
+    public-input pillar event, one reconstructed pillar event and one reconstructed, re-dated character level-up."""
+    from health import character_privacy as CP
+
+    pv["public_method_version"] = CP.PUBLIC_METHOD_VERSION
+    rec = {"event_provenance": CP.RECONSTRUCTED, "reconstructed_at": "2026-11-26", "reconstructed_method": CP.PUBLIC_METHOD_VERSION}
+    pv["level_events"] = [
+        {"type": "level_up", "pillar": "sleep", "old_level": Decimal("3"), "new_level": Decimal("4")},
+        dict(rec, type="level_up", pillar="movement", old_level=Decimal("6"), new_level=Decimal("7")),
+        dict(rec, type="character_level_up", old_level=Decimal("4"), new_level=Decimal("5"), redated_from="2026-09-01"),
+    ]
+
+
 def _plant_character(r: dict) -> None:
     pv = r.get("public")
     if not isinstance(pv, dict):
+        return
+    if PROVENANCE["plant"]:
+        _plant_provenance(pv)
         return
     pv["active_effects"] = [{"name": EFFECT_CANARY, "emoji": "", "condition": RESTRAINT_CONDITION, "targets": {"mind": {"value": 0.03}}}]
     mind = pv.setdefault("pillar_mind", {})
@@ -281,12 +305,15 @@ def _mind_scored() -> None:
 
 # #6224: the keys that carry a Mind score, level, tier or XP on a served body.
 MIND_SCORE_KEYS = frozenset({"level", "raw_score", "score", "level_score", "tier", "xp_total", "xp_delta", "xp_earned", "xp_debt"})
-MIND_KEYS = frozenset({"mind", "pillar_mind", "mind_pillar"})
+# #6293 amendment: Relationships is not scored in public either (not instrumented), so the detector covers it too.
+UNSCORED_NAMES = ("mind", "relationships")
+MIND_KEYS = frozenset({k for n in UNSCORED_NAMES for k in (n, f"pillar_{n}", f"{n}_pillar")})
 
 
 def mind_numbers(body) -> list:
-    """Every place a served body carries a Mind score/level/tier/XP value (#6224: Mind is not scored in public) — a
-    pillar row named "mind", or the value under a Mind key — as sorted key paths. None is not a value."""
+    """Every place a served body carries a Mind (#6224) or Relationships (#6293) score/level/tier/XP value — neither is
+    scored in public — a pillar row named for one, or the value under its key — as sorted key paths. None is not a
+    value. (The name is historical; ``unscored_numbers`` is the same function.)"""
     if isinstance(body, str):
         try:
             body = json.loads(body)
@@ -299,7 +326,7 @@ def mind_numbers(body) -> list:
 
     def walk_(node, path):
         if isinstance(node, dict):
-            if str(node.get("name") or "").lower() == "mind" or str(node.get("pillar") or "").lower() == "mind":
+            if str(node.get("name") or "").lower() in UNSCORED_NAMES or str(node.get("pillar") or "").lower() in UNSCORED_NAMES:
                 found.update(f"{path}.{k}" for k in MIND_SCORE_KEYS | {"old_level", "new_level"} if value(node.get(k)))
             for k, v in node.items():
                 if k in MIND_KEYS:
@@ -314,6 +341,9 @@ def mind_numbers(body) -> list:
 
     walk_(body, "")
     return sorted(found)
+
+
+unscored_numbers = mind_numbers
 
 
 # #6224 (containment, owner ruling 2026-11-26): while the character scores are pending a recompute no public body carries
@@ -485,6 +515,12 @@ if __name__ == "__main__":
         assert state in ("low", "high"), state
         STATE["value"] = state
         jw._freeze(sys.argv[sys.argv.index("--now") + 1])  # one instant for both states (before any handler import)
+    PROVENANCE["plant"] = "--provenance" in sys.argv
+    if "--provenance-leak" in sys.argv:  # #6224's control: the public strip of provenance and reconstructed events off
+        from health import character_privacy as _CP
+
+        _CP.without_provenance = lambda e: e
+        _CP.is_reconstructed = lambda e: False
     if "--fd" in sys.argv:
         FD["day_offset"] = FD_OFFSETS[sys.argv[sys.argv.index("--fd") + 1]]
     try:

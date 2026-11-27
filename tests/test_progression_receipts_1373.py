@@ -92,14 +92,14 @@ def _manual_record(cfg, raw=75.0, prev=None, date="2026-08-01"):
         raw_score=raw,
         unadjusted_level_score=raw,
         raw_score_unblended=raw,
-        presence_dark=False,
     )
     prev_xp = (prev or {}).get("xp_total", 0)
     prev_debt = (prev or {}).get("xp_debt", 0)
     xp_earned, xp_delta, new_xp, new_debt = ce.pillar_xp_transition(raw, prev_xp, prev_debt, 0, False, cfg, day_number=30)
     leveling = cfg["leveling"]
+    shield = prev_xp + ce.xp_shield_delta(raw, False, 0, cfg)  # #6293: the shield rolls by the measured verdict
     xp_buffer = ce._roll_xp_buffer(
-        (prev or {}).get("xp_buffer"), prev_xp, new_xp, leveling["xp_per_level"], buffer_cap=leveling.get("xp_buffer_cap")
+        (prev or {}).get("xp_buffer"), prev_xp, shield, leveling["xp_per_level"], buffer_cap=leveling.get("xp_buffer_cap")
     )
     transition = {
         "inputs": {
@@ -109,7 +109,6 @@ def _manual_record(cfg, raw=75.0, prev=None, date="2026-08-01"):
             "raw_score": raw,
             "raw_score_unblended": raw,
             "data_coverage": 1.0,
-            "presence_dark": False,
             "not_instrumented": False,
             "bonus_xp": 0,
         },
@@ -154,8 +153,9 @@ def test_engine_captures_transitions_for_every_pillar_and_headline():
     rec = _sheet()
     tr = rec.get("progression_transitions")
     assert tr, "engine must capture transitions at fire time"
-    assert set(tr["pillars"].keys()) == set(PILLARS)
-    for name in PILLARS:
+    scored = [p for p in PILLARS if p not in ce.UNINSTRUMENTED_PILLARS]  # #6293: an uninstrumented pillar has no chain
+    assert set(tr["pillars"].keys()) == set(scored)
+    for name in scored:
         t = tr["pillars"][name]
         assert "inputs" in t and "outputs" in t
         assert "level_score" in t["inputs"] and "raw_score" in t["inputs"]
@@ -517,7 +517,9 @@ def _nov14(order):
 
 
 def test_the_engine_sums_the_pillars_in_the_order_it_declares():
-    assert list(_sheet()["progression_transitions"]["pillars"]) == list(ce.HEADLINE_PILLAR_ORDER)
+    assert list(_sheet()["progression_transitions"]["pillars"]) == [
+        p for p in ce.HEADLINE_PILLAR_ORDER if p not in ce.UNINSTRUMENTED_PILLARS
+    ]
 
 
 def test_the_boundary_day_is_a_real_boundary():

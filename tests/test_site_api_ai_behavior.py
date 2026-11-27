@@ -1068,7 +1068,7 @@ def test_the_character_sheet_falls_back_to_yesterday_when_today_has_not_computed
     assert ctx["character_level"] == 6.0
     assert ctx["character_tier"] == "Discipline"
     assert ctx["pillars"]["sleep"]["level"] == 5.0
-    assert ctx["pillars"]["relationships"]["tier"] == "Foundation"  # absent pillar defaults honestly
+    assert ctx["pillars"]["relationships"] == {"not_scored": True}  # #6293: not instrumented — no number, not a default
 
 
 # ══════════════════════════════════════════════════════════════════════════

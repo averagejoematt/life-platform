@@ -154,7 +154,7 @@ def test_the_public_variant_carries_no_mind_number_and_says_why(histories):
     _, _, pub, _ = histories
     for d, block in pub.items():
         assert block["pillar_mind"] == character_privacy.not_scored_pillar("mind"), d
-        assert "mind" in block["headline_excluded_pillars"] and block["unscored_pillars"] == ["mind"], d
+        assert "mind" in block["headline_excluded_pillars"] and block["unscored_pillars"] == ["mind", "relationships"], d
         assert RW.mind_numbers(block) == [], d
         assert not [e for e in block.get("level_events") or [] if e.get("pillar") == "mind"], d
         for ev in block.get("level_events") or []:
@@ -217,7 +217,7 @@ def test_a_stored_v1_variant_is_served_with_mind_not_scored_and_unnamed():
     assert view["active_effects"][0]["targets"] == {"movement": {"value": -0.08}}
     assert [e["type"] for e in view["level_events"]] == ["character_level_up"]
     assert view["level_events"][0]["drivers"] == [{"pillar": "sleep"}]
-    assert view["headline_excluded_pillars"] == ["relationships", "mind"]
+    assert view["headline_excluded_pillars"] == ["mind", "relationships"]  # #6293: both not scored in public
     assert RW.mind_numbers(view) == []
     assert view["pillar_sleep"] == record["public"]["pillar_sleep"]
 
@@ -252,12 +252,13 @@ def test_a_method_change_is_never_a_headline_event(histories):
 
 
 def test_the_method_is_versioned_and_says_mind_is_not_scored():
-    assert character_privacy.PUBLIC_METHOD_VERSION == "character-public-v2"
-    assert character_privacy.PUBLIC_METHOD_VERSIONS == ("character-public-v1", "character-public-v2")
-    note = character_privacy.PUBLIC_METHOD_HISTORY[-1]["note"]
-    assert "Mind is not scored in public" in note and "food-delivery" in note
+    # #6224/#6293: v3 is current (Relationships not scored, no neutral fill, no XP debt); v2's entry keeps its own words
+    assert character_privacy.PUBLIC_METHOD_VERSION == "character-public-v3"
+    assert character_privacy.PUBLIC_METHOD_VERSIONS == ("character-public-v1", "character-public-v2", "character-public-v3")
+    v2_note = next(m for m in character_privacy.PUBLIC_METHOD_HISTORY if m["version"] == character_privacy.PUBLIC_METHOD_V2)["note"]
+    assert "Mind is not scored in public" in v2_note and "food-delivery" in v2_note
     for origin, label in character_privacy.PUBLIC_METHOD_LABELS.items():
-        assert "Mind is not scored in public" in label and "(v2)" in label, origin
+        assert "Mind and Relationships are not scored in public" in label and "(v3)" in label, origin
     v1 = {"public_method_version": character_privacy.PUBLIC_METHOD_V1, "origin": "recomputed", "character_level": 3}
     assert "(v1)" in character_privacy.public_method_label({"public": v1})["label"]  # a v1 value keeps its own words
 
