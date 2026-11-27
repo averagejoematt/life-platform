@@ -1355,15 +1355,15 @@ Note: since notion Lambda v1.2.0, property extraction is **dynamic** — `extrac
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `enriched_mood` | number | 1-5 synthesized mood score |
-| `enriched_energy` | number | 1-5 synthesized energy score |
-| `enriched_stress` | number | 1-5 stress score (1=calm, 5=overwhelmed) |
+| `enriched_mood` | number | 1-5 synthesized mood score — a model reading; his own `morning_mood`/`day_rating` outranks it (#6286, `common.inferred_fields.resolve_rating`) |
+| `enriched_energy` | number | 1-5 synthesized energy score — a model reading; his own `morning_energy`/`energy_eod` outranks it (#6286) |
+| `enriched_stress` | number | 1-5 stress score (1=calm, 5=overwhelmed) — a model reading; his own `stress_level` outranks it (#6286) |
 | `enriched_sentiment` | string | positive/neutral/negative/mixed |
 | `enriched_emotions` | list | Precise emotional vocabulary |
 | `enriched_themes` | list | Life themes (max 4) |
-| `enriched_cognitive_patterns` | list | CBT patterns (catastrophizing, reframing, etc.) |
+| `enriched_cognitive_patterns` | list | Model-inferred, unreviewed CBT-pattern labels (catastrophizing, reframing, etc.). Withheld from every prompt (#6286, `common.inferred_fields`) |
 | `enriched_growth_signals` | list | Evidence of learning/growth |
-| `enriched_avoidance_flags` | list | Things being avoided |
+| `enriched_avoidance_flags` | list | Model-inferred, unreviewed "things being avoided". Withheld from every prompt (#6286, `common.inferred_fields`) |
 | `enriched_ownership` | number | 1-5 locus of control |
 | `enriched_social_quality` | string | alone/surface/meaningful/deep |
 | `enriched_flow` | boolean | Evidence of deep engagement |
@@ -1380,7 +1380,7 @@ Note: since notion Lambda v1.2.0, property extraction is **dynamic** — `extrac
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `enriched_defense_patterns` | list | Detected defense mechanisms: intellectualization, avoidance, displacement, rationalization, isolation_of_affect, minimization, projection, denial, sublimation, humor_as_deflection, compartmentalization |
+| `enriched_defense_patterns` | list | Model-inferred, unreviewed defense-mechanism labels — withheld from every prompt, never presented as detected (#6286, `common.inferred_fields`): intellectualization, avoidance, displacement, rationalization, isolation_of_affect, minimization, projection, denial, sublimation, humor_as_deflection, compartmentalization |
 | `enriched_primary_defense` | string | Single most prominent defense (null if none) |
 | `enriched_defense_context` | string | 1-sentence description of what's being defended against |
 | `enriched_emotional_depth` | number | 1-5 emotional depth rating (1=very surface/avoidant, 5=deep processing) |

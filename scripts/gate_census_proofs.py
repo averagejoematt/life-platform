@@ -5305,3 +5305,26 @@ STRUCTURAL_HAND_PROOFS["structural::test_editorial_release_6258.py"] = {
     ),
     "proved_on": "2026-11-25",
 }
+
+# #6286 — model-inferred psychological labels (defense / avoidance / cognitive-distortion families) never reach a
+# prompt: outside lambdas/common/inferred_fields.py and the two producers, no source under lambdas/ or mcp/ names one.
+STRUCTURAL_HAND_PROOFS["structural::test_inferred_psych_fields_guard_6286.py"] = {
+    "gate_name": "test_inferred_psych_fields_guard_6286.py",
+    "command": "python3 -m pytest tests/test_inferred_psych_fields_guard_6286.py -q -p no:warnings   # baseline 2 passed",
+    "mutation": (
+        "Two plants, ONE AT A TIME, each reverted: M1 lambdas/emails/daily_brief_signals.py gains "
+        '`_planted = entry.get("enriched_defense_patterns")` inside extract_journal_signals; M2 a new module '
+        'mcp/zz_plant_6286.py returning `e.get("avoidance_flags")` (the bare re-keyed name).'
+    ),
+    "observed": (
+        "2026-11-26, #6286 lane. BASELINE 2 passed. M1 1 failed (test_no_consumer_reads_a_model_inferred_psych_label, "
+        "offender lambdas/emails/daily_brief_signals.py:71 'enriched_defense_patterns'). M2 1 failed (same test, offender "
+        "mcp/zz_plant_6286.py:2 'avoidance_flags'). REVERTED 2 passed."
+    ),
+    "scope": (
+        "Every .py under lambdas/ and mcp/, string constants compared EXACTLY against INFERRED_PSYCH_LABEL_FIELDS and their "
+        'bare keys. NOT SEEN: a name built at runtime ("enriched_" + family), and a generic whole-row dump that never names '
+        "the field (mcp.tools_data's dumpers relabel through inferred_fields.relabel_row; other whole-row paths are not swept)."
+    ),
+    "proved_on": "2026-11-26",
+}

@@ -9,6 +9,7 @@ re-imports every name, so callers and tests keep one import surface.
 """
 
 from common.digest_utils import safe_float
+from common.inferred_fields import resolved_value  # #6286: self-report-first mood/energy/stress
 from common.pacific_time import parse_iso_utc
 from common.platform_logger import get_logger
 from health import hr_regime  # #4999: THE dated HR regime markers
@@ -42,15 +43,16 @@ def extract_journal_signals(entries):
     for entry in entries:
         template = entry.get("template", "")
         templates_found.append(template)
-        m = entry.get("enriched_mood")
-        e = entry.get("enriched_energy")
-        s = entry.get("enriched_stress")
+        # #6286: his own rating first; the enrichment model's score only when he gave none.
+        m = resolved_value(entry, "mood")
+        e = resolved_value(entry, "energy")
+        s = resolved_value(entry, "stress")
         if m is not None:
-            mood_scores.append(float(m))
+            mood_scores.append(m)
         if e is not None:
-            energy_scores.append(float(e))
+            energy_scores.append(e)
         if s is not None:
-            stress_scores.append(float(s))
+            stress_scores.append(s)
         for t in entry.get("enriched_themes") or []:
             all_themes.append(t)
         for em in entry.get("enriched_emotions") or []:
@@ -58,37 +60,14 @@ def extract_journal_signals(entries):
         q = entry.get("enriched_notable_quote")
         if q and (template.lower() == "evening" or notable_quote is None):
             notable_quote = str(q)
-        if m is None:
-            for field in ("morning_mood", "day_rating"):
-                val = entry.get(field)
-                if val is not None:
-                    mood_scores.append(float(val))
-                    break
-        if e is None:
-            for field in ("morning_energy", "energy_eod"):
-                val = entry.get(field)
-                if val is not None:
-                    energy_scores.append(float(val))
-                    break
-        if s is None:
-            val = entry.get("stress_level")
-            if val is not None:
-                stress_scores.append(float(val))
-    # Phase 2A: Extract enrichment fields for deeper coaching
-    all_cognitive_patterns, all_defense_patterns = [], []
-    all_avoidance_flags, all_growth_signals = [], []
+    # Phase 2A: Extract enrichment fields for deeper coaching.
+    # #6286: the model-inferred defense / avoidance / cognitive-distortion labels
+    # (common.inferred_fields) are NOT collected — they fed the journal coach as
+    # "DETECTED … challenge one" and are withheld from every prompt by owner ruling.
+    all_growth_signals = []
     social_quality_readings, ownership_readings = [], []
     stress_sources = []
     for entry in entries:
-        for cp in entry.get("enriched_cognitive_patterns") or []:
-            all_cognitive_patterns.append(cp)
-        for dp in entry.get("enriched_defense_patterns") or []:
-            all_defense_patterns.append(dp)
-        primary_defense = entry.get("enriched_primary_defense")
-        if primary_defense and primary_defense not in all_defense_patterns:
-            all_defense_patterns.insert(0, primary_defense)
-        for af in entry.get("enriched_avoidance_flags") or []:
-            all_avoidance_flags.append(af)
         for gs in entry.get("enriched_growth_signals") or []:
             all_growth_signals.append(gs)
         sq = entry.get("enriched_social_quality")
@@ -110,9 +89,6 @@ def extract_journal_signals(entries):
         "notable_quote": notable_quote,
         "templates": templates_found,
         # Phase 2A enrichment
-        "cognitive_patterns": list(dict.fromkeys(all_cognitive_patterns))[:3],
-        "defense_patterns": list(dict.fromkeys(all_defense_patterns))[:3],
-        "avoidance_flags": list(dict.fromkeys(all_avoidance_flags))[:3],
         "growth_signals": list(dict.fromkeys(all_growth_signals))[:3],
         "social_quality": social_quality_readings[-1] if social_quality_readings else None,
         "ownership_avg": round(sum(ownership_readings) / len(ownership_readings), 1) if ownership_readings else None,

@@ -34,6 +34,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Iterable, Mapping, Optional
 
+from common.inferred_fields import resolved_value  # #6286: self-report-first mood/stress
+
 logger = logging.getLogger(__name__)
 
 WINDOW_DAYS = 21
@@ -94,8 +96,8 @@ def _entry_date(e: Mapping[str, Any]) -> str:
 
 def scored_journal_count(entries: list) -> int:
     """The floor's count: the larger of the mood-scored and the stress-scored entries."""
-    moods = sum(1 for e in entries if _num(e.get("enriched_mood")) is not None)
-    stresses = sum(1 for e in entries if _num(e.get("enriched_stress")) is not None)
+    moods = sum(1 for e in entries if resolved_value(e, "mood") is not None)
+    stresses = sum(1 for e in entries if resolved_value(e, "stress") is not None)
     return max(moods, stresses)
 
 
@@ -111,9 +113,10 @@ def journal_signal(entries: list, window_days: int = WINDOW_DAYS) -> Optional[di
     social: list[Any] = []
     quote, quote_date = None, None
     for entry in entries:
-        if (m := _num(entry.get("enriched_mood"))) is not None:
+        # #6286: his own 1-5 rating first; the enrichment model's score only when he gave none.
+        if (m := resolved_value(entry, "mood")) is not None:
             moods.append(m)
-        if (s := _num(entry.get("enriched_stress"))) is not None:
+        if (s := resolved_value(entry, "stress")) is not None:
             stresses.append(s)
         emotions.extend(entry.get("enriched_emotions") or [])
         themes.extend(entry.get("enriched_themes") or [])

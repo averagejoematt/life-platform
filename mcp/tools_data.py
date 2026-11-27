@@ -8,6 +8,7 @@ import operator
 from datetime import datetime, timedelta
 
 from boto3.dynamodb.conditions import Key
+from common.inferred_fields import relabel_row  # #6286
 from common.macrofactor_fields import latest_day_condition, latest_sk_ceiling  # #5431: intake reads bounded at the Pacific today
 from common.pacific_time import pacific_now, pacific_today  # #2817: THE Pacific frame — DATE#/day keys name Pacific calendar days
 from ingestion.strava_population import DISTANCE_POPULATION, DISTANCE_POPULATION_LABEL, ELEVATION_POPULATION_LABEL, activity_type
@@ -36,12 +37,17 @@ TIER2_STRIP_FIELDS = strip_map()
 def _strip_tier2(source, item):
     """Remove `source`'s Tier-2 owner-only fields from one DDB row dict, in place.
     Returns the same dict for call-site chaining. A source with no Tier-2 facet (the
-    common case) is a no-op — this only ever REMOVES keys already present, never
-    invents, renames, or adds one. Keyed on the `source` the caller already queried
+    common case) is a no-op for the Tier-2 strip — that only ever REMOVES keys already
+    present. The one addition is #6286's: a row carrying model-inferred psychological
+    labels gets them moved under `_model_reading_unreviewed`, caveat attached. Keyed on the `source` the caller already queried
     (the row itself may not carry its own `source` attribute), never on the row."""
     if isinstance(item, dict):
         for f in TIER2_STRIP_FIELDS.get(source, ()):
             item.pop(f, None)
+        # #6286: the model-inferred psychological labels (defense / avoidance / cognitive
+        # distortion) never reach a conversation as bare row fields — they ride under one key
+        # whose caveat says they are an unreviewed model reading that may be wrong.
+        relabel_row(item)
     return item
 
 
