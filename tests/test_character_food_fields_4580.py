@@ -118,10 +118,14 @@ def test_mutation_legacy_names_only_reads_absent(monkeypatch):
     monkeypatch.setitem(mff.MACRO_FIELDS, "protein", ("protein", "total_protein"))
     monkeypatch.setattr(mff, "MEALS_ABOVE_30G_PROTEIN_FIELD", "meals")
     d = _details()
-    absent = sorted(k for k, v in d.items() if isinstance(v, dict) and v.get("absent"))
-    # calorie_adherence keeps the plan target but loses the intake, so it is absent too
-    # #5214: the distribution slot no longer reads the legacy stored count, so it is not among the absences
-    assert absent == ["calorie_adherence", "consistency", "protein_total"]
+    unknown = sorted(
+        k for k, v in d.items() if isinstance(v, dict) and "score" in v and v["score"] is None and k != "body_composition_progress"
+    )
+    # calorie_adherence keeps the plan target but loses the intake, so it is unread too
+    # #5214: the distribution slot no longer reads the legacy stored count, so it is not among them
+    # #6293 amendment: a non-habit component with no input is unknown (score None), never a 0 flagged absent
+    assert unknown == ["calorie_adherence", "consistency", "protein_total"]
+    assert not d["_absent_behaviors"]
 
 
 def test_distribution_counts_engine_feedings_not_the_legacy_stored_count():
@@ -133,4 +137,4 @@ def test_distribution_counts_engine_feedings_not_the_legacy_stored_count():
     assert d["protein_distribution"]["score"] == 20.0
     untimed = dict(ROW_2026_10_17, food_log=[{"protein_g": thr}], meals_above_30g_protein=Decimal("4"))
     _, d = compute_nutrition_raw({"macrofactor": untimed, "macrofactor_14d": ROWS_14D, "latest_weight": None}, _config())
-    assert d["protein_distribution"].get("absent")
+    assert d["protein_distribution"]["score"] is None and not d["protein_distribution"].get("absent")  # #6293: unknown

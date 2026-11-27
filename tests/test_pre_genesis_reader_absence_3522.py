@@ -165,7 +165,8 @@ def test_a_real_sheet_is_untouched(monkeypatch):
     b = _body(vitals.handle_character())
     # relationships (index 5) reads only private sources: served held (owner rulings 2026-11-03/04); Mind (index 4) is
     # not scored in public (#6224, owner rulings 2026-11-26): no score at all
-    assert [p["raw_score"] for p in b["pillars"]] == [40, 45, 50, 55, None, 50, 70]
+    # #6293 amendment: relationships is not scored in public at all (not instrumented) — no number, like Mind
+    assert [p["raw_score"] for p in b["pillars"]] == [40, 45, 50, 55, None, None, 70]
     for p in b["pillars"]:
         held = p["name"] in ("relationships", "mind")
         assert p["not_instrumented"] is held

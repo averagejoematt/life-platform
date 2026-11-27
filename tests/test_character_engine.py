@@ -33,7 +33,6 @@ from health.character_engine import (
     _compute_xp,
     _in_range_score,
     _roll_xp_buffer,
-    _social_quality_to_10,
     _weighted_pillar_score,
     character_level_up_drivers,
     compute_character_sheet,
@@ -47,7 +46,7 @@ from health.character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.8.0"  # #1411: fitted-not-authored — active effects carry fit badges
+    assert ENGINE_VERSION == "1.10.0"  # #6293: journaling frequency + model-counted values out of Mind; Relationships held
 
 
 # ── F-01: Confidence scoring ──
@@ -102,133 +101,66 @@ def test_weighted_pillar_score_with_data_not_flagged():
     assert details["_not_instrumented"] is False
 
 
-def test_compute_relationships_raw_no_data_is_not_instrumented():
-    """The reported #747 scenario: none of the relationships components have a
-    real data source today (no journal_entries, no buddy_freshness_days) -> the
-    pillar is flagged, not silently rendered as a real neutral score."""
-    config = {
-        "pillars": {
-            "relationships": {
-                "components": {
-                    "social_interaction_frequency": {"weight": 0.4},
-                    "interaction_quality": {"weight": 0.3},
-                    "buddy_engagement": {"weight": 0.15},
-                    "social_mood_correlation": {"weight": 0.15},
-                }
-            }
-        }
-    }
-    raw, details = compute_relationships_raw({}, config)
-    assert raw == 50.0
-    assert details["_not_instrumented"] is True
-
-
-def test_compute_relationships_raw_with_data_is_instrumented():
-    """Once a real relationship signal shows up (e.g. journal_entries carries a
-    social_connection_score), the pillar scores normally and is no longer flagged."""
-    config = {
-        "pillars": {
-            "relationships": {
-                "components": {
-                    "social_interaction_frequency": {"weight": 0.4},
-                    "interaction_quality": {"weight": 0.3},
-                    "buddy_engagement": {"weight": 0.15},
-                    "social_mood_correlation": {"weight": 0.15},
-                }
-            }
-        }
-    }
-    data = {"journal_entries": [{"social_connection_score": 7.0}]}
-    raw, details = compute_relationships_raw(data, config)
-    assert details["_not_instrumented"] is False
-    assert raw != 50.0 or details["_confidence"] > 0  # a real (if partial) reading, not the bare placeholder
-
-
-# ── #910: categorical enriched_social_quality → numeric social_score bridge ──
-
-
 def _relationships_config():
+    # The pre-#6293 component list: a stale config that still names them must not revive them.
     return {
         "pillars": {
             "relationships": {
                 "components": {
-                    "social_interaction_frequency": {"weight": 0.4},
-                    "interaction_quality": {"weight": 0.3},
-                    "buddy_engagement": {"weight": 0.15},
-                    "social_mood_correlation": {"weight": 0.15},
+                    "social_interaction_frequency": {"weight": 0.45},
+                    "interaction_quality": {"weight": 0.35},
+                    "social_mood_correlation": {"weight": 0.2},
                 }
             }
         }
     }
 
 
-def test_social_quality_scale_map_full_domain():
-    """The four ordered categories spread evenly across the 0–10 scale by rank:
-    alone→0, surface→3.33, meaningful→6.67, deep→10. The consumer's
-    `social_score * 10` then lands them at the intuitive quartiles 0/33/67/100 %."""
-    assert _social_quality_to_10("alone") == 0.0
-    assert round(_social_quality_to_10("surface"), 2) == 3.33
-    assert round(_social_quality_to_10("meaningful"), 2) == 6.67
-    assert _social_quality_to_10("deep") == 10.0
-    # Case / whitespace tolerant (the field is a free-form LLM string).
-    assert _social_quality_to_10(" Deep ") == 10.0
-    # Unknown / null / non-string -> None (falsy contract preserved).
-    assert _social_quality_to_10("null") is None
-    assert _social_quality_to_10("") is None
-    assert _social_quality_to_10(None) is None
-    assert _social_quality_to_10(5) is None
+def test_compute_relationships_raw_no_data_is_not_instrumented():
+    """#747 shape: no relationship reading -> the flagged placeholder, never presented as a real neutral."""
+    raw, details = compute_relationships_raw({}, _relationships_config())
+    assert raw == 50.0
+    assert details["_not_instrumented"] is True
 
 
-def test_social_quality_bridges_interaction_frequency():
-    """A day whose only social signal is the categorical enriched_social_quality
-    now scores social_interaction_frequency — previously dead, since the numeric
-    fields are never written. deep -> 10 -> *10 -> 100."""
-    data = {"journal_entries": [{"enriched_social_quality": "deep"}]}
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] == 100.0
-    assert details["_not_instrumented"] is False
-
-
-def test_social_quality_averaged_across_entries():
-    """Multiple entries' mapped qualities are averaged (mirrors #902's mood_avg).
-    deep(10) + surface(3.33) -> avg 6.67 -> *10 -> 66.7."""
+def test_relationships_is_not_instrumented_whatever_the_journal_says():
+    """#6293 (owner ruling 2026-11-26): every input the pillar read was a model's reading of journal prose — the
+    flourishing row's social quality, the categorical enriched_social_quality, enriched themes, the model's mood. None
+    is scored: the pillar is the not-instrumented state on a day that carries every one of them, under the old config."""
     data = {
-        "journal_entries": [
-            {"enriched_social_quality": "deep"},
-            {"enriched_social_quality": "surface"},
-        ]
+        "flourishing": {"social_quality_score": 10.0, "enrichment_model": "synthetic-model"},
+        "journal_entries": [{"social_connection_score": 7.0, "enriched_social_quality": "deep"}],
+        "journal": {"themes": ["friends", "family"], "mood_avg": 8.0},
     }
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] == 66.7
+    for cfg in (_relationships_config(), {"pillars": {"relationships": {"components": {}}}}, {}):
+        raw, details = compute_relationships_raw(data, cfg)
+        assert raw == 50.0
+        assert details["_not_instrumented"] is True
+        assert details["_raw_unblended"] is None
+        assert not {"social_interaction_frequency", "interaction_quality", "social_mood_correlation"} & set(details)
 
 
-def test_social_quality_enables_mood_correlation():
-    """social_mood_correlation is gated on `social_score is not None`; #902 fixed
-    `mood`, and the categorical bridge now supplies the remaining social_score.
-    meaningful -> 6.67 (non-None) unlocks the gate; mood_avg 8.0 -> (8/10)*100."""
+def test_relationships_holds_xp_and_level_and_stays_out_of_the_headline():
+    """#6293 amendment: Relationships is out of the whole chain — stored as its reason with NO number (no neutral 50, no
+    level, no XP), out of the headline mean, and no transition is captured for it."""
+    import json as _json
+
+    config = _json.load(open(os.path.join(os.path.dirname(__file__), "..", "config", "character_sheet.json")))
     data = {
-        "journal": {"mood_avg": 8.0},
-        "journal_entries": [{"enriched_social_quality": "meaningful"}],
+        "date": "2026-10-01",
+        "journal_entries": [{"enriched_social_quality": "deep"}],
+        "journal": {"themes": ["friends"], "mood_avg": 9.0},
+        "flourishing": {"social_quality_score": 10.0},
     }
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_mood_correlation"]["score"] == 80.0
-
-
-def test_numeric_social_score_takes_precedence_over_quality():
-    """The numeric field stays the primary path; the categorical is only a
-    fallback. A numeric 7 wins even when enriched_social_quality is also present."""
-    data = {"journal_entries": [{"social_connection_score": 7.0, "enriched_social_quality": "alone"}]}
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] == 70.0
-
-
-def test_unknown_social_quality_leaves_both_components_none():
-    """An unrecognized / null category leaves social_score None -> both social
-    components stay None (falsy contract preserved), even with mood present."""
-    data = {"journal": {"mood_avg": 8.0}, "journal_entries": [{"enriched_social_quality": "null"}]}
-    raw, details = compute_relationships_raw(data, _relationships_config())
-    assert details["social_interaction_frequency"]["score"] is None
-    assert details["social_mood_correlation"]["score"] is None
+    prev = {"character_level": 5, "pillar_relationships": {"level": 1, "xp_total": 0, "xp_debt": 0}}
+    rec = compute_character_sheet(data, prev, {}, config)
+    rel = rec["pillar_relationships"]
+    assert rel["not_instrumented"] is True and rel["coverage_hold"] is True
+    assert not {"raw_score", "level_score", "level", "tier", "xp_total", "xp_delta", "xp_debt"} & set(rel)
+    assert "relationships" in rec["headline_excluded_pillars"]
+    assert rec["uninstrumented_pillars"] == ["relationships"]
+    assert "relationships" not in rec["progression_transitions"]["pillars"]
+    assert rel["not_instrumented_note"] == config["pillars"]["relationships"]["not_instrumented_note"]
 
 
 def test_compute_character_sheet_propagates_not_instrumented_and_note():
@@ -261,44 +193,49 @@ def test_compute_character_sheet_propagates_not_instrumented_and_note():
     assert sleep_p["not_instrumented_note"] is None
 
 
-# ── F-02: XP decay ──
+# ── F-02 / #6293: XP never falls — no decay, no debt ──
 
 
-def test_xp_decays_on_mediocre_day():
-    """Score 40 earns +1 XP but decay -2 -> net -1."""
-    config = {
-        "xp_bands": [{"min_raw_score": 40, "xp": 1}, {"min_raw_score": 0, "xp": -1}],
-        "leveling": {"daily_xp_decay": 2},
+def test_xp_mediocre_day_nets_zero():
+    """Raw 45 sits at the zero-point (net band 0): no credit, no loss."""
+    config = {"xp_bands": [{"min_raw_score": 40, "xp": 0}, {"min_raw_score": 0, "xp": -2}], "leveling": {}}
+    assert _compute_xp(45, 100, config) == (0, 0, 100, 0)
+
+
+def test_xp_low_measured_day_earns_zero_and_no_debt():
+    """#6293: a genuinely low measured day earns zero — XP never drops and no debt accrues."""
+    config = {"xp_bands": [{"min_raw_score": 0, "xp": -2}], "leveling": {}}
+    assert _compute_xp(10, 1, config) == (0, 0, 1, 0)
+
+
+def test_xp_legacy_gross_bands_with_decay_give_the_same_credit():
+    """A stale S3 config (gross bands +3..-1 with daily_xp_decay 1) credits exactly what the net v1.7.0 bands do."""
+    gross = {
+        "xp_bands": [
+            {"min_raw_score": 80, "xp": 3},
+            {"min_raw_score": 60, "xp": 2},
+            {"min_raw_score": 40, "xp": 1},
+            {"min_raw_score": 0, "xp": -1},
+        ],
+        "leveling": {"daily_xp_decay": 1},
     }
-    earned, delta, new_xp, debt = _compute_xp(45, 100, config)
-    assert earned == 1
-    assert delta == -1  # 1 earned - 2 decay
-    assert new_xp == 99  # 100 + 1 - 2
-    assert debt == 0  # positive balance -> no debt
-
-
-def test_xp_floors_at_zero_with_visible_debt():
-    """#913: xp_total still floors at 0 (downstream % consumers untouched),
-    but the shortfall is now a visible xp_debt instead of vanishing."""
-    config = {
-        "xp_bands": [{"min_raw_score": 0, "xp": -1}],
-        "leveling": {"daily_xp_decay": 2},
+    net = {
+        "xp_bands": [
+            {"min_raw_score": 80, "xp": 2},
+            {"min_raw_score": 60, "xp": 1},
+            {"min_raw_score": 40, "xp": 0},
+            {"min_raw_score": 0, "xp": -2},
+        ],
+        "leveling": {},
     }
-    _, _, new_xp, debt = _compute_xp(10, 1, config)
-    assert new_xp == 0  # Can't go negative
-    assert debt == 2  # 1 - 3 = -2 -> the bleed is visible, not silent
+    for raw in (5, 25, 45, 65, 85):
+        assert _compute_xp(raw, 100, gross) == _compute_xp(raw, 100, net)
 
 
 def test_xp_grows_on_good_day():
-    config = {
-        "xp_bands": [{"min_raw_score": 80, "xp": 3}, {"min_raw_score": 0, "xp": -1}],
-        "leveling": {"daily_xp_decay": 2},
-    }
+    config = {"xp_bands": [{"min_raw_score": 80, "xp": 2}, {"min_raw_score": 0, "xp": -2}], "leveling": {}}
     earned, delta, new_xp, debt = _compute_xp(85, 100, config)
-    assert earned == 3
-    assert delta == 1  # 3 earned - 2 decay
-    assert new_xp == 101
-    assert debt == 0
+    assert (earned, delta, new_xp, debt) == (2, 2, 102, 0)
 
 
 # ── F-04: Body comp sigmoid ──
@@ -339,20 +276,22 @@ def test_lab_decay_full_value():
 
 
 def test_lab_decay_expires():
-    """Labs >180 days old get zero credit."""
+    """Labs >180 days old carry no evidence: unknown (#6293 lab_ageing), never a 0."""
     labs = {"date": "2025-06-01", "apob": 80}
     score = _compute_lab_score(labs, "2026-03-01", {})
-    assert score == 0.0  # 270+ days -> fully expired
+    assert score is None  # 270+ days -> past the validity horizon
 
 
 def test_lab_decay_at_90_days():
-    """Labs at 90 days get ~50% credit."""
+    """#6293 lab_ageing: at 90 days the SCORE is unchanged — the WEIGHT is about half (the evidence factor)."""
+    from health.character_engine import lab_evidence_factor
+
     labs = {"date": "2026-01-01", "apob": 80}
     score_fresh = _compute_lab_score(labs, "2026-01-15", {})
     score_90d = _compute_lab_score(labs, "2026-04-01", {})
-    assert score_90d is not None
     assert score_fresh is not None
-    assert score_90d < score_fresh
+    assert score_90d == score_fresh
+    assert 0.45 < lab_evidence_factor(labs, "2026-04-01") < 0.55
 
 
 # ── F-09: Neutral default ──
@@ -648,18 +587,29 @@ def test_steady_76_with_active_boost_levels_up_end_to_end():
 
 
 def test_behavioral_absent_scores_zero():
-    """An unlogged behavior is a miss (0 at full weight), not dropped-to-neutral."""
-    scores = {"journal_consistency": None, "state_of_mind_valence": 60}
+    """An unlogged HABIT is a miss (0 at full weight), not dropped-to-neutral — the two-state habit rule."""
+    scores = {"t0_habit_compliance": None, "state_of_mind_valence": 60}
     config = {
-        "journal_consistency": {"weight": 0.5, "behavioral": True},
+        "t0_habit_compliance": {"weight": 0.5, "behavioral": True},
         "state_of_mind_valence": {"weight": 0.5},
     }
     score, details = _weighted_pillar_score(scores, config)
     # Both components count: (0*0.5 + 60*0.5) / 1.0 = 30, full coverage, no blend
     assert score == 30.0
     assert details["_data_coverage"] == 1.0
-    assert details["_absent_behaviors"] == ["journal_consistency"]
-    assert details["journal_consistency"] == {"score": 0.0, "weight": 0.5, "absent": True}
+    assert details["_absent_behaviors"] == ["t0_habit_compliance"]
+    assert details["t0_habit_compliance"] == {"score": 0.0, "weight": 0.5, "absent": True}
+
+
+def test_non_habit_behavioral_absent_is_unknown():
+    """#6293 amendment: any other behavioral component with no input (a reading log) is unknown — out of the sum, lowering
+    the coverage — never a zero."""
+    scores = {"reading_practice": None, "state_of_mind_valence": 60}
+    config = {"reading_practice": {"weight": 0.5, "behavioral": True}, "state_of_mind_valence": {"weight": 0.5}}
+    score, details = _weighted_pillar_score(scores, config)
+    assert details["_absent_behaviors"] == []
+    assert details["_data_coverage"] == 0.5
+    assert details["_raw_unblended"] == 60.0
 
 
 def test_measured_absent_still_neutral_blended():
@@ -672,16 +622,20 @@ def test_measured_absent_still_neutral_blended():
 
 
 def test_fully_absent_behavioral_pillar_scores_low_not_neutral():
-    """The level-13 bug: a pillar of unlogged behaviors must read ~0, not ~50."""
-    scores = {"a": None, "b": None, "c": None}
-    config = {
-        "a": {"weight": 0.4, "behavioral": True},
-        "b": {"weight": 0.3, "behavioral": True},
-        "c": {"weight": 0.3, "behavioral": True},
-    }
+    """The level-13 bug: a pillar of unlogged HABITS must read ~0, not ~50 (the two-state habit rule)."""
+    scores = {"t0_habit_compliance": None, "t1_habit_compliance": None}
+    config = {"t0_habit_compliance": {"weight": 0.6, "behavioral": True}, "t1_habit_compliance": {"weight": 0.4, "behavioral": True}}
     score, details = _weighted_pillar_score(scores, config)
     assert score == 0.0
     assert details["_data_coverage"] == 1.0  # absence IS information here
+
+
+def test_fully_absent_non_habit_pillar_is_not_instrumented():
+    """#6293: a pillar whose only inputs are absent non-habit logs has no signal at all — not a zero."""
+    scores = {"a": None, "b": None}
+    config = {"a": {"weight": 0.5, "behavioral": True}, "b": {"weight": 0.5, "behavioral": True}}
+    _score, details = _weighted_pillar_score(scores, config)
+    assert details["_not_instrumented"] is True and details["_raw_unblended"] is None
 
 
 # ── ADR-104: coverage gate — no-signal days can't move levels ──
@@ -904,14 +858,23 @@ def _scenario_day(day_index):
     return data
 
 
+def _append_judged(histories, record, config):
+    """The loader's rule (#6293): only judged pillar-days enter a history."""
+    from health.character_engine import day_is_held
+
+    for p in config["pillars"]:
+        pd = record.get(f"pillar_{p}") or {}
+        if pd.get("raw_score") is not None and not day_is_held(pd):
+            histories[p].append(pd["raw_score"])
+
+
 def test_reported_scenario_mind_lags_and_movement_sinks():
     config = _scenario_config()
     prev_state = None
     histories = {p: [] for p in config["pillars"]}
     for day in range(20):
         record = compute_character_sheet(_scenario_day(day), prev_state, histories, config)
-        for p in config["pillars"]:
-            histories[p].append(record[f"pillar_{p}"]["raw_score"])
+        _append_judged(histories, record, config)
         prev_state = record
 
     sleep_p = record["pillar_sleep"]
@@ -920,10 +883,10 @@ def test_reported_scenario_mind_lags_and_movement_sinks():
 
     # Mind never journaled / logged habits: raw is stress-only ≈ 15, far below sleep
     assert mind_p["raw_score"] < 30 < sleep_p["raw_score"]
-    # Habit logging vanished entirely (record absent → behavioral zero, flagged);
-    # journaling shows as a scored 0/100 (the 14d count always exists) — both honest.
+    # Habit logging vanished entirely (record absent → behavioral zero, flagged, the owner-ruled two-state habit);
+    # #6293: journaling frequency is no longer scored at all — a config that still lists it does not revive it.
     assert mind_p["absent_behaviors"] == ["t0_habit_compliance"]
-    assert mind_p["components"]["journal_consistency"]["score"] == 0.0
+    assert "journal_consistency" not in mind_p["components"]
     # Movement collapsed after workouts stopped on day 13
     assert move_p["raw_score"] == 0.0
     # #747: the scenario never feeds a relationships signal (no journal_entries) —
@@ -933,7 +896,7 @@ def test_reported_scenario_mind_lags_and_movement_sinks():
     assert mind_p["level"] < sleep_p["level"]
     assert move_p["level"] < sleep_p["level"]
     # And the sheet differentiates: pillar levels spread, not one shared number
-    levels = [record[f"pillar_{p}"]["level"] for p in config["pillars"]]
+    levels = [record[f"pillar_{p}"]["level"] for p in config["pillars"] if p != "relationships"]
     assert max(levels) - min(levels) >= 6
     # Overall level sits below the best pillar — it's a weighted floor of a mixed story
     assert record["character_level"] < sleep_p["level"]
@@ -947,8 +910,7 @@ def test_reported_scenario_down_levels_after_stop():
     peak_move_level = 1
     for day in range(35):  # extend past the stop to let the EMA + shield drain
         record = compute_character_sheet(_scenario_day(day), prev_state, histories, config)
-        for p in config["pillars"]:
-            histories[p].append(record[f"pillar_{p}"]["raw_score"])
+        _append_judged(histories, record, config)
         if day == 12:
             peak_move_level = record["pillar_movement"]["level"]
         prev_state = record
@@ -1006,7 +968,7 @@ def test_character_level_up_event_persists_drivers():
     # Exactly the record's own top raw scores, highest first — persisted and
     # read-time attribution agree on the day the event fires.
     expected = sorted(
-        ((k.replace("pillar_", ""), rec[k]["raw_score"]) for k in rec if k.startswith("pillar_") and (rec[k]["raw_score"] or 0) > 0),
+        ((k.replace("pillar_", ""), rec[k]["raw_score"]) for k in rec if k.startswith("pillar_") and (rec[k].get("raw_score") or 0) > 0),
         key=lambda t: -t[1],
     )[:3]
     assert [(d["pillar"], d["raw_score"]) for d in drivers] == [(n, round(float(s), 1)) for n, s in expected]

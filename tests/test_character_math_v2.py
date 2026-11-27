@@ -7,7 +7,8 @@ Covers the seven mechanics the 2026-07 math audit flagged
   - #964: XP earn/decay gated on coverage_hold / not_instrumented
   - #961: food-delivery modifier + challenge XP as ENGINE inputs (provenance,
           debt-first paydown, stored raw == engine-scored raw)
-  - #959: persistent down-streak + buffer bypass during confirmed dark stretches
+  - #959: persistent down-streak + buffer bypass during dark stretches — RETIRED by #6293 (guarded below)
+  - #6293 amendment: XP never falls (no decay, no debt); the shield drains on measured verdicts only
   - #960: headline weighted mean renormalized over instrumented pillars
   - #962: derived consistency inputs + data-driven any_vice_streak conditions
   - #954 sizing: xp_buffer fill capped at leveling.xp_buffer_cap
@@ -124,23 +125,21 @@ def test_xp_mediocre_day_breaks_even():
     assert debt == 0
 
 
-def test_xp_bad_day_still_bleeds():
-    """Raw < 20 keeps bleeding — the retraction signal survives the retune."""
+def test_xp_bad_day_earns_zero_and_no_debt():
+    """#6293: raw < 20 is a measured low day — it earns zero; XP never drops and no debt accrues."""
     _earned, delta, new_xp, debt = _compute_xp(10, 1, _cfg(), day_number=30)
-    assert delta == -2
-    assert new_xp == 0
-    assert debt == 1
+    assert (delta, new_xp, debt) == (0, 1, 0)
 
 
-def test_xp_debt_repayable_by_realistic_living():
-    """A dark-stretch debt pays down day by day at raw ~65 — never a one-way
-    ratchet (the pre-v2 economy needed raw 80+ to move debt at all)."""
-    debt = 30
-    xp = 0
-    for _ in range(30):
-        _e, _d, xp, debt = _compute_xp(65, xp, _cfg(), day_number=100, previous_debt=debt)
-    assert debt == 0
-    assert xp == 0  # 30 days x net +1 exactly clears the 30-debt hole
+def test_bad_day_still_drains_the_demotion_shield():
+    """The retraction signal survives in the shield: a measured low day's signed verdict drains it."""
+    assert ce.xp_shield_delta(10, False, 0, _cfg()) == -2
+    assert ce.xp_shield_delta(10, True, 0, _cfg()) == 0  # a held day: no signal, no drain
+
+
+def test_a_stored_debt_is_forgiven():
+    _e, _d, xp, debt = _compute_xp(65, 0, _cfg(), day_number=100, previous_debt=30)
+    assert (xp, debt) == (1, 0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -172,17 +171,16 @@ def test_uninstrumented_pillar_accrues_no_xp_and_no_debt():
         data = {"date": f"2026-08-{(day % 28) + 1:02d}", "apple": {"steps": 9000}}
         rec = compute_character_sheet(data, rec, histories, cfg)
         for p, r in [(k, v) for k, v in rec.items() if k.startswith("pillar_")]:
-            histories.setdefault(p.replace("pillar_", ""), []).append(r["raw_score"])
+            if r.get("raw_score") is not None and not ce.day_is_held(r):
+                histories.setdefault(p.replace("pillar_", ""), []).append(r["raw_score"])
     rel = rec["pillar_relationships"]
     assert rel["not_instrumented"] is True
-    assert rel["xp_total"] == 0
-    assert rel["xp_debt"] == 0
-    assert rel["xp_earned"] == 0
+    assert not {"xp_total", "xp_debt", "xp_earned"} & set(rel)  # #6293: no XP fields at all — out of the chain
 
 
 def test_coverage_hold_freezes_xp_both_directions():
     """A below-floor-coverage day carries no XP judgment (mirrors the level
-    gate): prior XP and prior debt both carry over untouched."""
+    gate): prior XP carries over untouched; a stored debt is forgiven (#6293)."""
     cfg = _cfg()
     # movement scored only by the measured component -> coverage 0.4 < 0.5
     prev = {
@@ -199,7 +197,7 @@ def test_coverage_hold_freezes_xp_both_directions():
     mv = rec["pillar_movement"]
     assert mv["coverage_hold"] is True
     assert mv["xp_total"] == 37
-    assert mv["xp_debt"] == 12
+    assert mv["xp_debt"] == 0
     assert mv["xp_earned"] == 0
     assert mv["xp_delta"] == 0
 
@@ -229,19 +227,14 @@ def test_raw_modifier_applies_before_gates_with_provenance():
     assert mv_mod["xp_earned"] <= mv_base["xp_earned"]
 
 
-def test_challenge_bonus_pays_debt_before_growing_xp():
-    """+15 challenge XP against a 10-debt hole ends at debt 0 / xp 5+delta —
-    never a straight xp_total += that teleports past the paydown contract."""
+def test_challenge_bonus_credits_in_full():
+    """#6293: no debt to pay first — a challenge's XP credits in full."""
     earned, delta, new_xp, debt = _compute_xp(45, 0, _cfg(), day_number=50, previous_debt=10, bonus_xp=15)
-    assert earned == 1  # band credit unchanged
-    assert delta == 15  # net 0 day + 15 bonus
-    assert debt == 0
-    assert new_xp == 5
+    assert (earned, delta, new_xp, debt) == (0, 15, 15, 0)
 
 
-def test_challenge_bonus_credits_even_on_hold_days_debt_first():
-    cfg = _cfg()
-    cfg2 = copy.deepcopy(cfg)
+def test_challenge_bonus_credits_even_on_hold_days():
+    cfg2 = copy.deepcopy(_cfg())
     cfg2["pillars"]["movement"]["components"]["sessions"] = {"weight": 0.6}  # measured
     prev = {
         "character_level": 5,
@@ -251,9 +244,7 @@ def test_challenge_bonus_credits_even_on_hold_days_debt_first():
     rec = compute_character_sheet(data, prev, {}, cfg2)
     mv = rec["pillar_movement"]
     assert mv["coverage_hold"] is True
-    assert mv["xp_debt"] == 0  # 20 bonus pays the 12 hole first
-    assert mv["xp_total"] == 8
-    assert mv["challenge_bonus_xp"] == 20
+    assert (mv["xp_debt"], mv["xp_total"], mv["challenge_bonus_xp"]) == (0, 20, 20)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -272,50 +263,16 @@ def _down_pressure_state(level=30, streak_below=7, xp_buffer=0.0):
     }
 
 
-def test_dark_down_streak_persists_across_drops():
-    state = evaluate_level_changes(
-        "movement", 10.0, _down_pressure_state(streak_below=7), _cfg(), data_coverage=0.6, raw_score=5.0, presence_dark=True
-    )
-    assert state["level"] < 30
-    assert state["streak_below"] == 8  # incremented, NOT reset to 0
-    # Next dark day drops again immediately — no fresh 7-day re-arm.
-    state2 = evaluate_level_changes("movement", 10.0, state, _cfg(), data_coverage=0.6, raw_score=5.0, presence_dark=True)
-    assert state2["level"] < state["level"]
-
-
-def test_engaged_down_streak_still_resets():
-    """The anti-flip-flop reset is untouched for noisy engaged data."""
-    state = evaluate_level_changes(
-        "movement", 10.0, _down_pressure_state(streak_below=7), _cfg(), data_coverage=0.9, raw_score=12.0, presence_dark=False
-    )
+def test_dark_rules_are_retired_the_down_streak_resets_and_the_shield_holds():
+    """#6293: presence no longer reaches the level gate — every drop re-arms the anti-flip-flop streak and a full shield
+    holds measured pressure whatever the presence class."""
+    state = evaluate_level_changes("movement", 10.0, _down_pressure_state(streak_below=7), _cfg(), data_coverage=0.6, raw_score=5.0)
     assert state["level"] < 30
     assert state["streak_below"] == 0
-
-
-def test_dark_bypasses_the_xp_buffer_shield():
-    state = evaluate_level_changes(
-        "movement",
-        10.0,
-        _down_pressure_state(streak_below=7, xp_buffer=40.0),
-        _cfg(),
-        data_coverage=0.6,
-        raw_score=5.0,
-        presence_dark=True,
+    shielded = evaluate_level_changes(
+        "movement", 10.0, _down_pressure_state(streak_below=7, xp_buffer=40.0), _cfg(), data_coverage=0.6, raw_score=5.0
     )
-    assert state["level"] < 30  # a full buffer holds an ENGAGED dip, never a dark one
-
-
-def test_engaged_buffer_still_shields():
-    state = evaluate_level_changes(
-        "movement",
-        10.0,
-        _down_pressure_state(streak_below=7, xp_buffer=40.0),
-        _cfg(),
-        data_coverage=0.9,
-        raw_score=12.0,
-        presence_dark=False,
-    )
-    assert state["level"] == 30
+    assert shielded["level"] == 30
 
 
 def test_buffer_fill_caps_at_config_cap():
@@ -345,9 +302,9 @@ def test_headline_excludes_never_instrumented_pillar():
     assert rec["character_level"] == rec["pillar_movement"]["level"]
 
 
-def test_headline_keeps_pillar_once_it_has_leveled():
-    """A pillar that EARNED levels then went dark still counts — going dark
-    drags honestly instead of vanishing from the mean."""
+def test_headline_excludes_relationships_even_with_a_stored_level():
+    """#6293: Relationships is out of the mean even when an older record stored an earned level for it — that level came
+    from model-coded journal readings the method no longer scores."""
     cfg = _cfg()
     prev = {
         "character_level": 30,
@@ -355,9 +312,8 @@ def test_headline_keeps_pillar_once_it_has_leveled():
         "pillar_relationships": {"level": 20, "tier": "Foundation", "streak_above": 0, "streak_below": 0, "xp_total": 0},
     }
     rec = compute_character_sheet(_movement_data(), prev, {}, cfg)
-    assert rec["pillar_relationships"]["not_instrumented"] is True
-    assert "relationships" not in rec["headline_excluded_pillars"]
-    assert rec["character_level"] == 30  # floor((40*.5 + 20*.5))
+    assert "relationships" in rec["headline_excluded_pillars"]
+    assert rec["character_level"] == rec["pillar_movement"]["level"]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -382,7 +338,7 @@ def test_streak_counts_consecutive_days_all_above_30():
     assert out["streak_all_above_30th"] == 3
 
 
-def test_streak_breaks_on_sub_30_day_and_on_gap():
+def test_streak_breaks_on_sub_30_day_and_skips_a_gap():
     below = [
         _rec("2026-08-01", {"sleep": 55, "movement": 25, "nutrition": 45, "metabolic": 50, "mind": 40}),
         _rec("2026-08-02", {"sleep": 62, "movement": 33, "nutrition": 47, "metabolic": 52, "mind": 41}),
@@ -390,10 +346,10 @@ def test_streak_breaks_on_sub_30_day_and_on_gap():
     assert derive_consistency_inputs(below, "2026-08-03")["streak_all_above_30th"] == 1
     gapped = [
         _rec("2026-08-01", {"sleep": 55, "movement": 60, "nutrition": 45, "metabolic": 50, "mind": 40}),
-        # 08-02 missing entirely — a gap is not a floor held
+        # 08-02 missing entirely — #6293: silence neither extends nor breaks the streak
         _rec("2026-08-03", {"sleep": 58, "movement": 35, "nutrition": 49, "metabolic": 51, "mind": 44}),
     ]
-    assert derive_consistency_inputs(gapped, "2026-08-04")["streak_all_above_30th"] == 1
+    assert derive_consistency_inputs(gapped, "2026-08-04")["streak_all_above_30th"] == 2
 
 
 def test_weekend_weekday_ratio_needs_enough_of_both():
@@ -492,15 +448,15 @@ def test_strength_sessions_scores_distinct_hevy_days():
     assert d4["strength_sessions"]["score"] == 100.0
 
 
-def test_strength_sessions_unlogged_week_scores_zero_behavioral():
-    """No hevy days -> honest 0 (measured absence of the behavior). A missing
-    data key (fetch failure / legacy caller) -> None -> the behavioral flag
-    scores it 0 at full weight and lists it absent. Both roads end at 0."""
+def test_strength_sessions_unlogged_week_scores_zero_missing_key_is_unknown():
+    """No hevy days in a fetched week -> honest 0 (a measured count of zero). #6293 amendment: a missing data key (fetch
+    failure / legacy caller) is unknown — out of the sum, lowering the coverage — never a zero (only habits are
+    two-state)."""
     _raw, details = ce.compute_movement_raw({"hevy_workout_days_7d": []}, _wiring_config())
     assert details["strength_sessions"]["score"] == 0.0
     _raw2, d2 = ce.compute_movement_raw({}, _wiring_config())
-    assert d2["strength_sessions"]["score"] == 0.0
-    assert "strength_sessions" in d2["_absent_behaviors"]
+    assert d2["strength_sessions"]["score"] is None
+    assert "strength_sessions" not in d2["_absent_behaviors"]
 
 
 def test_reading_practice_scores_session_days():

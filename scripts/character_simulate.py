@@ -32,7 +32,12 @@ import character_sheet_lambda as csl  # noqa: E402
 from common.constants import EXPERIMENT_START_DATE  # noqa: E402
 from health import character_engine  # noqa: E402
 
-PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+# #6293: an uninstrumented pillar (Relationships) has no chain — no raw score, level or XP to simulate
+PILLARS = [
+    p
+    for p in ("sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency")
+    if p not in character_engine.UNINSTRUMENTED_PILLARS
+]
 
 
 def main():
@@ -63,7 +68,8 @@ def main():
         data = csl.assemble_data(d)
         record = character_engine.compute_character_sheet(data, prev_state, histories, config)
         for p in PILLARS:
-            histories[p].append(record[f"pillar_{p}"]["raw_score"])
+            if not character_engine.day_is_held(record[f"pillar_{p}"]):  # #6293: the loader's rule — held days never enter a history
+                histories[p].append(record[f"pillar_{p}"]["raw_score"])
         cells = []
         for p in PILLARS:
             pd = record[f"pillar_{p}"]

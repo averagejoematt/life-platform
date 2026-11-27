@@ -202,10 +202,12 @@ def test_composite_note_is_silent_once_every_pillar_is_instrumented(monkeypatch)
     assert (ch["composite_pillar_count"], ch["composite_pillar_total"]) == (5, 7) and ch["composite_note"]
     monkeypatch.setattr(activity_publication, "source_is_public", lambda s: True)
     ch = json.loads(vitals.handle_character()["body"])["character"]
-    # #6224: Mind stays unscored in public whatever the source policy says (owner rulings 2026-11-26)
-    assert ch["composite_pillar_count"] == 6
+    # #6224: Mind stays unscored in public whatever the source policy says (owner rulings 2026-11-26); #6293 amendment:
+    # so does Relationships (not instrumented in either method) — each named with its OWN reason
+    assert ch["composite_pillar_count"] == 5
     assert ch["composite_pillar_total"] == 7
     assert ch["composite_note"] == (
-        "composite_score is the mean of 6 of 7 pillars — Mind (not scored in public: its inputs are private) is excluded, "
+        "composite_score is the mean of 5 of 7 pillars — Mind (not scored in public: its inputs are private) and "
+        "Relationships (not instrumented: no defensible, approved relationship assessment exists yet) are excluded, "
         "not averaged in at a neutral score."
     )

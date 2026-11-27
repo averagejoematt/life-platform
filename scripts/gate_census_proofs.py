@@ -5413,3 +5413,29 @@ STRUCTURAL_HAND_PROOFS["structural::test_development_profile_6294.py"] = {
     ),
     "proved_on": "2026-11-27",
 }
+
+# #6224 — the public method v3 contract file, a structural gate since it sweeps site/method/**, site/assets/js and www/
+# (src, content, public) for a private rest classification (owner ruling 2026-11-27: "Planned rest remains private-only.
+# Correct the public methodology wording without ... exposing private rest classifications").
+STRUCTURAL_HAND_PROOFS["structural::test_public_method_v3_6224.py"] = {
+    "gate_name": "test_public_method_v3_6224.py",
+    "command": "python3 -m pytest tests/test_public_method_v3_6224.py -q -p no:cacheprovider   # baseline 13 passed",
+    "mutation": (
+        "Two plants in the REAL committed site/method/game/index.html, one at a time, each reverted with git checkout and the "
+        "file's md5 read before (1ab95fd5…), during (68fca6f8… for M1) and after (1ab95fd5…, byte-identical): M1 the old "
+        "sentence '<li><strong>Planned rest is not inactivity.</strong> A day recorded as a sick day or a travel day leaves "
+        "Movement's weekly windows.</li>' inserted before the dark section's closing </ul>; M2 'with no adjustment for rest' "
+        "changed to 'with no adjustment for xx'."
+    ),
+    "observed": (
+        "2026-11-27, #6319 lane. BASELINE 13 passed. M1 1 failed (test_no_public_method_page_or_script_names_a_private_rest_"
+        "classification, hits on site/method/game/index.html: planned rest, sick day, travel day). M2 1 failed (the same "
+        "test, the public rule's sentence missing). REVERTED 13 passed."
+    ),
+    "scope": (
+        "Every .html/.js/.mjs/.astro/.md/.mdx/.json/.ts file under site/method, site/assets/js and www/src, www/content, "
+        "www/public (node_modules, dist and .astro skipped), case-insensitive. NOT SEEN: a built www/dist and the deployed "
+        "pages — the web gate builds and the post-deploy route checks read those."
+    ),
+    "proved_on": "2026-11-27",
+}
