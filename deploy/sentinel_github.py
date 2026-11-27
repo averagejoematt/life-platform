@@ -104,6 +104,8 @@ PUSH_TRIGGER_GLOBS = (
     "scripts/publish_snapshot*.py",  # #5602 — the producer's sibling mappers (web-gate.yml), so a mapper change runs the gate
     "scripts/check_www_build.py",  # #5530 — its build gate
     "deploy/www_owned_paths.py",  # #5534 — the owned-paths reader the build gate's drift check imports (web-gate.yml)
+    "deploy/smoke_test_site.sh",  # #6320 — its page assertions are held to the built pages before the publish (web-gate.yml)
+    "scripts/www_smoke_pins.py",  # #6320 — the reader of those assertions
     "tests/web_preview_gate.py",  # #5530 — its render gate
     "deploy/www_preview_sync.sh",  # #5530 — its preview sync
     ".github/workflows/web-preview-deploy.yml",  # #5530 — the preview deploy exercises itself
