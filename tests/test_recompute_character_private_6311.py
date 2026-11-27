@@ -615,3 +615,32 @@ def test_ladder_states_reader_refuses_a_plan_without_them(seeded, tmp_path):
     assert A.planned_sheets(path)  # an older plan still reads (the field is additive)
     with pytest.raises(T.PlanGuardError):
         A.ladder_states(path)
+
+
+def test_stored_states_are_the_baseline_replay_residual_is_measured_from(seeded, tmp_path):
+    import recompute_character_private_report as R
+
+    store, plan = seeded
+    (tmp_path / "out").mkdir(exist_ok=True)
+    path = T.write_outputs(plan, str(tmp_path / "out"))["plan"]
+    stored = A.stored_states(path)
+    raw = {d: T.as_float(T.to_typed(store.get(T.SHEET_PK, f"DATE#{d}"))) for d in stored}
+    assert stored == {d: R.chain_state(raw[d]) for d in sorted(raw)}
+    first = A.ladder_states(path)["replay_residual"]
+    by_step = {d: set(a["by_step"].get("replay_residual", [])) for d, a in plan["attribution"].items()}
+    for d in stored:  # a state difference exists exactly where replay_residual changed the attribute behind it
+        assert (stored[d]["character_level"] != first[d]["character_level"]) == ("character_level" in by_step[d]), d
+        assert (stored[d]["character_xp"] != first[d]["character_xp"]) == ("character_xp" in by_step[d]), d
+        for p in R.STATE_PILLARS:
+            if stored[d]["pillars"][p] != first[d]["pillars"][p]:
+                assert f"pillar_{p}" in by_step[d], (d, p)
+    assert any(stored[d] != first[d] for d in stored)  # the seed's retired debt and missing chain fields do differ
+
+
+def test_stored_states_reader_refuses_a_plan_without_them(seeded, tmp_path):
+    _store, plan = seeded
+    (tmp_path / "out").mkdir(exist_ok=True)
+    path = T.write_outputs({k: v for k, v in plan.items() if k != "stored_states"}, str(tmp_path / "out"))["plan"]
+    assert A.ladder_states(path)  # the other readers still work
+    with pytest.raises(T.PlanGuardError):
+        A.stored_states(path)
