@@ -341,14 +341,15 @@ def claim_outbound(
     """
     if provenance is not None and now_pt is not None:
         cap = effective_cap(provenance, now_pt, cap)
-    names = {"#total": "total", "#ttl": "ttl"}  # both are DynamoDB reserved words
+    names = {"#total": "total", "#ttl": "ttl", "#hold": SAFETY_HOLD_FIELD}  # total/ttl are DynamoDB reserved words
     values = {
         ":one": 1,
         ":cap": cap,
         ":rt": "coach_outbound_ledger",
         ":ttl": int((now_ts if now_ts is not None else time.time()) + LEDGER_TTL_DAYS * 86400),
     }
-    condition = "(attribute_not_exists(#total) OR #total < :cap)"
+    # #6303: a day held by ``hold_day`` admits no unsolicited text at all, whatever the cap.
+    condition = "attribute_not_exists(#hold) AND (attribute_not_exists(#total) OR #total < :cap)"
     add_clause = "#total :one"
     if referral:
         names["#ref"] = "referrals"
@@ -366,9 +367,42 @@ def claim_outbound(
         return True
     except Exception as e:  # noqa: BLE001 — ConditionalCheckFailed = cap reached
         if "ConditionalCheckFailed" in type(e).__name__ or "ConditionalCheckFailed" in str(e):
-            logger.info("[outbound] daily cap reached for %s (referral=%s) — standing down", date_pt, referral)
+            logger.info("[outbound] daily cap reached or day held for %s (referral=%s) — standing down", date_pt, referral)
         else:
             logger.warning("[outbound] ledger claim failed (%s) — standing down", e)
+        return False
+
+
+# #6303: the same-day hold after the owner-channel gate answered a self-harm statement.
+SAFETY_HOLD_FIELD = "safety_hold"
+
+
+def hold_day(table, date_pt: str, *, now_ts: Optional[float] = None) -> bool:
+    """Close the day's unsolicited-outbound budget: no check-in, event ping or referral today.
+
+    Called by ``coach.owner_safety`` after it sent the fixed self-harm reply. It rides the
+    existing day row because ``claim_outbound`` already reads it atomically on every
+    unsolicited send, so the hold costs one write and no new read anywhere. The row keeps
+    its 30-day TTL. Only a flag and a timestamp are written, never message text, and nothing
+    is notified: the absence of a cheerful text is the whole effect. A failed write
+    returns False and is logged; the reply he needed has already gone out.
+    """
+    now = now_ts if now_ts is not None else time.time()
+    try:
+        table.update_item(
+            Key={"pk": LEDGER_PK, "sk": ledger_sk(date_pt)},
+            UpdateExpression="SET #hold = :t, safety_hold_ts = :ts, record_type = :rt, #ttl = if_not_exists(#ttl, :ttl)",
+            ExpressionAttributeNames={"#hold": SAFETY_HOLD_FIELD, "#ttl": "ttl"},
+            ExpressionAttributeValues={
+                ":t": True,
+                ":ts": int(now),
+                ":rt": "coach_outbound_ledger",
+                ":ttl": int(now + LEDGER_TTL_DAYS * 86400),
+            },
+        )
+        return True
+    except Exception as e:  # noqa: BLE001 — fail-soft: the hold is a courtesy, the reply already went
+        logger.warning("[outbound] safety hold write failed for %s: %s", date_pt, type(e).__name__)
         return False
 
 

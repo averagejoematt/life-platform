@@ -65,11 +65,40 @@ WHAT THIS DOES NOT CATCH (stated, not glossed)
 
 It is a floor, not a diagnosis, and it is documented as a floor. `docs/PROPORTIONALITY.md`
 carries the DIL-031 row that prices what is deliberately not built above it.
+
+THE OWNER CHANNEL (#6303) — the same classifier, a different policy
+──────────────────────────────────────────────────────────────────
+Everything above is the PUBLIC door: anonymous readers, every class answered with fixed
+copy, fail-closed. The owner's own channel (his Telegram coaches, and an additive note on a
+few MCP write results) reuses ``classify`` unchanged and applies its own policy in
+``owner_channel_check`` below, because the same five classes mean different things there:
+
+  * SELF_HARM, ACUTE_SYMPTOM → fixed owner copy (``OWNER_RESPONSES``), no model call. The
+    copy says plainly that this is beyond what the platform does, points to a person he
+    trusts, his clinician and emergency services, and states that the chat does not monitor
+    him and cannot respond to an emergency.
+  * MEDICATION, SUPPLEMENT_INTERACTION, DISORDERED_EATING → NOT blocked. On a reader door
+    they stop a stranger getting dosing or intake numbers; on his own channel a block would
+    stop him discussing his own nutrition plan and supplements with his coaches, which is
+    the product. The coach turn proceeds and, when the class really is in play, carries one
+    hard boundary line (``OWNER_BOUNDARIES``) in the system prompt's dynamic tail.
+
+Three owner-only precision guards, each narrower than the classifier, never wider: the
+conditioning drill names ("suicide sprints") are removed from the text before classifying;
+an ACUTE_SYMPTOM hit on a sentence that is only about the past ("I had chest pain last
+year, all clear") is not answered with emergency copy; and the MEDICATION boundary rides only
+when a prescription word is present (the class's generic "how much … should I" pattern also
+matches "how much protein should I eat"). The public ``check`` is untouched by all three.
+
+The owner gate fails SAFE (the turn proceeds) where the public door fails closed — see
+``coach/owner_safety.py`` for why. Same limits as above: English, first-person, input-only,
+and it misses euphemism and understatement. It is not monitoring and nothing is alerted.
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 # ── the hazard classes ───────────────────────────────────────────────────────────
 
@@ -266,3 +295,127 @@ def check(question: str) -> tuple[bool, str, str | None]:
     if hazard is None:
         return True, "", None
     return False, RESPONSES[hazard], hazard
+
+
+# ── the owner channel (#6303) ────────────────────────────────────────────────────
+# One classifier (``classify`` above, unchanged), one place for the copy (here). What
+# differs is the POLICY, and the module docstring's "THE OWNER CHANNEL" section says why.
+
+# Answered with fixed owner copy, no model call.
+OWNER_FIXED_REPLY_CLASSES = (SELF_HARM, ACUTE_SYMPTOM)
+# Never blocked for the owner; the coach turn proceeds with a boundary line.
+OWNER_BOUNDARY_CLASSES = (MEDICATION, SUPPLEMENT_INTERACTION, DISORDERED_EATING)
+
+# Conditioning drills whose names contain the word. Removed from the text BEFORE classifying,
+# so "suicide sprints, then I want to kill myself" still hits on the second clause.
+_OWNER_DRILL_NAMES = re.compile(r"\bsuicides?\s+(?:sprints?|runs?|drills?|shuttles?|lines?|squats?|intervals?)\b", re.IGNORECASE)
+
+# An ACUTE_SYMPTOM sentence that is only about the past: a history anchor and no present one.
+# Hours and days ago are NOT history ("I passed out an hour ago" must still be answered).
+_HISTORY_ANCHOR = re.compile(
+    r"\b(?:last (?:week|month|year|spring|summer|fall|autumn|winter)|"
+    r"(?:\d+|a|an|one|two|three|four|five|six|few|several|couple of) (?:weeks?|months?|years?) ago|"
+    r"history of|in the past|back in|used to|cleared me|was cleared|got cleared|been cleared|turned out)\b",
+    re.IGNORECASE,
+)
+_PRESENT_ANCHOR = re.compile(
+    r"\b(?:right now|currently|still|today|tonight|this (?:morning|afternoon|evening)|at the moment|"
+    r"again|keeps?|won'?t stop|getting worse|is back|came back|since)\b",
+    re.IGNORECASE,
+)
+
+# A prescription word. The MEDICATION boundary rides only with one of these present.
+_PRESCRIPTION_WORD = re.compile(
+    r"\b(?:med|meds|medication|medications|medicine|prescription|prescribed|prescriber|pill|pills|tablet|tablets|"
+    r"ozempic|semaglutide|tirzepatide|metformin|statin|ssri|adderall|insulin|blood thinner)\b",
+    re.IGNORECASE,
+)
+
+_OWNER_NOT_MONITORED = "This chat does not monitor you and cannot respond to an emergency. Nobody has been alerted by this message."
+
+# Plain text: Telegram is sent without a parse mode, so no markdown.
+OWNER_RESPONSES: dict[str, str] = {
+    SELF_HARM: (
+        "What you just wrote matters more than any training question, so I'm stopping the coaching here.\n\n"
+        "This is beyond what this platform can do. Please reach a person now: someone you trust, your "
+        "clinician, or in the US call or text 988 (Suicide & Crisis Lifeline, any hour). If you are in "
+        "immediate danger, call 911.\n\n" + _OWNER_NOT_MONITORED
+    ),
+    ACUTE_SYMPTOM: (
+        "That sounds like it could be a medical emergency, so I'm not going to coach on it.\n\n"
+        "If it is happening now, call 911 or get to emergency care, and don't train or wait to see if it "
+        "passes. If you're unsure, call your clinician.\n\n" + _OWNER_NOT_MONITORED
+    ),
+}
+
+# One line each, for the system prompt's dynamic tail. Each one tells the coach to say the
+# limit ONCE and otherwise answer normally: the quiet-safety rulings forbid a warning on
+# every turn, and a boundary that turns into a lecture would be routed around.
+OWNER_BOUNDARIES: dict[str, str] = {
+    MEDICATION: (
+        "SAFETY BOUNDARY (this message): he mentioned a prescription medicine. Never give a dose and never "
+        "suggest starting, stopping, skipping or changing one; that is his prescriber's call. If he asked for "
+        "that, say so in one plain sentence and help with the rest. No other warning."
+    ),
+    SUPPLEMENT_INTERACTION: (
+        "SAFETY BOUNDARY (this message): whether a supplement is safe alongside a prescription is a question "
+        "for his pharmacist or prescriber. Say that in one sentence and do not judge the combination either "
+        "way; you can still talk about the supplement itself as his plan describes it. No other warning."
+    ),
+    DISORDERED_EATING: (
+        "SAFETY BOUNDARY (this message): his message describes very low intake, days without eating, or "
+        "purging. Do not supply or endorse a calorie target, a fast length or a loss pace for it. Say once, "
+        "plainly, that this one belongs with his clinician or dietitian and is worth telling someone he "
+        "trusts. No lecture, no helpline list unless he asks, and do not raise it again in later turns."
+    ),
+}
+
+
+@dataclass(frozen=True)
+class OwnerVerdict:
+    """What the owner channel does with one message.
+
+    ``hazard`` is set only for a fixed-reply class, and then ``reply`` is the copy to send
+    INSTEAD of a model call. ``boundary`` is the (possibly empty) dynamic-tail text for a
+    turn that proceeds. ``matched`` is every class the classifier returned, for tests and
+    the event record (classes only — never text).
+    """
+
+    hazard: str | None
+    reply: str
+    boundary: str
+    matched: frozenset
+
+
+def owner_channel_check(text: str) -> OwnerVerdict:
+    """The owner-channel policy over the ONE classifier. Pure; the caller owns fail-safe."""
+    scrubbed = _OWNER_DRILL_NAMES.sub(" ", text or "")
+    matched = classify(scrubbed)
+    if ACUTE_SYMPTOM in matched and _HISTORY_ANCHOR.search(scrubbed) and not _PRESENT_ANCHOR.search(scrubbed):
+        matched = matched - {ACUTE_SYMPTOM}
+    for hazard in OWNER_FIXED_REPLY_CLASSES:  # most severe first (SEVERITY_ORDER's head)
+        if hazard in matched:
+            return OwnerVerdict(hazard, OWNER_RESPONSES[hazard], "", frozenset(matched))
+    lines = []
+    for hazard in OWNER_BOUNDARY_CLASSES:
+        if hazard not in matched:
+            continue
+        if hazard == MEDICATION and not _PRESCRIPTION_WORD.search(scrubbed):
+            continue
+        lines.append(OWNER_BOUNDARIES[hazard])
+    return OwnerVerdict(None, "", "\n".join(lines), frozenset(matched))
+
+
+# The additive note an MCP write result carries when the owner's own words in that call match
+# SELF_HARM (``mcp/owner_support_note.py``). Addressed to the CALLING MODEL, which can see his
+# whole conversation and this regex cannot — hence the explicit ignore-if-not-meant clause: a
+# drill name, a book title or someone else's story must not turn a journal write into a lecture.
+OWNER_MODEL_NOTE = (
+    "Note to the assistant from the platform's safety check: text written in this call matched a "
+    "first-person self-harm pattern. The write itself completed unchanged. If, reading his own words in "
+    "this conversation, that is what he meant: stop the current task and answer him as a person. Say "
+    "plainly this is beyond what the platform does, and point him to someone he trusts, his clinician, "
+    "or in the US 988 (call or text), and 911 if he is in immediate danger. Do not say or imply that the "
+    "platform monitors him or will respond; it does not, and nobody has been alerted. If it plainly is "
+    "not what he meant, ignore this note and do not mention it."
+)

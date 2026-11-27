@@ -194,7 +194,9 @@ def format_thread(thread: list, max_turns: int = MAX_THREAD_TURNS) -> list:
     return messages
 
 
-def _system_parts(persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "") -> tuple:
+def _system_parts(
+    persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "", boundary_block: str = ""
+) -> tuple:
     """(stable_prefix_parts, volatile_tail_parts) — the ONE composition both the
     string and block renderers derive from, so they cannot fork.
 
@@ -321,20 +323,29 @@ def _system_parts(persona_block: str, memory_block: str, facts_block: str, coach
         "do not contain what he asked about, say you don't have it — do not estimate, do not reach for a typical "
         "value, and do not attach today to a reading from another day. Naming the day a reading belongs to is "
         "always correct; implying a reading is today's when it is not is the one unforgivable error.",
+        # #6303: the owner-channel safety boundary for THIS message (safety_contract.OWNER_BOUNDARIES),
+        # empty on almost every turn. LAST in the tail: never cached, and closest to the reply.
+        boundary_block,
     ]
     return prefix, tail
 
 
-def build_system_prompt(persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "") -> str:
+def build_system_prompt(
+    persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "", boundary_block: str = ""
+) -> str:
     """The system message as one string: WHO the coach is, WHAT they remember, WHAT
     is true today. Kept for tests and any consumer that wants the flat text; the
     request path uses ``build_system_blocks`` so the stable prefix actually caches.
     """
-    prefix, tail = _system_parts(persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block)
+    prefix, tail = _system_parts(
+        persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block, boundary_block=boundary_block
+    )
     return "\n\n".join(p for p in prefix + tail if p)
 
 
-def build_system_blocks(persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "") -> list:
+def build_system_blocks(
+    persona_block: str, memory_block: str, facts_block: str, coach_name: str, colleagues_block: str = "", boundary_block: str = ""
+) -> list:
     """The system message as Anthropic content blocks with a real cached prefix.
 
     Until tonight this surface sent ``system`` as a plain string — the docstring
@@ -344,7 +355,9 @@ def build_system_blocks(persona_block: str, memory_block: str, facts_block: str,
     ``cache_control: ephemeral`` like every other coach surface; the volatile
     tail rides uncached behind it.
     """
-    prefix, tail = _system_parts(persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block)
+    prefix, tail = _system_parts(
+        persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block, boundary_block=boundary_block
+    )
     prefix_text = "\n\n".join(p for p in prefix if p)
     tail_text = "\n\n".join(p for p in tail if p)
     blocks = []
@@ -366,6 +379,7 @@ def build_request(
     model: str,
     max_tokens: int = 400,
     colleagues_block: str = "",
+    boundary_block: str = "",
 ) -> dict:
     """The Anthropic Messages body. Pure — builds a dict, calls nothing."""
     messages = format_thread(thread)
@@ -373,7 +387,9 @@ def build_request(
     return {
         "model": model,
         "max_tokens": max_tokens,
-        "system": build_system_blocks(persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block),
+        "system": build_system_blocks(
+            persona_block, memory_block, facts_block, coach_name, colleagues_block=colleagues_block, boundary_block=boundary_block
+        ),
         "messages": messages,
     }
 
@@ -517,6 +533,25 @@ def reaction_allowed(inbound: str, tier: Optional[int], turns_today: int, cap: i
     return coach_reactions.is_bare_acknowledgement(inbound)
 
 
+# ── The owner-channel safety boundary (#6303) ─────────────────────────────────
+
+
+def owner_boundary(inbound: str) -> str:
+    """The dynamic-tail boundary line(s) for this message, or "". Fails SAFE to "".
+
+    The policy is ``safety_contract.owner_channel_check`` (one classifier, one place for the
+    copy); this only fetches its ``boundary``. A classifier error must not cost him the turn,
+    so it yields no boundary and a log line — the transport's gate counts the same error.
+    """
+    try:
+        from ai import safety_contract
+
+        return safety_contract.owner_channel_check(inbound or "").boundary
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[coach_chat] owner boundary unavailable (turn proceeds without it): %s", type(e).__name__)
+        return ""
+
+
 # ── The turn ──────────────────────────────────────────────────────────────────
 
 
@@ -567,6 +602,7 @@ def run_turn(
     colleagues_block: str = "",
     persona_id: Optional[str] = None,
     last_reply_had_em_dash: bool = False,
+    boundary_block: Optional[str] = None,
 ) -> TurnResult:
     """One conversational turn: budget -> generate -> ground -> regenerate-or-hold.
 
@@ -585,7 +621,13 @@ def run_turn(
     this coach's own voice. ``coach_id`` is not always that key — a route-derived
     caller may pass a shorthand or an aliased route — so it is a SEPARATE param
     that defaults to ``coach_id`` only when the caller has nothing better.
+
+    ``boundary_block`` (#6303) is the owner-channel safety boundary for this message. None (every
+    production caller) derives it from ``inbound`` via ``owner_boundary``; the fixed-reply classes
+    never reach here, the transport answered them before any turn.
     """
+    if boundary_block is None:
+        boundary_block = owner_boundary(inbound)
     refusal = budget_refusal(tier, turns_today, cap, persona_id=persona_id or coach_id)
     if refusal:
         return TurnResult(refusal, "paused" if tier is not None and tier >= _PAUSE_TIER else "capped")
@@ -599,6 +641,7 @@ def run_turn(
         inbound=inbound,
         model=model,
         colleagues_block=colleagues_block,
+        boundary_block=boundary_block,
     )
 
     attempts = 0

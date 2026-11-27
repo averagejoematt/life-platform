@@ -46,6 +46,7 @@ from common.text_guards import residue_fragments  # #4190 — shared, bundled (#
 from mcp import (
     audit as mcp_audit,
     invoke_gate,  # #5540 — privileged branches gated before they run
+    owner_support_note,  # #6303 — additive support note on owner-words write results
 )
 from mcp.config import __version__, logger
 from mcp.core import (
@@ -275,6 +276,9 @@ def handle_tools_call(params):
         _pool.shutdown(wait=False)
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
         _audit_tool_call(name, arguments, "success", (time.time() - _t0) * 1000)  # #753
+        # #6303: additive, post-write, fail-safe — a support note for the calling model on the few
+        # write tools that carry his own words; never blocks or rewrites the write (mcp/owner_support_note.py).
+        result = owner_support_note.annotate(name, arguments, result)
         return _call_result(name, result)
     except Exception as e:
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=False)
