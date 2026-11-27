@@ -90,6 +90,9 @@ when the sources are put side by side.
 - Offer a look ahead only when there is something specific: a trend about to matter, a
   recommendation that has fallen due, a decision with no recorded outcome.
 - No recap of his data he did not ask for, no closing summary, no list of everything you read.
+- Plain words about saving. If something is worth recording, ask it as a question he can
+  answer in a word ("Want me to record your answer to the protein recommendation?"), never
+  as platform talk ("to route", "to log", "to enqueue").
 
 ## Writing things down
 

@@ -85,7 +85,7 @@ The same procedure applies, per skill, after a change reaches `main`:
 ```bash
 python3 scripts/check_synced_skill_drift.py --skill ask --package ~/Downloads/ask.zip
 python3 scripts/check_synced_skill_drift.py --skill reflect --package ~/Downloads/reflect.zip
-# upload each in claude.ai (Settings → Capabilities → Skills), let the app sync, then:
+# upload each in claude.ai (Settings → Plugins → Skills → Add, as of 2026-11-26), let the app sync, then:
 python3 scripts/check_synced_skill_drift.py --skill ask
 python3 scripts/check_synced_skill_drift.py --skill reflect
 ```
