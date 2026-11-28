@@ -51,6 +51,7 @@ The owner asked for a substantially better visual experience and told the sessio
 
 ## Backlog — a portfolio reset was applied on 27 Nov (another session, owner-approved)
 - 49 issues and 13 epics were closed with ADR-099 verdicts; open issues went from 172 to 115; `Now` holds 11 stories and 3 epics. Five issues were filed: #6330–#6334. No code and no merges.
+- **Corrected on 28 Nov (owner-reviewed reconciliation; the exercise is closed):** #5421 and #5821 were reopened in `Next`, each for one unmet acceptance box, so 47 of the 49 closures stand and 117 issues are open. #6268 is back in `Now` (12 stories, 3 epics). Requirements a closure had dropped now sit as acceptance sections on open issues: #6206's standing constraints on #6158, #5051's measurement outcome on #5760, #6244's email release on #6260. About 50 further proposed closures are on hold by owner ruling; no more backlog cleanup.
 - Epic consolidation: the training epics #5050, #5051, #5067, #5770 and #5861 into #6014; #5925 and #5926 into #5946; #5134 into #5928; #5945 into #5539; #6206's outcome into #6158; #5529 closed (v9 live since 1 Nov), its open stories #6114 and #6135 now under #5946.
 - Left open on request: #6195 (moved to `Next`), #6224, #6329, #6311, #6293, #6271, #6270, #6268, #6315, #6227, #6223. #4531 was to be checked before closing: the week-12 draft is still held and its alarm is red.
 - **The 25 Nov queue carried below predates that reset.** A line citing a closed issue (#5067, #6206 and others) now belongs to the epic it was folded into; read each state fresh before acting.
@@ -120,7 +121,7 @@ This session's lines first; then the 25 Nov queue, verbatim. Each line cites its
 **Incidents:** 1 row added — the first root publish of The Days rolled back on a stale smoke assertion.
 **Stash/hooks:** clean · worktree-reap removed 30 and released 24 merged locks; the recompute lanes' worktrees were left in place and are releasable.
 **Closures:** #6320, #6290 commented · DoD: scanned 64, hits 1 after commenting — #6320's post-close comment is the release evidence and the owner's acceptance, not-work.
-**Backlog:** not refilled here — an owner-approved portfolio reset the same day left `Now` at 11 stories and 3 epics (172 → 115 open); no Later sweep at this wrap.
+**Backlog:** not refilled here — an owner-approved portfolio reset the same day left `Now` at 11 stories and 3 epics (172 → 115 open; 12 stories and 117 open after the 28 Nov correction); no Later sweep at this wrap.
 **Alarms:** 2 uncited — named: swallowed-permission-denial (new episode 27 Nov, stale citation, cause not re-derived), site-api-p95-latency-sustained (a flap, #6271).
 **CI warnings:** 6 — one identical annotation six times: a Playwright test skipped where the job has no Chromium (#3640, closed as designed); no action.
 **Ledger:** none — a check added inside the existing build gate; no new standing subsystem.
